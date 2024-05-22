@@ -3,8 +3,13 @@
 #include <unordered_set>
 
 int main(int argc, char **argv) {
+  // {{{ Initialization
   PRINT_VERSION
-  // {{{ Definitiions and Arguments fo CLI
+  std::random_device rd;
+  std::mt19937 g(rd());
+  // }}}
+
+  // {{{ Definitions and arguments for CLI
   CLI::App app{
       "Keremet: "
       "a tool for k-mer-based search across a large genome collection!"};
@@ -86,61 +91,65 @@ int main(int argc, char **argv) {
   CLI11_PARSE(app, argc, argv);
   // }}}
 
-  std::ifstream tree_file(nwk_filepath.c_str());
-  std::string newick_tree((std::istreambuf_iterator<char>(tree_file)),
-                          std::istreambuf_iterator<char>());
-  // fprintf(stderr, "newick: %s", newick_tree.c_str());
-
-  std::vector<std::string> n_vec;
-  mysplit2(strdup(newick_tree.c_str()), n_vec);
-  // for (int i = 0; 0 && i < n_vec.size(); i++)
-  //   fprintf(stderr, "%d) %s\n", i, n_vec[i].c_str());
-
-  node_t *nd = parse(n_vec);
-  // node_t **lst = new node_t *[serial];
-  // serialize(nd, lst);
-
-  // fprintf(stderr, "serial: %d\n", serial);
-  // for (int i = 0; i < serial; i++)
-  //   print_node(stderr, lst[i]);
-
-  // read reference genomes and their corresponding paths
-  std::unordered_map<std::string, std::string> le_fpaths;
-  read_refmap(le_fpaths, input_filepath);
-
-  std::vector<node_t *> po_vec;
-  post_order_traversal(nd, po_vec, le_fpaths);
-  uint64_t MAXGN = 600;
-  po_vec.resize(MAXGN);
-
-  std::random_device rd;
-  std::mt19937 g(rd());
-  // std::shuffle(po_vec.begin(), po_vec.end(), g);
-
-  // get LSH positions
+  // {{{ Getting LSH positions
   vec_uint8 ppos;
   vec_uint8 npos;
   maskLSH lsh_vg;
   get_randpos(k, h, ppos, npos);
   lsh_vg = generateMaskLSH(ppos);
+  // }}}
 
-  vvec_merrec table;
+  // {{{ Parsing the Newick tree
+  std::ifstream tree_file(nwk_filepath.c_str());
+  std::string newick_tree((std::istreambuf_iterator<char>(tree_file)),
+                          std::istreambuf_iterator<char>());
+  // fprintf(stderr, "newick: %s", newick_tree.c_str());
+  std::vector<std::string> n_vec;
+  mysplit2(strdup(newick_tree.c_str()), n_vec);
+  // for (int i = 0; 0 && i < n_vec.size(); i++)
+  //   fprintf(stderr, "%d) %s\n", i, n_vec[i].c_str());
+  node_t *root = parse(n_vec);
+  // node_t **lst = new node_t *[serial];
+  // serialize(root, lst);
+  // fprintf(stderr, "serial: %d\n", serial);
+  // for (int i = 0; i < serial; i++)
+  //   print_node(stderr, lst[i]);
+  // }}}
+
+  // {{{ Read reference genomes and correspoding paths
+  std::unordered_map<std::string, std::string> le_fpaths;
+  read_refmap(le_fpaths, input_filepath);
+  // }}}
+
+  // {{{ Initialize main data structures
+  libtab root_lt;
+  root_lt.k = k;
+  root_lt.w = w;
+  root_lt.h = h;
+  root_lt.lsh_vg = lsh_vg;
+  root_lt.npos = npos;
   um_h_esset shash2desc;
+  // }}}
 
-  h_t num_rows = pow(2, 2 * h);
-  table.resize(num_rows);
-  int num_gread = 0;
-  for (auto &nd_ : po_vec) {
-    std::cout << nd_->name << ", hash: " << nd_->sh << std::endl;
-    if (le_fpaths.contains(nd_->name)) {
-      inputHandler<encT> pI({le_fpaths[nd_->name]}, k, w, h, &lsh_vg, &npos);
-      uint64_t total_genome_len = pI.extractInput(1);
-      num_gread++;
-      process_genome(nd_, pI, table, shash2desc);
-    }
-    std::cout << "genome read: " << num_gread
-              << ", record size:" << shash2desc.size() << std::endl;
-  }
+  uint64_t MAXGN = 600;
+  std::vector<node_t *> po_vec;
+  post_order_traversal(root, po_vec, root_lt, shash2desc, le_fpaths, MAXGN);
+
+  po_vec.resize(MAXGN);
+  // std::shuffle(po_vec.begin(), po_vec.end(), g);
+
+  // int num_gread = 0;
+  // for (auto &nd_ : po_vec) {
+  //   std::cout << nd_->name << ", hash: " << nd_->sh << std::endl;
+  //   if (le_fpaths.contains(nd_->name)) {
+  //     inputHandler<encT> pI({le_fpaths[nd_->name]}, k, w, h, &lsh_vg, &npos);
+  //     uint64_t total_genome_len = pI.extractInput(1);
+  //     num_gread++;
+  //     process_genome(nd_, pI, root_lt.table, shash2desc);
+  //   }
+  //   std::cout << "genome read: " << num_gread
+  //             << ", record size:" << shash2desc.size() << std::endl;
+  // }
 
   std::unordered_map<h_t, std::string> shash2names;
   for (auto nd_ : po_vec) {
