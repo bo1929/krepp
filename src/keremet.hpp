@@ -2,10 +2,10 @@
 #define _KEREMET_H
 
 #include "CLI11.hpp"
+#include "builder.hpp"
 #include "common.hpp"
 #include "lshf.hpp"
-#include "reader.hpp"
-#include "subsets.hpp"
+#include "subset.hpp"
 #include "table.hpp"
 #include "tree.hpp"
 

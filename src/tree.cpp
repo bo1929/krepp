@@ -6,7 +6,7 @@ void Tree::parse() {
   root = std::make_shared<Node>(this->getptr());
   root->parse(n_vec);
   subtree_root = root;
-  record_sptr_t tree_record = std::make_shared<Record>(root);
+  record = std::make_shared<Record>(root);
 }
 
 void Tree::split_nwk(vec<std::string> &n_vec) {
@@ -15,7 +15,7 @@ void Tree::split_nwk(vec<std::string> &n_vec) {
                       std::istreambuf_iterator<char>());
   int i = 0;
   int at = 0;
-  char buf[nwk_str.length()]; // THIS IS ENOUGH
+  char buf[nwk_str.length()];
   std::memset(buf, 0, nwk_str.length());
   for (; i < nwk_str.length(); i++) {
     if (nwk_str[i] == '\t' || nwk_str[i] == ' ' || nwk_str[i] == ';')
@@ -44,7 +44,6 @@ void Node::parse(vec<std::string> &n_vec) {
   tree->nnodes++;
   if (tree->atter >= n_vec.size())
     return;
-  // catch leaflike case;
   if (n_vec[tree->atter] != "(") {
     if (n_vec[tree->atter] != ":") {
       name = n_vec[tree->atter];
@@ -64,7 +63,6 @@ void Node::parse(vec<std::string> &n_vec) {
       shash = Subset::rehash(reinterpret_cast<uint64_t>(&shash));
     return;
   }
-  // catch recursive cases;
   if (n_vec[tree->atter] == "(") {
     while (1) {
       tree->atter++;
@@ -73,7 +71,7 @@ void Node::parse(vec<std::string> &n_vec) {
       children.back()->ix_child = nchildren;
       (children.back())->set_parent(this->getptr());
       shash += children.back()->shash;
-      card = children.back()->card;
+      card += children.back()->card;
       nchildren++;
       if (n_vec[tree->atter] == ",")
         continue;

@@ -1,12 +1,11 @@
 #include "lshf.hpp"
 
-void LSHFunction::generate_mask(std::vector<uint8_t> &ppos_v) {
+void LSHF::generate_mask() {
   sort(ppos_v.begin(), ppos_v.end(), std::greater<uint8_t>());
   std::vector<int8_t> v;
   std::vector<int8_t> g;
   int8_t lp = 31;
   int8_t jp = 0;
-
   for (int8_t j = 0; j < ppos_v.size(); j++) {
     if (j == 0) {
       v.push_back((lp - ppos_v[j]) * 2);
@@ -22,10 +21,8 @@ void LSHFunction::generate_mask(std::vector<uint8_t> &ppos_v) {
     }
   }
   g.push_back(jp);
-
   v.push_back(-1);
   g.push_back(-1);
-
   glsh_v.clear();
   glsh_v.resize(v.size() < g.size() ? v.size() : g.size());
   for (unsigned int i = 0; i < glsh_v.size(); i++) {
@@ -33,7 +30,7 @@ void LSHFunction::generate_mask(std::vector<uint8_t> &ppos_v) {
   }
 }
 
-uint32_t LSHFunction::compute_hash(uint64_t enc_bp) {
+uint32_t LSHF::compute_hash(uint64_t enc_bp) {
   uint64_t res = 0;
   unsigned int i = 0;
   while (glsh_v[i].first != -1) {
@@ -47,8 +44,8 @@ uint32_t LSHFunction::compute_hash(uint64_t enc_bp) {
   return static_cast<uint32_t>(res);
 }
 
-void LSHFunction::drop_ppos(uint64_t enc64_bp, uint64_t enc64_lr,
-                            uint32_t &enc32_bp, uint32_t &enc32_lr) {
+void LSHF::drop_ppos_encoding(uint64_t enc64_bp, uint64_t enc64_lr,
+                              uint32_t &enc32_bp, uint32_t &enc32_lr) {
   enc32_bp = 0;
   enc32_lr = 0;
   for (uint i = npos_v.size() - 1; i >= 0; --i) {

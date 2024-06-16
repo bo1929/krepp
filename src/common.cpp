@@ -1,6 +1,6 @@
 #include "common.hpp"
 
-uint num_threads;
+uint32_t num_threads;
 thread_local std::random_device rd;
 thread_local std::mt19937 gen;
 

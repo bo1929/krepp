@@ -11,15 +11,20 @@ extern "C" {
 
 KSEQ_INIT(gzFile, gzread)
 
-class Reader {
+class Builder {
   friend class DynTable;
 
 public:
-  Reader(uint8_t k, uint8_t w, sh_t shash, std::string path, lshf_sptr_t hash_func);
-  ~Reader();
-bool make_ready();
-  bool read_next_seq(){return kseq_read(kseq) >= 0;}
-  void extract_mers(vvec<mer_t> &table);
+  Builder(uint8_t k, uint8_t w, sh_t shash, std::string gpath,
+          lshf_sptr_t hash_func);
+  ~Builder();
+  bool read_next_seq() { return kseq_read(kseq) >= 0; }
+  bool set_curr_seq() {
+    name = kseq->name.s;
+    seq = kseq->seq.s;
+    len = kseq->seq.l;
+    return len >= k;
+  }
   static void compute_encoding(char *s1, char *s2, uint64_t &enc_lr,
                                uint64_t &enc_bp) {
     enc_lr = 0;
@@ -27,34 +32,35 @@ bool make_ready();
     for (; s1 < s2; s1++) {
       enc_lr <<= 1;
       enc_bp <<= 2;
-      enc_bp += static_cast<uint64_t>(seq_nt4_table[*s1]);
+      enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
       enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
     }
   }
-  static void update_encoding(char c, uint64_t &enc_lr, uint64_t &enc_bp) {
+  static void update_encoding(char *s1, uint64_t &enc_lr, uint64_t &enc_bp) {
     enc_lr <<= 1;
     enc_bp <<= 2;
     enc_lr &= 0xFFFFFFFEFFFFFFFE;
-    enc_bp += static_cast<uint64_t>(seq_nt4_table[c]);
-    enc_lr += nt4_lr_table[seq_nt4_table[c]];
+    enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
+    enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
   }
-  static size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *stream) {
-    size_t written = fwrite(ptr, size, nmemb, stream);
+  static size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *fst) {
+    size_t written = fwrite(ptr, size, nmemb, fst);
     return written;
   }
+  void extract_mers(vvec<mer_t> &table);
   std::string download_url(std::string url);
 
 private:
-  lshf_sptr_t hash_func;
-  std::string filepath;
-  bool is_url;
-  gzFile file;
-  kseq_t *kseq;
-  uint len;
-  char *name;
-  char *seq;
   uint8_t k;
   uint8_t w;
+  lshf_sptr_t hash_func;
+  std::string filepath;
+  gzFile file;
+  bool is_url;
+  kseq_t *kseq;
+  uint64_t len;
+  char *seq;
+  char *name;
   sh_t shash;
   uint64_t mask_bp;
   uint64_t mask_lr;

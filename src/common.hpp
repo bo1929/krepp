@@ -20,15 +20,15 @@
 #include <vector>
 #include <zlib.h>
 
-extern uint num_threads;
+extern uint32_t num_threads;
 extern thread_local std::random_device rd;
 extern thread_local std::mt19937 gen;
 extern const unsigned char seq_nt4_table[128];
 extern const uint64_t nt4_lr_table[4];
 extern const uint64_t nt4_bp_table[4];
 
-class LSHFunction;
-class Reader;
+class LSHF;
+class Builder;
 class Subset;
 class Record;
 class Tree;
@@ -38,8 +38,8 @@ typedef std::shared_ptr<Tree> tree_sptr_t;
 typedef std::shared_ptr<Node> node_sptr_t;
 typedef std::shared_ptr<Subset> subset_sptr_t;
 typedef std::shared_ptr<Record> record_sptr_t;
-typedef std::shared_ptr<Reader> reader_sptr_t;
-typedef std::shared_ptr<LSHFunction> lshf_sptr_t;
+typedef std::shared_ptr<Builder> builder_sptr_t;
+typedef std::shared_ptr<LSHF> lshf_sptr_t;
 
 typedef uint64_t sh_t;
 typedef uint32_t enc_t;
@@ -51,15 +51,15 @@ template <typename T> using vec = std::vector<T>;
 static inline uint32_t gp_hash(const std::string &str) {
   uint32_t b = 378551;
   uint32_t a = 63689;
-  uint32_t hash = 0;
+  uint32_t h = 0;
   for (std::size_t i = 0; i < str.length(); i++) {
-    hash = hash * a + str[i];
+    h = h * a + str[i];
     a = a * b;
   }
-  return (hash & 0x7FFFFFFF);
+  return (h & 0x7FFFFFFF);
 }
 
-static inline uint64_t mmh3f64(uint64_t h) {
+static inline uint64_t mur_hash(uint64_t h) {
   h ^= (h >> 33);
   h *= 0xff51afd7ed558ccdL;
   h ^= (h >> 33);
@@ -110,6 +110,5 @@ struct mer_t {
   enc_t encoding;
   sh_t shash;
 };
-
 
 #endif
