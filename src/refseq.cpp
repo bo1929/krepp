@@ -1,7 +1,7 @@
-#include "builder.hpp"
+#include "refseq.hpp"
 #include <cstdint>
 
-Builder::Builder(uint8_t k, uint8_t w, sh_t shash, std::string gpath,
+RefSeq::RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string gpath,
                  lshf_sptr_t hash_func)
     : k(k), w(w), shash(shash), hash_func(hash_func) {
   mask_bp = u64m >> (32 - k) * 2;
@@ -20,7 +20,7 @@ Builder::Builder(uint8_t k, uint8_t w, sh_t shash, std::string gpath,
   kseq = kseq_init(file);
 }
 
-std::string Builder::download_url(std::string url) {
+std::string RefSeq::download_url(std::string url) {
   char tmp_input_path[FILENAME_MAX] = "/tmp/seq";
   const char *sx = std::to_string(gp_hash(url)).c_str();
   strcat(tmp_input_path, sx);
@@ -42,14 +42,14 @@ std::string Builder::download_url(std::string url) {
   return tmp_input_path;
 }
 
-Builder::~Builder() {
+RefSeq::~RefSeq() {
   kseq_destroy(kseq);
   gzclose(file);
   if (is_url)
     std::remove(filepath.c_str());
 }
 
-void Builder::extract_mers(vvec<mer_t> &table) {
+void RefSeq::extract_mers(vvec<mer_t> &table) {
   uint64_t i, l;
   uint32_t rix;
   uint64_t wix = 0, kix = 0;

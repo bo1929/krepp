@@ -11,6 +11,7 @@ public:
   Tree(std::string nwk_filepath) : nwk_filepath(nwk_filepath) {}
   void set_subtree(node_sptr_t nd) { subtree_root = nd; }
   tree_sptr_t getptr() { return shared_from_this(); }
+  record_sptr_t get_record() { return record; }
   node_sptr_t get_root() { return root; }
   void reset_traversal() {
     curr = nullptr;
@@ -42,9 +43,12 @@ public:
   node_sptr_t getptr() { return shared_from_this(); }
   void set_parent(node_sptr_t nd) { parent = nd; }
   void set_shash(sh_t sh) { shash = sh; }
-  tree_sptr_t get_tree() { return tree; }
   bool check_leaf() { return is_leaf; }
+  tree_sptr_t get_tree() { return tree; }
+  std::string get_name() { return name; }
   sh_t get_shash() { return shash; }
+  vec<node_sptr_t> get_children() { return children; }
+  tuint get_nchildren() { return nchildren; }
   sh_t sum_children_shash() {
     sh_t sh = 0;
     std::for_each(children.begin(), children.end(),

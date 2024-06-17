@@ -11,13 +11,13 @@ extern "C" {
 
 KSEQ_INIT(gzFile, gzread)
 
-class Builder {
+class RefSeq {
   friend class DynTable;
 
 public:
-  Builder(uint8_t k, uint8_t w, sh_t shash, std::string gpath,
+  RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string gpath,
           lshf_sptr_t hash_func);
-  ~Builder();
+  ~RefSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   bool set_curr_seq() {
     name = kseq->name.s;

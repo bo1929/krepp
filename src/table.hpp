@@ -1,7 +1,7 @@
 #ifndef _TABLE_H
 #define _TABLE_H
 
-#include "builder.hpp"
+#include "refseq.hpp"
 #include "common.hpp"
 #include "subset.hpp"
 
@@ -24,7 +24,7 @@ public:
   static void union_row(vec<mer_t> &dest_v, vec<mer_t> &source_v,
                         record_sptr_t record, bool in_place);
 #endif
-  void fill_table(builder_sptr_t builder);
+  void fill_table(refseq_sptr_t refseq);
   // void convert_table(FlatTable &dest);
   static bool comp_encoding(const mer_t &left, const mer_t &right) {
     return left.encoding < right.encoding;

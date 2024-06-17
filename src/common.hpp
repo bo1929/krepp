@@ -28,17 +28,18 @@ extern const uint64_t nt4_lr_table[4];
 extern const uint64_t nt4_bp_table[4];
 
 class LSHF;
-class Builder;
+class RefSeq;
 class Subset;
 class Record;
 class Tree;
 class Node;
+class DynTable;
 
 typedef std::shared_ptr<Tree> tree_sptr_t;
 typedef std::shared_ptr<Node> node_sptr_t;
 typedef std::shared_ptr<Subset> subset_sptr_t;
 typedef std::shared_ptr<Record> record_sptr_t;
-typedef std::shared_ptr<Builder> builder_sptr_t;
+typedef std::shared_ptr<RefSeq> refseq_sptr_t;
 typedef std::shared_ptr<LSHF> lshf_sptr_t;
 
 typedef uint64_t sh_t;
@@ -47,6 +48,7 @@ typedef uint_least32_t tuint;
 
 template <typename T> using vvec = std::vector<std::vector<T>>;
 template <typename T> using vec = std::vector<T>;
+template <typename T1, T2> using umap = std::unordered_map<T1,T2>;
 
 static inline uint32_t gp_hash(const std::string &str) {
   uint32_t b = 378551;

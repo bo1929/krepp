@@ -1,7 +1,8 @@
 #include "lshf.hpp"
 
-void LSHF::generate_mask() {
-  sort(ppos_v.begin(), ppos_v.end(), std::greater<uint8_t>());
+LSHF::LSHF(vec<uint8_t> &ppos_v, vec<uint8_t> &npos_v)
+    : ppos_v(ppos_v), npos_v(npos_v) {
+  std::sort(ppos_v.begin(), ppos_v.end(), std::greater<uint8_t>());
   std::vector<int8_t> v;
   std::vector<int8_t> g;
   int8_t lp = 31;
@@ -23,7 +24,6 @@ void LSHF::generate_mask() {
   g.push_back(jp);
   v.push_back(-1);
   g.push_back(-1);
-  glsh_v.clear();
   glsh_v.resize(v.size() < g.size() ? v.size() : g.size());
   for (unsigned int i = 0; i < glsh_v.size(); i++) {
     glsh_v[i] = std::make_pair(v[i], g[i]);
