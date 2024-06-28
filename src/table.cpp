@@ -59,22 +59,29 @@ void DynTable::prune_columns(size_t max_size) {
   }
 }
 
-void DynTable::union_table(DynTable &source) {
-  assertm(nrows == source.nrows, "Two tables differ in size.");
-  for (uint32_t i = 0; i < table.size(); ++i) {
-    if (!source.table[i].empty() && !table[i].empty()) {
-      nkmers -= table[i].size();
+void DynTable::union_table(dyntable_sptr_t source) {
+  assertm(nrows == source->nrows, "Two tables differ in size.");
+  if (source->table.empty()) {
+    return;
+  } else if (table.empty()) {
+    table = std::move(source->table);
+    return;
+  } else {
+    for (uint32_t i = 0; i < table.size(); ++i) {
+      if (!source->table[i].empty() && !table[i].empty()) {
+        nkmers -= table[i].size();
 #ifdef NONSTD_UNION
-      DynTable::union_row(table[i], source.table[i], record);
+        DynTable::union_row(table[i], source->table[i], record);
 #else
-      DynTable::union_row(table[i], source.table[i], record, false);
+        DynTable::union_row(table[i], source->table[i], record, false);
 #endif
-      nkmers += table[i].size();
-    } else if (!source.table[i].empty()) {
-      table[i] = std::move(source.table[i]);
-      nkmers += source.table[i].size();
-    } else {
-      continue;
+        nkmers += table[i].size();
+      } else if (!source->table[i].empty()) {
+        table[i] = std::move(source->table[i]);
+        nkmers += source->table[i].size();
+      } else {
+        continue;
+      }
     }
   }
 }
@@ -123,12 +130,12 @@ void DynTable::union_row(vec<mer_t> &dest_v, vec<mer_t> &source_v,
   vec<mer_t> temp_v;
   temp_v.reserve(source_v.size() + dest_v.size());
   auto iter_d = dest_v.begin(), iter_s = source_v.begin();
-  for (; iter_s != source_v.end(); ++iter_s) {
-    while (iter_s->encoding > iter_d->encoding) {
+  for (; iter_s != source_v.end() && iter_d != dest_v.end(); ++iter_s) {
+    while (iter_d != dest_v.end() && iter_s->encoding > iter_d->encoding) {
       temp_v.push_back(std::move(*iter_d));
       iter_d++;
     }
-    while (iter_s->encoding == iter_d->encoding) {
+    while (iter_d != dest_v.end() && iter_s->encoding == iter_d->encoding) {
       // TODO: check collisions and resolve.
       // TODO: check if subset is a node and skip.
       subset_sptr_t new_subset =
@@ -146,6 +153,7 @@ void DynTable::union_row(vec<mer_t> &dest_v, vec<mer_t> &source_v,
 #endif
 
 void DynTable::fill_table(refseq_sptr_t rs) {
+  table.resize(nrows);
   while (rs->read_next_seq() && rs->set_curr_seq()) {
     rs->extract_mers(table);
   }

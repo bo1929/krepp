@@ -1,7 +1,4 @@
-#include "common.hpp"
 #include "keremet.hpp"
-#include "table.hpp"
-#include <memory>
 
 void Bkrmt::build_library() {
   dyntable_sptr_t root_dyntable;
@@ -9,16 +6,25 @@ void Bkrmt::build_library() {
 }
 
 void Bkrmt::build_for_subtree(node_sptr_t nd, dyntable_sptr_t dt) {
+  std::cout << nd->get_name() << std::endl;
   if (nd->check_leaf()) {
-    dt = std::make_shared<DynTable>(nrows);
-    sh_tshash = nd->get_shash();
-    std::string gpath = name_to_gpath[nd->get_name()];
-    refseq_sptr_t rs = std::make_shared<RefSeq>(k, w, shash, gpath, hash_func);
-    dt.fill_table(rs);
+    sh_t shash = nd->get_shash();
+    if (name_to_gpath.contains(nd->get_name())) {
+      std::string gpath = name_to_gpath[nd->get_name()];
+      std::cout << "Reading genome: " << nd->get_name() << std::endl;
+      refseq_sptr_t rs =
+          std::make_shared<RefSeq>(k, w, shash, gpath, hash_func);
+      dt->fill_table(rs);
+    } else {
+      std::cout << "Skipping genome: " << nd->get_name() << std::endl;
+    }
   } else {
     assert(nd->get_nchildren() > 0);
     vec<node_sptr_t> children_nd_v = nd->get_children();
-    vec<dyntable_sptr_t> children_dt_v(nd->get_nchildren());
+    vec<dyntable_sptr_t> children_dt_v;
+    children_dt_v.assign(
+        nd->get_nchildren(),
+        std::make_shared<DynTable>(nrows, ref_tree->get_record()));
     for (tuint i = 0; i < nd->get_nchildren(); ++i) {
       build_for_subtree(children_nd_v[i], children_dt_v[i]);
     }
@@ -31,6 +37,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dyntable_sptr_t dt) {
 
 void Bkrmt::parse_newick_tree() {
   ref_tree = std::make_shared<Tree>(nwk_filepath);
+  ref_tree->parse();
   ref_tree->reset_traversal();
 }
 
@@ -64,7 +71,7 @@ void Bkrmt::get_random_positions(uint8_t k, uint8_t h,
   std::uniform_int_distribution<uint8_t> distrib(0, k - 1);
   for (uint8_t m = 0; m < h; m++) {
     n = distrib(gen);
-    if (std::count(ppos_v_v.begin(), ppos_v.end(), n)) {
+    if (std::count(ppos_v.begin(), ppos_v.end(), n)) {
       m -= 1;
     } else {
       ppos_v.push_back(n);
@@ -104,10 +111,6 @@ Bkrmt::Bkrmt(CLI::App &app) {
                         "Length of minimizer window. Default: k+3.");
   sub_build->add_option("-h,--num-positions", h,
                         "Number of positions for the LSH. Default: 13.");
-  sub_build->callback([&]() {
-    if (!(sub_build->count("-w") + sub_build->count("--window-length")))
-      w = k + 3;
-  });
 }
 
 void Bkrmt::set_hash_func() {
@@ -159,12 +162,17 @@ int main(int argc, char **argv) {
                  "Number of threads to use in OpenMP-based parallelism.");
   Bkrmt b(app);
   Qkrmt q(app);
+  // sub_build->callback([&]() {
+  //   if (!(sub_build->count("-w") + sub_build->count("--window-length")))
+  //     w = k + 3;
+  // });
 
   CLI11_PARSE(app, argc, argv);
 
   b.set_hash_func();
   b.read_input_file();
   b.parse_newick_tree();
+  std::cout << "Building the library..." << std::endl;
   b.build_library();
 
   return 0;

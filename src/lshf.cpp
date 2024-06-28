@@ -48,7 +48,7 @@ void LSHF::drop_ppos_encoding(uint64_t enc64_bp, uint64_t enc64_lr,
                               uint32_t &enc32_bp, uint32_t &enc32_lr) {
   enc32_bp = 0;
   enc32_lr = 0;
-  for (uint i = npos_v.size() - 1; i >= 0; --i) {
+  for (int i = npos_v.size() - 1; i >= 0; i--) {
     enc32_lr += static_cast<uint32_t>((enc64_lr >> npos_v[i]) & 1);
     enc32_lr += static_cast<uint32_t>((enc64_lr >> (npos_v[i] + 32)) & 1) << 16;
     enc32_bp += static_cast<uint32_t>((enc64_bp >> (npos_v[i] * 2)) & 3);

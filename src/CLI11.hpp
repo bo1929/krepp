@@ -1073,9 +1073,7 @@ template <bool B, class T = void>
 using enable_if_t = typename std::enable_if<B, T>::type;
 
 /// A copy of std::void_t from C++17 (helper for C++11 and C++14)
-template <typename... Ts> struct make_void {
-  using type = void;
-};
+template <typename... Ts> struct make_void { using type = void; };
 
 /// A copy of std::void_t from C++17 - same reasoning as enable_if_t, it does
 /// not hurt to redefine
@@ -1112,14 +1110,10 @@ template <typename T> struct is_copyable_ptr {
 };
 
 /// This can be specialized to override the type deduction for IsMember.
-template <typename T> struct IsMemberType {
-  using type = T;
-};
+template <typename T> struct IsMemberType { using type = T; };
 
 /// The main custom type needed here is const char * should be a string.
-template <> struct IsMemberType<const char *> {
-  using type = std::string;
-};
+template <> struct IsMemberType<const char *> { using type = std::string; };
 
 namespace detail {
 
@@ -1181,14 +1175,14 @@ struct pair_adaptor<T,
 
   /// Get the first value (really just the underlying value)
   template <typename Q>
-  static auto
-  first(Q &&pair_value) -> decltype(std::get<0>(std::forward<Q>(pair_value))) {
+  static auto first(Q &&pair_value)
+      -> decltype(std::get<0>(std::forward<Q>(pair_value))) {
     return std::get<0>(std::forward<Q>(pair_value));
   }
   /// Get the second value (really just the underlying value)
   template <typename Q>
-  static auto
-  second(Q &&pair_value) -> decltype(std::get<1>(std::forward<Q>(pair_value))) {
+  static auto second(Q &&pair_value)
+      -> decltype(std::get<1>(std::forward<Q>(pair_value))) {
     return std::get<1>(std::forward<Q>(pair_value));
   }
 };
@@ -1214,12 +1208,12 @@ template <typename T, typename C> class is_direct_constructible {
 #ifdef __CUDACC__
 #pragma diag_suppress 2361
 #endif
-                                            TT{std::declval<CC>()}
+      TT { std::declval<CC>() }
 #ifdef __CUDACC__
 #pragma diag_default 2361
 #endif
-                                            ,
-                                            std::is_move_assignable<TT>());
+      ,
+      std::is_move_assignable<TT>());
 
   template <typename TT, typename CC>
   static auto test(int, std::false_type) -> std::false_type;
@@ -1227,8 +1221,8 @@ template <typename T, typename C> class is_direct_constructible {
   template <typename, typename> static auto test(...) -> std::false_type;
 
 public:
-  static constexpr bool value = decltype(test<T, C>(
-      0, typename std::is_constructible<T, C>::type()))::value;
+  static constexpr bool value = decltype(
+      test<T, C>(0, typename std::is_constructible<T, C>::type()))::value;
 };
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
@@ -1240,8 +1234,8 @@ public:
 
 template <typename T, typename S = std::ostringstream> class is_ostreamable {
   template <typename TT, typename SS>
-  static auto test(int) -> decltype(std::declval<SS &>() << std::declval<TT>(),
-                                    std::true_type());
+  static auto test(int)
+      -> decltype(std::declval<SS &>() << std::declval<TT>(), std::true_type());
 
   template <typename, typename> static auto test(...) -> std::false_type;
 
@@ -1252,9 +1246,9 @@ public:
 /// Check for input streamability
 template <typename T, typename S = std::istringstream> class is_istreamable {
   template <typename TT, typename SS>
-  static auto test(int) -> decltype(std::declval<SS &>() >>
-                                        std::declval<TT &>(),
-                                    std::true_type());
+  static auto test(int)
+      -> decltype(std::declval<SS &>() >> std::declval<TT &>(),
+                  std::true_type());
 
   template <typename, typename> static auto test(...) -> std::false_type;
 
@@ -1265,9 +1259,9 @@ public:
 /// Check for complex
 template <typename T> class is_complex {
   template <typename TT>
-  static auto test(int) -> decltype(std::declval<TT>().real(),
-                                    std::declval<TT>().imag(),
-                                    std::true_type());
+  static auto test(int)
+      -> decltype(std::declval<TT>().real(), std::declval<TT>().imag(),
+                  std::true_type());
 
   template <typename> static auto test(...) -> std::false_type;
 
@@ -1341,9 +1335,9 @@ template <typename S> class is_tuple_like {
   // static auto test(int)
   //     -> decltype(std::conditional<(std::tuple_size<SS>::value > 0),
   //     std::true_type, std::false_type>::type());
-  static auto
-  test(int) -> decltype(std::tuple_size<typename std::decay<SS>::type>::value,
-                        std::true_type{});
+  static auto test(int)
+      -> decltype(std::tuple_size<typename std::decay<SS>::type>::value,
+                  std::true_type{});
   template <typename> static auto test(...) -> std::false_type;
 
 public:

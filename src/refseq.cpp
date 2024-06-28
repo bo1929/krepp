@@ -1,8 +1,7 @@
 #include "refseq.hpp"
-#include <cstdint>
 
 RefSeq::RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string gpath,
-                 lshf_sptr_t hash_func)
+               lshf_sptr_t hash_func)
     : k(k), w(w), shash(shash), hash_func(hash_func) {
   mask_bp = u64m >> (32 - k) * 2;
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
@@ -101,7 +100,7 @@ void RefSeq::extract_mers(vvec<mer_t> &table) {
         }
       }
     } else {
-      l = 0;
+      l = 0, i++;
     }
   }
 }

@@ -2,28 +2,30 @@
 #define _KEREMET_H
 
 #include "CLI11.hpp"
-#include "refseq.hpp"
 #include "common.hpp"
 #include "lshf.hpp"
+#include "refseq.hpp"
 #include "subset.hpp"
 #include "table.hpp"
 #include "tree.hpp"
 
-class Bkrmt
-{
+class Bkrmt {
 public:
   Bkrmt(CLI::App &app);
-	static void get_random_positions();
+  static void get_random_positions(uint8_t k, uint8_t h,
+                                   std::vector<uint8_t> &npos_v,
+                                   std::vector<uint8_t> &ppos_v);
   void set_hash_func();
   void read_input_file();
   void parse_newick_tree();
   void build_for_subtree(node_sptr_t nd, dyntable_sptr_t dt);
+  void build_library();
 
 private:
   uint8_t k = 29;
   uint8_t w = k + 3;
   uint8_t h = 13;
-  uint32_t nrows = pow(2, 2*h); // This needs to be an argument.
+  uint32_t nrows = pow(2, 2 * h); // This needs to be an argument.
   uint32_t nleaves;
   std::string library_dir;
   std::string nwk_filepath;
@@ -33,14 +35,14 @@ private:
   lshf_sptr_t hash_func = nullptr;
 };
 
-class Qkrmt
-{
+class Qkrmt {
 public:
   Qkrmt(CLI::App &app);
+
 private:
-    std::vector<std::string> library_dir_v;
-    std::string output_dir = "./";
-    std::string query_file;
+  std::vector<std::string> library_dir_v;
+  std::string output_dir = "./";
+  std::string query_file;
 };
 
 #endif

@@ -16,7 +16,7 @@ class RefSeq {
 
 public:
   RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string gpath,
-          lshf_sptr_t hash_func);
+         lshf_sptr_t hash_func);
   ~RefSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   bool set_curr_seq() {

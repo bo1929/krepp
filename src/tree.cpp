@@ -1,9 +1,10 @@
+#include "common.hpp"
 #include "tree.hpp"
 
 void Tree::parse() {
   vec<std::string> n_vec;
   split_nwk(n_vec);
-  root = std::make_shared<Node>(this->getptr());
+  root = std::make_shared<Node>(getptr());
   root->parse(n_vec);
   subtree_root = root;
   record = std::make_shared<Record>(root);
@@ -66,12 +67,13 @@ void Node::parse(vec<std::string> &n_vec) {
   if (n_vec[tree->atter] == "(") {
     while (1) {
       tree->atter++;
-      children.push_back(std::make_shared<Node>(tree));
-      children.back()->parse(n_vec);
-      children.back()->ix_child = nchildren;
-      (children.back())->set_parent(this->getptr());
-      shash += children.back()->shash;
-      card += children.back()->card;
+      node_sptr_t child = std::make_shared<Node>(tree);
+      child->set_parent(getptr());
+      child->ix_child = nchildren;
+      child->parse(n_vec);
+      shash += child->shash;
+      card += child->card;
+      children.push_back(std::move(child));
       nchildren++;
       if (n_vec[tree->atter] == ",")
         continue;

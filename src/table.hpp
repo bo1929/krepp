@@ -1,21 +1,22 @@
 #ifndef _TABLE_H
 #define _TABLE_H
 
-#include "refseq.hpp"
 #include "common.hpp"
+#include "refseq.hpp"
 #include "subset.hpp"
+#include <cstdint>
 
 #define NONSTD_UNION
 
 class DynTable {
 public:
-  DynTable() : nrows(nrows), nkmers(0) { table.resize(nrows); }
+  DynTable(uint32_t nrows, record_sptr_t record) : nrows(nrows), record(record), nkmers(0) {}
   void clear_rows();
   void make_unique();
   void sort_columns();
   void ensure_sorted_columns();
   void prune_columns(size_t max_size);
-  void union_table(DynTable &source);
+  void union_table(dyntable_sptr_t source);
   void update_size_hist();
 #ifdef NONSTD_UNION
   static void union_row(vec<mer_t> &dest_v, vec<mer_t> &source_v,
@@ -43,7 +44,7 @@ private:
 
 class FlatTable {
 public:
-  FlatTable() {};
+  FlatTable(){};
 
 private:
 };
