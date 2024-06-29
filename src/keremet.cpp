@@ -1,36 +1,55 @@
 #include "keremet.hpp"
 
 void Bkrmt::build_library() {
-  dyntable_sptr_t root_dyntable;
-  build_for_subtree(ref_tree->get_root(), root_dyntable);
+  DynTable root_dyntable(nrows, ref_tree->get_record());
+  omp_set_num_threads(num_threads);
+  omp_set_nested(1);
+#pragma omp parallel
+  {
+#pragma omp single
+    { build_for_subtree(ref_tree->get_root(), root_dyntable); }
+  }
 }
 
-void Bkrmt::build_for_subtree(node_sptr_t nd, dyntable_sptr_t dt) {
-  std::cout << nd->get_name() << std::endl;
+void Bkrmt::build_for_subtree(node_sptr_t nd, DynTable &dt) {
   if (nd->check_leaf()) {
     sh_t shash = nd->get_shash();
-    if (name_to_gpath.contains(nd->get_name())) {
+    if (name_to_gpath.find(nd->get_name()) != name_to_gpath.end()) {
       std::string gpath = name_to_gpath[nd->get_name()];
-      std::cout << "Reading genome: " << nd->get_name() << std::endl;
       refseq_sptr_t rs =
           std::make_shared<RefSeq>(k, w, shash, gpath, hash_func);
-      dt->fill_table(rs);
+      dt.fill_table(rs);
+#pragma omp critical
+      {
+        std::cout << "Genome processed: " << nd->get_name() << "\t";
+        dt.print_info();
+      }
     } else {
-      std::cout << "Skipping genome: " << nd->get_name() << std::endl;
+#pragma omp critical
+      { std::cout << "Genome skipped: " << nd->get_name() << std::endl; }
     }
   } else {
     assert(nd->get_nchildren() > 0);
     vec<node_sptr_t> children_nd_v = nd->get_children();
-    vec<dyntable_sptr_t> children_dt_v;
-    children_dt_v.assign(
-        nd->get_nchildren(),
-        std::make_shared<DynTable>(nrows, ref_tree->get_record()));
+    vec<DynTable> children_dt_v;
+    children_dt_v.assign(nd->get_nchildren(),
+                         DynTable(nrows, ref_tree->get_record()));
+    omp_lock_t parent_lock;
+    omp_init_lock(&parent_lock);
     for (tuint i = 0; i < nd->get_nchildren(); ++i) {
-      build_for_subtree(children_nd_v[i], children_dt_v[i]);
+#pragma omp task untied shared(dt)
+      {
+        build_for_subtree(children_nd_v[i], children_dt_v[i]);
+        omp_set_lock(&parent_lock);
+        dt.union_table(children_dt_v[i]);
+        omp_unset_lock(&parent_lock);
+      }
     }
-    dt = children_dt_v.front();
-    for (tuint i = 1; i < nd->get_nchildren(); ++i) {
-      dt->union_table(children_dt_v[i]);
+#pragma omp taskwait
+#pragma omp critical
+    {
+      std::cout << "Internal node processed: " << nd->get_name() << "\t";
+      dt.print_info();
     }
   }
 }
@@ -95,9 +114,9 @@ Bkrmt::Bkrmt(CLI::App &app) {
                    "Path to the directory in which the library is stored.")
       ->required();
   sub_build
-      ->add_option(
-          "-i,--input-file", input_filepath,
-          "Path to the tsv-file containing paths/urls and names of references.")
+      ->add_option("-i,--input-file", input_filepath,
+                   "Path to the tsv-file containing paths/urls and names of "
+                   "references.")
       ->required()
       ->check(CLI::ExistingFile);
   sub_build
@@ -111,6 +130,7 @@ Bkrmt::Bkrmt(CLI::App &app) {
                         "Length of minimizer window. Default: k+3.");
   sub_build->add_option("-h,--num-positions", h,
                         "Number of positions for the LSH. Default: 13.");
+  nrows = pow(2, 2 * h);
 }
 
 void Bkrmt::set_hash_func() {

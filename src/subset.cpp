@@ -31,7 +31,7 @@ bool Record::tree_with_collision() {
   node_sptr_t nd_curr;
   while (collision_free &&
          (nd_curr = subtree_root->get_tree()->next_post_order())) {
-    if (!sh_to_node.contains(nd_curr->get_shash()) ||
+    if (sh_to_node.find(nd_curr->get_shash()) == sh_to_node.end() ||
         (sh_to_node.at(nd_curr->get_shash()) != nd_curr) ||
         (!nd_curr->get_shash())) {
       collision_free = false;
@@ -57,52 +57,67 @@ void Record::rehash_tree() {
 }
 
 void Record::union_record(record_sptr_t source) {
-  // TODO: check conflicts and resolve.
-  sh_to_node.merge(source->sh_to_node);
-  sh_to_subset.merge(source->sh_to_subset);
-  subtree_root = Tree::compute_lca(subtree_root, source->subtree_root);
-  tree = subtree_root->get_tree();
+#pragma omp critical
+  {
+    // TODO: check conflicts and resolve.
+    // TODO: check if either of the records is empty.
+    sh_to_node.insert(source->sh_to_node.begin(), source->sh_to_node.end());
+    sh_to_subset.insert(source->sh_to_subset.begin(),
+                        source->sh_to_subset.end());
+    subtree_root = Tree::compute_lca(subtree_root, source->subtree_root);
+    tree = subtree_root->get_tree();
+  }
 }
 
 void Record::add_subset(subset_sptr_t new_subset) {
-  // TODO: check collisions and resolve.
-  if (!sh_to_node.contains(new_subset->shash)) {
-    sh_to_subset[new_subset->shash] = new_subset;
-  } else {
-    // TODO: Collision with a node or a real node.
+#pragma omp critical
+  {
+    // TODO: check collisions and resolve.
+    if (sh_to_node.find(new_subset->shash) == sh_to_node.end()) {
+      sh_to_subset[new_subset->shash] = new_subset;
+    } else {
+      // TODO: Collision with a node or a real node.
+    }
   }
 }
 
 Subset::Subset(sh_t shash1, sh_t shash2, record_sptr_t record) {
-  auto &node_map = record->sh_to_node;
-  auto &subset_map = record->sh_to_subset;
-  if (subset_map.contains(shash1) && subset_map.contains(shash2)) {
-    card = subset_map[shash1]->card + subset_map[shash2]->card;
-    shash = subset_map[shash1]->shash + subset_map[shash2]->shash;
-    chash = subset_map[shash1]->card > subset_map[shash2]->card
-                ? subset_map[shash2]->shash
-                : subset_map[shash1]->shash;
-  } else if (node_map.contains(shash1) && node_map.contains(shash2)) {
-    card = node_map[shash1]->card + node_map[shash2]->card;
-    shash = node_map[shash1]->shash + node_map[shash2]->shash;
-    chash = node_map[shash1]->card > node_map[shash2]->card
-                ? node_map[shash2]->shash
-                : node_map[shash1]->shash;
-  } else if (subset_map.contains(shash1) && node_map.contains(shash2)) {
-    card = subset_map[shash1]->card + node_map[shash2]->card;
-    shash = subset_map[shash1]->shash + node_map[shash2]->shash;
-    chash = subset_map[shash1]->card > node_map[shash2]->card
-                ? node_map[shash2]->shash
-                : subset_map[shash1]->shash;
-  } else if (node_map.contains(shash1) && subset_map.contains(shash2)) {
-    card = node_map[shash1]->card + subset_map[shash2]->card;
-    shash = node_map[shash1]->shash + subset_map[shash2]->shash;
-    chash = node_map[shash1]->card > subset_map[shash2]->card
-                ? subset_map[shash2]->shash
-                : node_map[shash1]->shash;
-  } else {
-    std::cerr << "Cannot constuct subset, given record lacks the partition!";
-    std::quick_exit(EXIT_FAILURE);
+#pragma omp critical
+  {
+    auto &node_map = record->sh_to_node;
+    auto &subset_map = record->sh_to_subset;
+    if ((subset_map.find(shash1) != subset_map.end()) &&
+        (subset_map.find(shash2) != subset_map.end())) {
+      card = subset_map[shash1]->card + subset_map[shash2]->card;
+      shash = subset_map[shash1]->shash + subset_map[shash2]->shash;
+      chash = subset_map[shash1]->card > subset_map[shash2]->card
+                  ? subset_map[shash2]->shash
+                  : subset_map[shash1]->shash;
+    } else if ((node_map.find(shash1) != node_map.end()) &&
+               (node_map.find(shash2) != node_map.end())) {
+      card = node_map[shash1]->card + node_map[shash2]->card;
+      shash = node_map[shash1]->shash + node_map[shash2]->shash;
+      chash = node_map[shash1]->card > node_map[shash2]->card
+                  ? node_map[shash2]->shash
+                  : node_map[shash1]->shash;
+    } else if ((subset_map.find(shash1) != subset_map.end()) &&
+               (node_map.find(shash2) != node_map.end())) {
+      card = subset_map[shash1]->card + node_map[shash2]->card;
+      shash = subset_map[shash1]->shash + node_map[shash2]->shash;
+      chash = subset_map[shash1]->card > node_map[shash2]->card
+                  ? node_map[shash2]->shash
+                  : subset_map[shash1]->shash;
+    } else if ((node_map.find(shash1) != node_map.end()) &&
+               (subset_map.find(shash2) != subset_map.end())) {
+      card = node_map[shash1]->card + subset_map[shash2]->card;
+      shash = node_map[shash1]->shash + subset_map[shash2]->shash;
+      chash = node_map[shash1]->card > subset_map[shash2]->card
+                  ? subset_map[shash2]->shash
+                  : node_map[shash1]->shash;
+    } else {
+      std::cerr << "Cannot constuct subset, given record lacks the partition!";
+      std::quick_exit(EXIT_FAILURE);
+    }
+    // TODO: Consider adding another subsets to the record for further pruning.
   }
-  // TODO: Consider addingother subsets to the record for further pruning.
 }

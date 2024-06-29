@@ -2,6 +2,7 @@
 #define _COMMON_H
 
 #include <cassert>
+#include "omp.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -19,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 #include <zlib.h>
+// TODO: Organize all included headers across all headers.
 
 extern uint32_t num_threads;
 extern thread_local std::random_device rd;
@@ -41,7 +43,6 @@ typedef std::shared_ptr<Node> node_sptr_t;
 typedef std::shared_ptr<Subset> subset_sptr_t;
 typedef std::shared_ptr<Record> record_sptr_t;
 typedef std::shared_ptr<RefSeq> refseq_sptr_t;
-typedef std::shared_ptr<DynTable> dyntable_sptr_t;
 
 typedef uint64_t sh_t;
 typedef uint32_t enc_t;
@@ -61,7 +62,16 @@ static inline uint32_t gp_hash(const std::string &str) {
   return (h & 0x7FFFFFFF);
 }
 
-static inline uint64_t mur_hash(uint64_t h) {
+static inline uint32_t xur32_hash(uint32_t h) {
+  h ^= h >> 16;
+  h *= 0x85ebca6b;
+  h ^= h >> 13;
+  h *= 0xc2b2ae35;
+  h ^= h >> 16;
+  return h;
+}
+
+static inline uint64_t xur64_hash(uint64_t h) {
   h ^= (h >> 33);
   h *= 0xff51afd7ed558ccdL;
   h ^= (h >> 33);
@@ -70,21 +80,21 @@ static inline uint64_t mur_hash(uint64_t h) {
   return h;
 }
 
-static inline uint8_t lr64hd(const uint64_t x, const uint64_t y) {
+static inline uint32_t hd_lr64(const uint64_t x, const uint64_t y) {
   uint64_t z1 = x ^ y;
   uint32_t z2 = z1 >> 32;
   uint32_t zc = z1 | z2;
-  return static_cast<uint8_t>(__builtin_popcount(zc));
+  return __builtin_popcount(zc);
 }
 
-static inline uint8_t lr32hd(const uint32_t x, const uint32_t y) {
+static inline uint32_t hd_lr32(const uint32_t x, const uint32_t y) {
   uint32_t z1 = x ^ y;
   uint16_t z2 = z1 >> 16;
   uint16_t zc = z1 | z2;
-  return static_cast<uint8_t>(__builtin_popcount(zc));
+  return __builtin_popcount(zc);
 }
 
-static inline u_int64_t bp64revcomp(const u_int64_t &x, size_t k) {
+static inline u_int64_t revcomp_b64(const u_int64_t &x, size_t k) {
   uint64_t res = ~x;
   res = ((res >> 2 & 0x3333333333333333) | (res & 0x3333333333333333) << 2);
   res = ((res >> 4 & 0x0F0F0F0F0F0F0F0F) | (res & 0x0F0F0F0F0F0F0F0F) << 4);
@@ -94,7 +104,7 @@ static inline u_int64_t bp64revcomp(const u_int64_t &x, size_t k) {
   return (res >> (2 * (32 - k)));
 }
 
-static inline uint64_t bp64rmoddp(uint64_t x) {
+static inline uint64_t rmoddp_b64(uint64_t x) {
   x = x & 0x5555555555555555;
   x = (x | (x >> 1)) & 0x3333333333333333;
   x = (x | (x >> 2)) & 0x0f0f0f0f0f0f0f0f;
@@ -104,13 +114,17 @@ static inline uint64_t bp64rmoddp(uint64_t x) {
   return x;
 }
 
-static inline u_int64_t bp64convlr64(u_int64_t x) {
-  return (bp64rmoddp(x >> 1) << 32) | bp64rmoddp(x);
+static inline u_int64_t cast_bp64_lr64(u_int64_t x) {
+  return (rmoddp_b64(x >> 1) << 32) | rmoddp_b64(x);
 }
 
 struct mer_t {
   enc_t encoding;
   sh_t shash;
+  mer_t (enc_t encoding, sh_t shash)
+        : encoding(encoding)
+        , shash(shash)
+    {}
 };
 
 #endif

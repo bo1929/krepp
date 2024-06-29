@@ -18,7 +18,7 @@ public:
   void set_hash_func();
   void read_input_file();
   void parse_newick_tree();
-  void build_for_subtree(node_sptr_t nd, dyntable_sptr_t dt);
+  void build_for_subtree(node_sptr_t nd, DynTable &dt);
   void build_library();
 
 private:

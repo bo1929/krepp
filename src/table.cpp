@@ -2,10 +2,20 @@
 
 #define assertm(exp, msg) assert(((void)msg, exp))
 
+void DynTable::print_info() {
+  std::cout << "size: " << nkmers << std::endl;
+  /*
+  for (auto kv : size_hist) {
+    std::cout << "# of rows with " << kv.first << " k-mers: " << kv.second
+              << std::endl;
+  }
+  */
+}
+
 void DynTable::clear_rows() {
   table.clear();
-  nkmers = 0;
   size_hist.clear();
+  nkmers = 0;
 }
 
 void DynTable::sort_columns() {
@@ -25,6 +35,13 @@ void DynTable::ensure_sorted_columns() {
   }
 }
 
+void DynTable::update_nkmers() {
+  nkmers = 0;
+  for (uint32_t i = 0; i < table.size(); ++i) {
+    nkmers += table[i].size();
+  }
+}
+
 void DynTable::update_size_hist() {
   size_hist.clear();
   nkmers = 0;
@@ -35,53 +52,53 @@ void DynTable::update_size_hist() {
 }
 
 void DynTable::make_unique() {
+  nkmers = 0;
   for (uint32_t i = 0; i < table.size(); ++i) {
     if (!table[i].empty()) {
-      nkmers -= table[i].size();
       table[i].erase(std::unique(table[i].begin(), table[i].end(), eq_encoding),
                      table[i].end());
-      nkmers += table[i].size();
     }
+    nkmers += table[i].size();
   }
 }
 
 void DynTable::prune_columns(size_t max_size) {
+  nkmers = 0;
   for (uint32_t i = 0; i < table.size(); ++i) {
     if (table[i].size() > max_size) {
-      nkmers -= table[i].size();
       vec<mer_t> tmp_v;
       tmp_v.reserve(max_size);
       std::sample(table[i].begin(), table[i].end(), std::back_inserter(tmp_v),
                   max_size, gen);
       table[i] = std::move(tmp_v);
-      nkmers += max_size;
     }
+    nkmers += max_size;
   }
 }
 
-void DynTable::union_table(dyntable_sptr_t source) {
-  assertm(nrows == source->nrows, "Two tables differ in size.");
-  if (source->table.empty()) {
+void DynTable::union_table(DynTable &source) {
+  assertm(nrows == source.nrows, "Two tables differ in size.");
+  if (source.table.empty()) {
     return;
   } else if (table.empty()) {
-    table = std::move(source->table);
+    table = std::move(source.table);
+    size_hist = std::move(source.size_hist);
+    nkmers = source.nkmers;
     return;
   } else {
+    nkmers = 0;
     for (uint32_t i = 0; i < table.size(); ++i) {
-      if (!source->table[i].empty() && !table[i].empty()) {
-        nkmers -= table[i].size();
+      if (!source.table[i].empty() && !table[i].empty()) {
 #ifdef NONSTD_UNION
-        DynTable::union_row(table[i], source->table[i], record);
+        DynTable::union_row(table[i], source.table[i], record);
 #else
-        DynTable::union_row(table[i], source->table[i], record, false);
+        DynTable::union_row(table[i], source.table[i], record, false);
 #endif
-        nkmers += table[i].size();
-      } else if (!source->table[i].empty()) {
-        table[i] = std::move(source->table[i]);
-        nkmers += source->table[i].size();
+      } else if (!source.table[i].empty()) {
+        table[i] = std::move(source.table[i]);
       } else {
-        continue;
       }
+      nkmers += table[i].size();
     }
   }
 }
@@ -113,7 +130,7 @@ void DynTable::union_row(vec<mer_t> &dest_v, vec<mer_t> &source_v,
       // TODO: check collisions and resolve.
       // TODO: check if subset is a node and skip.
       subset_sptr_t new_subset =
-          make_shared<Subset>(iter_d->shash, iter_s->shash, record);
+          std::make_shared<Subset>(iter->shash, result->shash, record);
       record->add_subset(new_subset);
       result->shash += iter->shash;
     } else if (++result != iter) {
@@ -138,9 +155,12 @@ void DynTable::union_row(vec<mer_t> &dest_v, vec<mer_t> &source_v,
     while (iter_d != dest_v.end() && iter_s->encoding == iter_d->encoding) {
       // TODO: check collisions and resolve.
       // TODO: check if subset is a node and skip.
-      subset_sptr_t new_subset =
-          make_shared<Subset>(iter_d->shash, iter_s->shash, record);
-      record->add_subset(new_subset);
+#pragma omp critical
+      {
+        subset_sptr_t new_subset =
+            make_shared<Subset>(iter_d->shash, iter_s->shash, record);
+        record->add_subset(new_subset);
+      }
       iter_s->shash += iter_d->shash;
       iter_d++;
     }
@@ -157,7 +177,7 @@ void DynTable::fill_table(refseq_sptr_t rs) {
   while (rs->read_next_seq() && rs->set_curr_seq()) {
     rs->extract_mers(table);
   }
+  // update_nkmers();
   sort_columns();
   make_unique();
-  // TODO: check when the RefSeq class is finalized.
 }
