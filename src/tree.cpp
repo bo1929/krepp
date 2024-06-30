@@ -1,7 +1,8 @@
-#include "common.hpp"
 #include "tree.hpp"
+#include "common.hpp"
 
-void Tree::parse() {
+void Tree::parse()
+{
   vec<std::string> n_vec;
   split_nwk(n_vec);
   root = std::make_shared<Node>(getptr());
@@ -10,7 +11,8 @@ void Tree::parse() {
   record = std::make_shared<Record>(root);
 }
 
-void Tree::split_nwk(vec<std::string> &n_vec) {
+void Tree::split_nwk(vec<std::string>& n_vec)
+{
   std::ifstream tree_file(nwk_filepath);
   std::string nwk_str((std::istreambuf_iterator<char>(tree_file)),
                       std::istreambuf_iterator<char>());
@@ -21,8 +23,7 @@ void Tree::split_nwk(vec<std::string> &n_vec) {
   for (; i < nwk_str.length(); i++) {
     if (nwk_str[i] == '\t' || nwk_str[i] == ' ' || nwk_str[i] == ';')
       continue;
-    if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' ||
-        nwk_str[i] == ',') {
+    if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',') {
       if (strlen(buf) > 0) {
         n_vec.push_back(buf);
         std::memset(buf, 0, nwk_str.length());
@@ -41,7 +42,8 @@ void Tree::split_nwk(vec<std::string> &n_vec) {
   }
 }
 
-void Node::parse(vec<std::string> &n_vec) {
+void Node::parse(vec<std::string>& n_vec)
+{
   tree->nnodes++;
   if (tree->atter >= n_vec.size())
     return;
@@ -104,13 +106,14 @@ void Node::parse(vec<std::string> &n_vec) {
   return;
 }
 
-void Node::print_info() {
+void Node::print_info()
+{
   std::string pname = parent ? parent->name : "";
-  std::cout << name << "\t" << shash << "\t" << len_branch << "\t" << pname
-            << std::endl;
+  std::cout << name << "\t" << shash << "\t" << len_branch << "\t" << pname << std::endl;
 }
 
-node_sptr_t Tree::next_post_order() {
+node_sptr_t Tree::next_post_order()
+{
   if (curr == subtree_root)
     return nullptr;
   if (!curr) {
@@ -143,13 +146,15 @@ node_sptr_t Tree::next_post_order() {
   }
 }
 
-void Tree::print_info() {
+void Tree::print_info()
+{
   std::cout << "The tree rooted at : " << root->name << std::endl;
   std::cout << "\tNumber of nodes : " << nnodes << std::endl;
   std::cout << "\tTotal branch length : " << total_len_branch << std::endl;
 }
 
-node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b) {
+node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
+{
   if (!a || !b) // LCA(x,0) = LCA(0,x) = x
     return a ? a : b;
   while (a != b) {

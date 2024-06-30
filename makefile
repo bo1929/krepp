@@ -2,7 +2,7 @@
 #--------------------------------------------
 COMPILER = g++
 LDLIBS = -lm -lz -lstdc++ -lcurl
-CXXFLAGS = -std=c++17 -O3 -g -fopenmp 
+CXXFLAGS = -std=c++17 -O3 -g -fopenmp
 WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 
 # project files

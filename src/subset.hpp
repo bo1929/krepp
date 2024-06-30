@@ -8,7 +8,8 @@
 #include "common.hpp"
 #include "tree.hpp"
 
-class Subset : public std::enable_shared_from_this<Subset> {
+class Subset : public std::enable_shared_from_this<Subset>
+{
   friend class Record;
 
 private:
@@ -19,7 +20,8 @@ private:
 public:
   Subset(sh_t shash1, sh_t shash2, record_sptr_t record);
   subset_sptr_t getptr() { return shared_from_this(); }
-  static inline sh_t get_singleton_shash(std::string &name) {
+  static inline sh_t get_singleton_shash(std::string& name)
+  {
     sh_t sh = 0;
     uint32_t a1, a2;
     MurmurHash3_x86_32(name.c_str(), name.length(), MMHSEED0, &a1);
@@ -29,7 +31,8 @@ public:
     sh = sh | static_cast<uint64_t>(a2);
     return sh;
   }
-  static inline sh_t rehash(sh_t sh) {
+  static inline sh_t rehash(sh_t sh)
+  {
     uint32_t a1, a2;
     MurmurHash3_x86_32(&sh, sizeof(sh), MMHSEED0, &a1);
     MurmurHash3_x86_32(&sh, sizeof(sh), MMHSEED1, &a2);
@@ -41,7 +44,8 @@ public:
   }
 };
 
-class Record : public std::enable_shared_from_this<Record> {
+class Record : public std::enable_shared_from_this<Record>
+{
   friend class Subset;
 
 public:
@@ -60,6 +64,7 @@ private:
   std::unordered_map<sh_t, node_sptr_t> sh_to_node = {};
   node_sptr_t subtree_root = nullptr;
   tree_sptr_t tree = nullptr;
+  omp_lock_t main_lock;
 };
 
 #endif
