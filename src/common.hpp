@@ -2,10 +2,13 @@
 #define _COMMON_H
 
 #include "omp.h"
+#include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <curl/curl.h>
 #include <filesystem>
 #include <fstream>
@@ -17,10 +20,10 @@
 #include <random>
 #include <regex>
 #include <string>
+#include <sys/types.h>
 #include <unordered_map>
 #include <vector>
 #include <zlib.h>
-// TODO: Organize all included headers across all headers.
 
 extern uint32_t num_threads;
 extern thread_local std::random_device rd;
@@ -45,8 +48,9 @@ typedef std::shared_ptr<Record> record_sptr_t;
 typedef std::shared_ptr<RefSeq> refseq_sptr_t;
 
 typedef uint64_t sh_t;
+typedef uint64_t inc_t;
 typedef uint32_t enc_t;
-typedef uint_least32_t tuint;
+typedef uint_least32_t tuint_t;
 
 template<typename T>
 using vvec = std::vector<std::vector<T>>;
@@ -130,8 +134,9 @@ static inline u_int64_t cast_bp64_lr64(u_int64_t x)
 
 struct mer_t
 {
-  enc_t encoding;
-  sh_t shash;
+  enc_t encoding = 0;
+  sh_t shash = 0;
+  mer_t(){};
   mer_t(enc_t encoding, sh_t shash)
     : encoding(encoding)
     , shash(shash)

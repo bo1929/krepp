@@ -2,6 +2,8 @@
 
 void Bkrmt::build_library()
 {
+  std::cout << "Building the library..." << std::endl;
+  auto start = std::chrono::system_clock::now();
   DynTable root_dyntable(nrows, ref_tree->get_record());
   omp_set_num_threads(num_threads);
   omp_set_nested(1);
@@ -12,6 +14,11 @@ void Bkrmt::build_library()
       build_for_subtree(ref_tree->get_root(), root_dyntable);
     }
   }
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+  std::cout << "Finished ation at " << std::ctime(&end_time)
+            << "Elapsed time: " << elapsed_seconds.count() << " seconds" << std::endl;
 }
 
 void Bkrmt::build_for_subtree(node_sptr_t nd, DynTable& dt)
@@ -40,7 +47,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, DynTable& dt)
     children_dt_v.assign(nd->get_nchildren(), DynTable(nrows, ref_tree->get_record()));
     omp_lock_t parent_lock;
     omp_init_lock(&parent_lock);
-    for (tuint i = 0; i < nd->get_nchildren(); ++i) {
+    for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
 #pragma omp task untied shared(dt)
       {
         build_for_subtree(children_nd_v[i], children_dt_v[i]);
@@ -61,8 +68,8 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, DynTable& dt)
 
 void Bkrmt::parse_newick_tree()
 {
-  ref_tree = std::make_shared<Tree>(nwk_filepath);
-  ref_tree->parse();
+  ref_tree = std::make_shared<Tree>();
+  ref_tree->parse(nwk_filepath);
   ref_tree->reset_traversal();
 }
 
@@ -182,7 +189,6 @@ int main(int argc, char** argv)
   b.set_hash_func();
   b.read_input_file();
   b.parse_newick_tree();
-  std::cout << "Building the library..." << std::endl;
   b.build_library();
 
   return 0;

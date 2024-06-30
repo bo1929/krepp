@@ -5,7 +5,7 @@
 #include "common.hpp"
 #include "lshf.hpp"
 #include "refseq.hpp"
-#include "subset.hpp"
+#include "record.hpp"
 #include "table.hpp"
 #include "tree.hpp"
 

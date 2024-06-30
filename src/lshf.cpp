@@ -1,6 +1,4 @@
 #include "lshf.hpp"
-#include <cstdint>
-#include <sys/types.h>
 
 LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m, uint32_t r, bool frac)
   : k(k)

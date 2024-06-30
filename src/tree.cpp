@@ -1,17 +1,16 @@
 #include "tree.hpp"
-#include "common.hpp"
 
-void Tree::parse()
+void Tree::parse(std::string nwk_filepath)
 {
   vec<std::string> n_vec;
-  split_nwk(n_vec);
+  split_nwk(nwk_filepath, n_vec);
   root = std::make_shared<Node>(getptr());
   root->parse(n_vec);
   subtree_root = root;
   record = std::make_shared<Record>(root);
 }
 
-void Tree::split_nwk(vec<std::string>& n_vec)
+void Tree::split_nwk(std::string nwk_filepath, vec<std::string>& n_vec)
 {
   std::ifstream tree_file(nwk_filepath);
   std::string nwk_str((std::istreambuf_iterator<char>(tree_file)),
@@ -165,3 +164,11 @@ node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
   }
   return a;
 }
+
+void Tree::save(std::filesystem::path library_dir, std::string suffix)
+{
+  std::ofstream tree_stream(library_dir / ("tree" + suffix), std::ofstream::binary);
+  std::ofstream record_stream(library_dir / ("record" + suffix), std::ofstream::binary);
+}
+
+Tree::Tree(std::filesystem::path library_dir, std::string suffix) {}

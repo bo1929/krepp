@@ -17,7 +17,7 @@ class RefSeq
   friend class DynTable;
 
 public:
-  RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string gpath, lshf_sptr_t hash_func);
+  RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string genomepath, lshf_sptr_t hash_func);
   ~RefSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   bool set_curr_seq()

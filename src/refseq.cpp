@@ -1,7 +1,7 @@
-#include "common.hpp"
 #include "refseq.hpp"
+#include "common.hpp"
 
-RefSeq::RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string gpath, lshf_sptr_t hash_func)
+RefSeq::RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string genomepath, lshf_sptr_t hash_func)
   : k(k)
   , w(w)
   , shash(shash)
@@ -9,11 +9,11 @@ RefSeq::RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string gpath, lshf_sptr_t 
 {
   mask_bp = u64m >> (32 - k) * 2;
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
-  is_url = std::regex_match(gpath, url_regexp);
+  is_url = std::regex_match(genomepath, url_regexp);
   if (is_url) {
-    filepath = download_url(gpath);
+    filepath = download_url(genomepath);
   } else {
-    filepath = gpath;
+    filepath = genomepath;
   }
   file = gzopen(filepath.c_str(), "rb");
   if (file == nullptr) {

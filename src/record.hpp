@@ -15,10 +15,11 @@ class Subset : public std::enable_shared_from_this<Subset>
 private:
   sh_t shash = 0;
   sh_t chash = 0;
-  tuint card = 0;
+  tuint_t card = 0;
 
 public:
   Subset(sh_t shash1, sh_t shash2, record_sptr_t record);
+  Subset(sh_t shash, sh_t chash, tuint_t card): shash(shash), chash(chash), card(card) {}
   subset_sptr_t getptr() { return shared_from_this(); }
   static inline sh_t get_singleton_shash(std::string& name)
   {
@@ -64,7 +65,6 @@ private:
   std::unordered_map<sh_t, node_sptr_t> sh_to_node = {};
   node_sptr_t subtree_root = nullptr;
   tree_sptr_t tree = nullptr;
-  omp_lock_t main_lock;
 };
 
 #endif
