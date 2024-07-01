@@ -9,9 +9,7 @@ class Tree : public std::enable_shared_from_this<Tree>
   friend class Node;
 
 public:
-  Tree()
-  {}
-  Tree(std::filesystem::path library_dir, std::string suffix);
+  Tree() {}
   void set_subtree(node_sptr_t nd) { subtree_root = nd; }
   tree_sptr_t getptr() { return shared_from_this(); }
   record_sptr_t get_record() { return record; }
@@ -25,8 +23,9 @@ public:
   node_sptr_t next_post_order();
   static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
   void parse(std::string nwk_filepath);
-  void split_nwk(std::string nwk_filepath, vec<std::string>& n_vec);
+  void split_nwk(vec<std::string>& n_vec);
   void save(std::filesystem::path library_dir, std::string suffix);
+  void load (std::filesystem::path library_dir, std::string suffix);
 
 private:
   tuint_t atter = 0;
@@ -36,6 +35,7 @@ private:
   node_sptr_t subtree_root = nullptr;
   node_sptr_t root = nullptr;
   node_sptr_t curr = nullptr;
+  std::string nwk_str;
 };
 
 class Node : public std::enable_shared_from_this<Node>

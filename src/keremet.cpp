@@ -71,6 +71,7 @@ void Bkrmt::parse_newick_tree()
   ref_tree = std::make_shared<Tree>();
   ref_tree->parse(nwk_filepath);
   ref_tree->reset_traversal();
+  ref_tree->save(library_dir, "");
 }
 
 void Bkrmt::read_input_file()
@@ -132,6 +133,7 @@ Bkrmt::Bkrmt(CLI::App& sub_build)
     if (!(sub_build.count("-w") + sub_build.count("--win-len"))) {
       w = k + 3;
     }
+    std::filesystem::create_directory(library_dir);
   });
 }
 

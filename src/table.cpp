@@ -231,8 +231,9 @@ void DynTable::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t
   vec<mer_t> temp_v;
   temp_v.reserve(source_v.size() + dest_v.size());
   auto iter_d = dest_v.begin(), iter_s = source_v.begin();
-  for (; iter_s != source_v.end() && iter_d != dest_v.end(); ++iter_s) {
+  for (; iter_s != source_v.end(); ++iter_s) {
     while (iter_d != dest_v.end() && iter_s->encoding > iter_d->encoding) {
+      /* temp_v.push_back(std::move(*iter_d)); */
       temp_v.push_back(std::move(*iter_d));
       iter_d++;
     }

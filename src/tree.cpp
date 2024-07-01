@@ -2,19 +2,19 @@
 
 void Tree::parse(std::string nwk_filepath)
 {
+  std::ifstream tree_stream(nwk_filepath);
+  nwk_str =
+    std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
   vec<std::string> n_vec;
-  split_nwk(nwk_filepath, n_vec);
+  split_nwk(n_vec);
   root = std::make_shared<Node>(getptr());
   root->parse(n_vec);
   subtree_root = root;
   record = std::make_shared<Record>(root);
 }
 
-void Tree::split_nwk(std::string nwk_filepath, vec<std::string>& n_vec)
+void Tree::split_nwk(vec<std::string>& n_vec)
 {
-  std::ifstream tree_file(nwk_filepath);
-  std::string nwk_str((std::istreambuf_iterator<char>(tree_file)),
-                      std::istreambuf_iterator<char>());
   int i = 0;
   int at = 0;
   char buf[nwk_str.length()];
@@ -167,8 +167,26 @@ node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
 
 void Tree::save(std::filesystem::path library_dir, std::string suffix)
 {
-  std::ofstream tree_stream(library_dir / ("tree" + suffix), std::ofstream::binary);
-  std::ofstream record_stream(library_dir / ("record" + suffix), std::ofstream::binary);
+  std::ofstream tree_stream(library_dir / ("tree" + suffix));
+  std::ostream_iterator<char> output_iterator(tree_stream);
+  std::copy(nwk_str.begin(), nwk_str.end(), output_iterator);
+  if (!tree_stream.good()) {
+    std::cerr << "Writing the parsed reference tree to has failed!" << library_dir << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  /* std::ofstream record_stream(library_dir / ("record" + suffix), std::ofstream::binary); */
 }
 
-Tree::Tree(std::filesystem::path library_dir, std::string suffix) {}
+void Tree::load(std::filesystem::path library_dir, std::string suffix)
+{
+  std::ifstream tree_stream(library_dir / ("tree" + suffix));
+  nwk_str =
+    std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
+  vec<std::string> n_vec;
+  split_nwk(n_vec);
+  root = std::make_shared<Node>(getptr());
+  atter = 0, nnodes = 0, total_len_branch = 0;
+  root->parse(n_vec);
+  subtree_root = root;
+  record = std::make_shared<Record>(root);
+}
