@@ -5,69 +5,77 @@ FlatTable::FlatTable(DynTable& source)
   nkmers = source.nkmers;
   nrows = source.nrows;
   inc_v.resize(nrows);
-  mer_v.reserve(nkmers);
+  cmer_v.reserve(nkmers);
   inc_t limit_inc = std::numeric_limits<inc_t>::max();
   inc_t copy_inc;
   inc_t lix = 0;
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, source.mer_vvec[rix].size());
-    std::copy(source.mer_vvec[rix].begin(),
-              std::next(source.mer_vvec[rix].begin(), copy_inc),
-              std::back_inserter(mer_v));
+    std::transform(source.mer_vvec[rix].begin(),
+                   std::next(source.mer_vvec[rix].begin(), copy_inc),
+                   std::back_inserter(cmer_v),
+                   conv_mer_cmer);
     inc_v[rix] = lix;
     lix += copy_inc;
   }
+  // TODO: Check if deallocation is more efficient and do not reserve.
 }
 
 FlatTable::FlatTable(std::filesystem::path library_dir, std::string suffix)
 {
   std::filesystem::path mer_path = library_dir / ("mer" + suffix);
-  std::filesystem::path inc_path = library_dir / ("inc" + suffix);
   std::ifstream mer_stream(mer_path, std::ifstream::binary);
-  std::ifstream inc_stream(inc_path, std::ifstream::binary);
   if (!mer_stream.is_open()) {
     std::cerr << "Failed to open " << mer_path << std::endl;
     exit(EXIT_FAILURE);
   } else {
-    nkmers = std::filesystem::file_size(mer_path) / sizeof(mer_t);
-    mer_v.resize(nkmers);
-    mer_stream.read(reinterpret_cast<char*>(mer_v.data()), nkmers * sizeof(mer_t));
-    assert(nkmers == mer_v.size());
+    mer_stream.read(reinterpret_cast<char*>(&nkmers), sizeof(uint64_t));
+    cmer_v.resize(nkmers);
+    mer_stream.read(reinterpret_cast<char*>(cmer_v.data()), nkmers * sizeof(cmer_t));
+    assert(nkmers == cmer_v.size());
   }
+  if (!mer_stream.good()) {
+    std::cerr << "Reading k-mer vector to has failed!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  mer_stream.close();
+
+  std::filesystem::path inc_path = library_dir / ("inc" + suffix);
+  std::ifstream inc_stream(inc_path, std::ifstream::binary);
   if (!inc_stream.is_open()) {
     std::cerr << "Failed to open " << inc_path << std::endl;
     exit(EXIT_FAILURE);
   } else {
-    nrows = std::filesystem::file_size(inc_path) / sizeof(inc_t);
+    inc_stream.read(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
     inc_v.resize(nrows);
     inc_stream.read(reinterpret_cast<char*>(inc_v.data()), nrows * sizeof(inc_t));
     assert(nrows == inc_v.size());
   }
-  if (!mer_stream.good()) {
-    std::cerr << "Reading k-mer vector to has failed!" << library_dir << std::endl;
-    exit(EXIT_FAILURE);
-  }
   if (!inc_stream.good()) {
-    std::cerr << "Reading index-increment vector has failed!" << library_dir << std::endl;
+    std::cerr << "Reading index-increment vector has failed!" << std::endl;
     exit(EXIT_FAILURE);
   }
+  inc_stream.close();
 }
 
 void FlatTable::save(std::filesystem::path library_dir, std::string suffix)
 {
   std::ofstream mer_stream(library_dir / ("mer" + suffix), std::ofstream::binary);
-  std::ofstream inc_stream(library_dir / ("inc" + suffix), std::ofstream::binary);
-  mer_stream.write(reinterpret_cast<const char*>(mer_v.data()), sizeof(mer_t) * mer_v.size());
-  inc_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * inc_v.size());
+  mer_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
+  mer_stream.write(reinterpret_cast<const char*>(cmer_v.data()), sizeof(cmer_t) * cmer_v.size());
   if (!mer_stream.good()) {
-    std::cerr << "Writing k-mer vector to has failed!" << library_dir << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  if (!inc_stream.good()) {
-    std::cerr << "Writing index-increment vector has failed!" << library_dir << std::endl;
+    std::cerr << "Writing k-mer vector has failed!" << std::endl;
     exit(EXIT_FAILURE);
   }
   mer_stream.close();
+
+  std::ofstream inc_stream(library_dir / ("inc" + suffix), std::ofstream::binary);
+  inc_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
+  inc_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * inc_v.size());
+  if (!inc_stream.good()) {
+    std::cerr << "Writing index-increment vector has failed!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
   inc_stream.close();
 }
 

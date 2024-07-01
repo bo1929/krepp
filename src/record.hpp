@@ -19,7 +19,11 @@ private:
 
 public:
   Subset(sh_t shash1, sh_t shash2, record_sptr_t record);
-  Subset(sh_t shash, sh_t chash, tuint_t card): shash(shash), chash(chash), card(card) {}
+  Subset(sh_t shash, sh_t chash, tuint_t card)
+    : shash(shash)
+    , chash(chash)
+    , card(card)
+  {}
   subset_sptr_t getptr() { return shared_from_this(); }
   static inline sh_t get_singleton_shash(std::string& name)
   {
@@ -59,6 +63,8 @@ public:
   record_sptr_t getptr() { return shared_from_this(); }
   // bool check_collision(subset_sptr_t x);
   // bool check_conflict(record_sptr_t x);
+  void save(std::filesystem::path library_dir, std::string suffix);
+  void load(std::filesystem::path library_dir, std::string suffix);
 
 private:
   std::unordered_map<sh_t, subset_sptr_t> sh_to_subset = {};

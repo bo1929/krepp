@@ -1,4 +1,5 @@
 #include "record.hpp"
+#include <cstdint>
 
 Record::Record(node_sptr_t nd)
 {
@@ -124,5 +125,97 @@ Subset::Subset(sh_t shash1, sh_t shash2, record_sptr_t record)
       std::quick_exit(EXIT_FAILURE);
     }
     // TODO: Consider adding another subsets to the record for further pruning.
+  }
+}
+
+void Record::save(std::filesystem::path library_dir, std::string suffix)
+{
+#pragma omp critical(RecordLock)
+  {
+    std::ofstream subset_stream(library_dir / ("subset_records" + suffix), std::ofstream::binary);
+    uint64_t nsubsets = static_cast<uint64_t>(sh_to_subset.size());
+    subset_stream.write(reinterpret_cast<char*>(&nsubsets), sizeof(uint64_t));
+    for (auto& [shash, subset_sptr] : sh_to_subset) {
+      subset_stream.write(reinterpret_cast<char*>(&subset_sptr->shash), sizeof(sh_t));
+      subset_stream.write(reinterpret_cast<char*>(&subset_sptr->chash), sizeof(sh_t));
+      subset_stream.write(reinterpret_cast<char*>(&subset_sptr->card), sizeof(tuint_t));
+    }
+    if (!subset_stream.good()) {
+      std::cerr << "Writing the subset records of the tree has failed!" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    subset_stream.close();
+
+    std::ofstream node_stream(library_dir / ("node_records" + suffix), std::ofstream::binary);
+    uint32_t name_length;
+    uint64_t nnodes = static_cast<uint64_t>(sh_to_node.size());
+    node_stream.write(reinterpret_cast<char*>(&nnodes), sizeof(uint64_t));
+    for (auto& [shash, node_sptr] : sh_to_node) {
+      name_length = static_cast<uint32_t>(node_sptr->name.length());
+      node_stream.write(reinterpret_cast<char*>(&node_sptr->shash), sizeof(sh_t));
+      node_stream.write(reinterpret_cast<char*>(&name_length), sizeof(uint32_t));
+      node_stream.write(node_sptr->name.c_str(), name_length);
+    }
+    if (!node_stream.good()) {
+      std::cerr << "Writing the node records of the tree has failed!" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    node_stream.close();
+  }
+}
+
+void Record::load(std::filesystem::path library_dir, std::string suffix)
+{
+#pragma omp critical(RecordLock)
+  {
+    std::filesystem::path subset_path = library_dir / ("subset_records" + suffix);
+    std::ifstream subset_stream(subset_path, std::ifstream::binary);
+    if (!subset_stream.is_open()) {
+      std::cerr << "Failed to open " << subset_path << std::endl;
+      exit(EXIT_FAILURE);
+    } else {
+      sh_t shash, chash, card;
+      uint64_t nsubsets;
+      subset_stream.read(reinterpret_cast<char*>(&nsubsets), sizeof(uint64_t));
+      for (uint64_t six = 0; six < nsubsets; ++six) {
+        subset_stream.read(reinterpret_cast<char*>(&shash), sizeof(sh_t));
+        subset_stream.read(reinterpret_cast<char*>(&chash), sizeof(sh_t));
+        subset_stream.read(reinterpret_cast<char*>(&card), sizeof(tuint_t));
+        sh_to_subset.emplace(shash, std::make_shared<Subset>(shash, chash, card));
+      }
+    }
+    if (!subset_stream.good()) {
+      std::cerr << "Reading subset records of the tree has failed!" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    subset_stream.close();
+
+    std::filesystem::path node_path = library_dir / ("node_records" + suffix);
+    std::ifstream node_stream(node_path, std::ifstream::binary);
+    if (!node_stream.is_open()) {
+      std::cerr << "Failed to open " << node_path << std::endl;
+      exit(EXIT_FAILURE);
+    } else {
+      sh_t shash;
+      uint32_t name_length;
+      std::string name;
+      uint64_t nnodes;
+      node_stream.read(reinterpret_cast<char*>(&nnodes), sizeof(uint64_t));
+      for (uint64_t nix = 0; nix < nnodes; ++nix) {
+        node_stream.read(reinterpret_cast<char*>(&shash), sizeof(sh_t));
+        node_stream.read(reinterpret_cast<char*>(&name_length), sizeof(uint32_t));
+        name.resize(name_length);
+        node_stream.read(name.data(), name_length);
+        if (!(sh_to_node.find(shash) != sh_to_node.end() && sh_to_node[shash]->name == name)) {
+          std::cerr << "Inconsistency between loaded and assigned hash values." << std::endl;
+          exit(EXIT_FAILURE);
+        }
+      }
+    }
+    if (!node_stream.good()) {
+      std::cerr << "Reading node records of the tree has failed!" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    subset_stream.close();
   }
 }

@@ -127,7 +127,7 @@ static inline uint64_t rmoddp_b64(uint64_t x)
   return x;
 }
 
-static inline u_int64_t cast_bp64_lr64(u_int64_t x)
+static inline u_int64_t conv_bp64_lr64(u_int64_t x)
 {
   return (rmoddp_b64(x >> 1) << 32) | rmoddp_b64(x);
 }
@@ -142,6 +142,8 @@ struct mer_t
     , shash(shash)
   {}
 };
+typedef uint64_t se_t;
+typedef std::pair<enc_t, se_t> cmer_t;
 
 #define assertm(exp, msg) assert(((void)msg, exp))
 

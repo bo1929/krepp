@@ -2,8 +2,8 @@
 #define _TABLE_H
 
 #include "common.hpp"
-#include "refseq.hpp"
 #include "record.hpp"
+#include "refseq.hpp"
 
 #define NONSTD_UNION
 // TODO: Choose one, one of the options has a bug.
@@ -61,11 +61,15 @@ public:
   FlatTable(DynTable& source);
   FlatTable(std::filesystem::path library_dir, std::string suffix);
   void save(std::filesystem::path library_dir, std::string suffix);
+  static cmer_t conv_mer_cmer(mer_t x)
+  {
+    return std::make_pair(x.encoding, static_cast<se_t>(x.shash));
+  }
 
 private:
   uint32_t nrows;
   uint64_t nkmers;
-  vec<mer_t> mer_v;
+  vec<cmer_t> cmer_v;
   vec<inc_t> inc_v;
 };
 

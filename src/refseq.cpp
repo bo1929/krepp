@@ -85,7 +85,7 @@ void RefSeq::extract_mers(vvec<mer_t>& table)
     renc64_bp = revcomp_b64(cenc64_bp, k);
     if (cenc64_bp < renc64_bp) {
       cenc64_bp = renc64_bp;
-      cenc64_lr = cast_bp64_lr64(renc64_bp);
+      cenc64_lr = conv_bp64_lr64(renc64_bp);
     }
     hash_func->drop_ppos_enc(cenc64_bp, cenc64_lr, cenc32_bp, cenc32_lr);
     rix = hash_func->compute_hash(cenc64_bp);

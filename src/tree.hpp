@@ -25,7 +25,7 @@ public:
   void parse(std::string nwk_filepath);
   void split_nwk(vec<std::string>& n_vec);
   void save(std::filesystem::path library_dir, std::string suffix);
-  void load (std::filesystem::path library_dir, std::string suffix);
+  void load(std::filesystem::path library_dir, std::string suffix);
 
 private:
   tuint_t atter = 0;
@@ -42,6 +42,7 @@ class Node : public std::enable_shared_from_this<Node>
 {
   friend class Tree;
   friend class Subset;
+  friend class Record;
 
 public:
   Node(tree_sptr_t tree)

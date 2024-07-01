@@ -5,6 +5,7 @@ void Tree::parse(std::string nwk_filepath)
   std::ifstream tree_stream(nwk_filepath);
   nwk_str =
     std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
+  tree_stream.close();
   vec<std::string> n_vec;
   split_nwk(n_vec);
   root = std::make_shared<Node>(getptr());
@@ -171,10 +172,12 @@ void Tree::save(std::filesystem::path library_dir, std::string suffix)
   std::ostream_iterator<char> output_iterator(tree_stream);
   std::copy(nwk_str.begin(), nwk_str.end(), output_iterator);
   if (!tree_stream.good()) {
-    std::cerr << "Writing the parsed reference tree to has failed!" << library_dir << std::endl;
+    std::cerr << "Writing the parsed reference tree has failed!" << std::endl;
     exit(EXIT_FAILURE);
   }
-  /* std::ofstream record_stream(library_dir / ("record" + suffix), std::ofstream::binary); */
+  tree_stream.close();
+
+  record->save(library_dir, suffix);
 }
 
 void Tree::load(std::filesystem::path library_dir, std::string suffix)
@@ -182,6 +185,7 @@ void Tree::load(std::filesystem::path library_dir, std::string suffix)
   std::ifstream tree_stream(library_dir / ("tree" + suffix));
   nwk_str =
     std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
+  tree_stream.close();
   vec<std::string> n_vec;
   split_nwk(n_vec);
   root = std::make_shared<Node>(getptr());
@@ -189,4 +193,5 @@ void Tree::load(std::filesystem::path library_dir, std::string suffix)
   root->parse(n_vec);
   subtree_root = root;
   record = std::make_shared<Record>(root);
+  record->load(library_dir, suffix);
 }

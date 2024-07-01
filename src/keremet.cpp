@@ -1,9 +1,12 @@
 #include "keremet.hpp"
+#include "table.hpp"
+#include <string>
 
 void Bkrmt::build_library()
 {
   std::cout << "Building the library..." << std::endl;
-  auto start = std::chrono::system_clock::now();
+
+  auto start_b = std::chrono::system_clock::now();
   DynTable root_dyntable(nrows, ref_tree->get_record());
   omp_set_num_threads(num_threads);
   omp_set_nested(1);
@@ -14,11 +17,20 @@ void Bkrmt::build_library()
       build_for_subtree(ref_tree->get_root(), root_dyntable);
     }
   }
-  auto end = std::chrono::system_clock::now();
-  std::chrono::duration<double> elapsed_seconds = end - start;
-  std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-  std::cout << "Finished ation at " << std::ctime(&end_time)
-            << "Elapsed time: " << elapsed_seconds.count() << " seconds" << std::endl;
+  auto end_b = std::chrono::system_clock::now();
+  std::chrono::duration<double> es_b = end_b - start_b;
+  std::cout << "Finished building, elapsed: " << es_b.count() << " seconds" << std::endl;
+
+  auto start_c = std::chrono::system_clock::now();
+  FlatTable root_flattable(root_dyntable);
+  root_flattable.save(library_dir, suffix);
+  ref_tree->save(library_dir, suffix);
+  auto end_c = std::chrono::system_clock::now();
+  std::chrono::duration<double> es_s = end_c - start_c;
+  std::cout << "Done converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
+
+  std::time_t end_time = std::chrono::system_clock::to_time_t(end_c);
+  std::cout << std::ctime(&end_time);
 }
 
 void Bkrmt::build_for_subtree(node_sptr_t nd, DynTable& dt)
@@ -71,7 +83,6 @@ void Bkrmt::parse_newick_tree()
   ref_tree = std::make_shared<Tree>();
   ref_tree->parse(nwk_filepath);
   ref_tree->reset_traversal();
-  ref_tree->save(library_dir, "");
 }
 
 void Bkrmt::read_input_file()
@@ -134,6 +145,10 @@ Bkrmt::Bkrmt(CLI::App& sub_build)
       w = k + 3;
     }
     std::filesystem::create_directory(library_dir);
+    suffix = "-";
+    /* suffix += "k" + std::to_string(k) + "w" + std::to_string(w) + "h" + std::to_string(h); */
+    suffix += "m" + std::to_string(m) + "r" + std::to_string(r);
+    suffix += frac ? "-frac" : "-no_frac";
   });
 }
 

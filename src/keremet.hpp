@@ -4,8 +4,8 @@
 #include "CLI11.hpp"
 #include "common.hpp"
 #include "lshf.hpp"
-#include "refseq.hpp"
 #include "record.hpp"
+#include "refseq.hpp"
 #include "table.hpp"
 #include "tree.hpp"
 
@@ -32,6 +32,7 @@ private:
   std::string nwk_filepath;
   std::string input_filepath;
   std::unordered_map<std::string, std::string> name_to_gpath;
+  std::string suffix;
   tree_sptr_t ref_tree = nullptr;
   lshf_sptr_t hash_func = nullptr;
 };
