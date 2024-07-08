@@ -3,18 +3,20 @@
 
 #include "common.hpp"
 #include "record.hpp"
-#include "refseq.hpp"
+#include "rqseq.hpp"
+#include <cstdint>
 
 #define NONSTD_UNION
 // TODO: Choose one, one of the options has a bug.
 
-class DynTable
+class DynHT
 {
-  friend class FlatTable;
+  friend class FlatHT;
 
 public:
-  DynTable(uint32_t nrows, record_sptr_t record)
+  DynHT(uint32_t nrows, tree_sptr_t tree, record_sptr_t record)
     : nrows(nrows)
+    , tree(tree)
     , record(record)
     , nkmers(0)
   {}
@@ -22,15 +24,14 @@ public:
   void clear_rows();
   void make_unique();
   void sort_columns();
-  void ensure_sorted_columns();
-  void prune_columns(size_t max_size);
-  void union_table(DynTable& source);
-  void update_size_hist();
   void update_nkmers();
+  void update_size_hist();
+  void ensure_sorted_columns();
+  void union_table(DynHT& source);
+  void fill_table(rseq_sptr_t rqseq);
+  void prune_columns(size_t max_size);
   void reserve() { mer_vvec.reserve(nrows); }
-  void fill_table(refseq_sptr_t refseq);
-  uint64_t get_nkmers() { return nkmers; }
-#ifdef NONSTD_UNION
+#ifdef NONSTD_UNION // TODO: Benchmark for static vs non-static, and std non-std, in-place etc.
   static void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t record);
 #else
   static void
@@ -44,33 +45,48 @@ public:
   {
     return left.encoding == right.encoding;
   }
+  uint64_t get_nkmers() { return nkmers; }
+  cmer_t conv_mer_cmer(mer_t x) { return std::make_pair(x.encoding, record->map_compact(x.shash)); }
 
 private:
   uint32_t nrows;
   uint64_t nkmers;
-  vvec<mer_t> mer_vvec;
+  tree_sptr_t tree;
   record_sptr_t record;
+  vvec<mer_t> mer_vvec;
   std::map<size_t, uint32_t> size_hist;
 };
 
-class FlatTable
+class FlatHT
 {
-  friend class DynTable;
+  friend class DynHT;
 
 public:
-  FlatTable(DynTable& source);
-  FlatTable(std::filesystem::path library_dir, std::string suffix);
+  FlatHT(DynHT& source);
+  FlatHT(tree_sptr_t tree, crecord_sptr_t crecord)
+    : tree(tree)
+    , crecord(crecord){};
+  void load(std::filesystem::path library_dir, std::string suffix);
   void save(std::filesystem::path library_dir, std::string suffix);
-  static cmer_t conv_mer_cmer(mer_t x)
+  void set_crecord(crecord_sptr_t source) { crecord = source; }
+  void set_tree(tree_sptr_t source) { tree = source; }
+  crecord_sptr_t get_crecord() { return crecord; }
+  tree_sptr_t get_tree() { return tree; }
+  std::vector<cmer_t>::const_iterator begin() { return cmer_v.begin(); }
+  std::vector<cmer_t>::const_iterator end() { return cmer_v.end(); }
+  std::vector<cmer_t>::const_iterator at(uint32_t rix)
   {
-    return std::make_pair(x.encoding, static_cast<se_t>(x.shash));
+    return std::next(cmer_v.begin(), inc_v[rix]);
   }
+  inc_t get_inc(uint32_t rix) { return inc_v[rix]; }
 
 private:
-  uint32_t nrows;
-  uint64_t nkmers;
-  vec<cmer_t> cmer_v;
+  uint32_t nrows = 0;
+  uint64_t nkmers = 0;
   vec<inc_t> inc_v;
+  vec<cmer_t> cmer_v;
+  tree_sptr_t tree = nullptr;
+  crecord_sptr_t crecord = nullptr;
 };
 
 #endif

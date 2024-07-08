@@ -1,9 +1,11 @@
-#ifndef _READER_H
-#define _READER_H
+#ifndef _RQSEQ_H
+#define _RQSEQ_H
 
 #include "common.hpp"
 #include "lshf.hpp"
 #include "table.hpp"
+
+#define BATCH_SIZE 262144
 
 extern "C"
 {
@@ -12,13 +14,13 @@ extern "C"
 
 KSEQ_INIT(gzFile, gzread)
 
-class RefSeq
+class RSeq
 {
-  friend class DynTable;
+  friend class DynHT;
 
 public:
-  RefSeq(uint8_t k, uint8_t w, sh_t shash, std::string genomepath, lshf_sptr_t hash_func);
-  ~RefSeq();
+  RSeq(uint8_t w, uint32_t r, bool frac, sh_t shash, lshf_sptr_t lshashf, std::string input);
+  ~RSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   bool set_curr_seq()
   {
@@ -27,28 +29,9 @@ public:
     len = kseq->seq.l;
     return len >= k;
   }
-  static void compute_encoding(char* s1, char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
+  static size_t write_data(void* ptr, size_t s, size_t nmb, FILE* fst)
   {
-    enc_lr = 0;
-    enc_bp = 0;
-    for (; s1 < s2; s1++) {
-      enc_lr <<= 1;
-      enc_bp <<= 2;
-      enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
-      enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
-    }
-  }
-  static void update_encoding(char* s1, uint64_t& enc_lr, uint64_t& enc_bp)
-  {
-    enc_lr <<= 1;
-    enc_bp <<= 2;
-    enc_lr &= 0xFFFFFFFEFFFFFFFE;
-    enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
-    enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
-  }
-  static size_t write_data(void* ptr, size_t size, size_t nmemb, FILE* fst)
-  {
-    size_t written = fwrite(ptr, size, nmemb, fst);
+    size_t written = fwrite(ptr, s, nmb, fst);
     return written;
   }
   void extract_mers(vvec<mer_t>& table);
@@ -57,9 +40,12 @@ public:
 private:
   uint8_t k;
   uint8_t w;
-  lshf_sptr_t hash_func;
-  std::string filepath;
-  gzFile file;
+  uint32_t m;
+  uint32_t r;
+  bool frac;
+  lshf_sptr_t lshashf;
+  std::filesystem::path input_path;
+  gzFile gfile;
   bool is_url;
   kseq_t* kseq;
   uint64_t len;
@@ -68,9 +54,28 @@ private:
   sh_t shash;
   uint64_t mask_bp;
   uint64_t mask_lr;
-  const uint32_t max_rix = std::numeric_limits<uint32_t>::max();
-  const uint64_t u64m = std::numeric_limits<uint64_t>::max();
   const std::regex url_regexp = std::regex(
     R"(^(?:(?:https?|ftp)://)(?:\S+@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:[a-z\u00a1-\uffff0-9]+-)*[a-z\u00a1-\uffff0-9]+(?:\.(?:[a-z\u00a1-\uffff0-9]+-)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:/\S*)?$)");
 };
+
+class QSeq
+{
+  friend class QBatch;
+
+public:
+  QSeq(std::filesystem::path input_path);
+  ~QSeq();
+  bool read_next_batch();
+  bool is_batch_finished();
+  void clear_curr_batch();
+
+private:
+  gzFile gfile;
+  kseq_t* kseq;
+  uint64_t batch_size;
+  vec<std::string> seq_batch;
+  vec<std::string> name_batch;
+  std::filesystem::path input_path;
+};
+
 #endif

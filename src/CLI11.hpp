@@ -99,7 +99,7 @@
 #endif
 
 // GCC < 10 doesn't ignore this in unevaluated contexts
-#if !defined(CLI11_CPP17) || (defined(__GNUC__) && !defined(__llvm__) &&                          \
+#if !defined(CLI11_CPP17) || (defined(__GNUC__) && !defined(__llvm__) &&                           \
                               !defined(__INTEL_COMPILER) && __GNUC__ < 10 && __GNUC__ > 4)
   #define CLI11_NODISCARD
 #else
@@ -487,10 +487,8 @@ namespace CLI {
       return input;
     }
 
-    CLI11_INLINE std::ostream& format_help(std::ostream& out,
-                                           std::string name,
-                                           const std::string& description,
-                                           std::size_t wid)
+    CLI11_INLINE std::ostream&
+    format_help(std::ostream& out, std::string name, const std::string& description, std::size_t wid)
     {
       name = "  " + name;
       out << std::setw(static_cast<int>(wid)) << std::left << name;
@@ -610,8 +608,7 @@ namespace CLI {
         if (delims.find_first_of(str[0]) != std::string::npos) {
           keyChar = str[0];
           auto end = str.find_first_of(keyChar, 1);
-          while ((end != std::string::npos) &&
-                 (str[end - 1] == '\\')) { // deal with escaped quotes
+          while ((end != std::string::npos) && (str[end - 1] == '\\')) { // deal with escaped quotes
             end = str.find_first_of(keyChar, end + 1);
             embeddedQuote = true;
           }
@@ -677,28 +674,28 @@ namespace CLI {
 
 // Use one of these on all error classes.
 // These are temporary and are undef'd at the end of this file.
-#define CLI11_ERROR_DEF(parent, name)                                                             \
-protected:                                                                                        \
-  name(std::string ename, std::string msg, int exit_code)                                         \
-    : parent(std::move(ename), std::move(msg), exit_code)                                         \
-  {}                                                                                              \
-  name(std::string ename, std::string msg, ExitCodes exit_code)                                   \
-    : parent(std::move(ename), std::move(msg), exit_code)                                         \
-  {}                                                                                              \
-                                                                                                  \
-public:                                                                                           \
-  name(std::string msg, ExitCodes exit_code)                                                      \
-    : parent(#name, std::move(msg), exit_code)                                                    \
-  {}                                                                                              \
-  name(std::string msg, int exit_code)                                                            \
-    : parent(#name, std::move(msg), exit_code)                                                    \
+#define CLI11_ERROR_DEF(parent, name)                                                              \
+protected:                                                                                         \
+  name(std::string ename, std::string msg, int exit_code)                                          \
+    : parent(std::move(ename), std::move(msg), exit_code)                                          \
+  {}                                                                                               \
+  name(std::string ename, std::string msg, ExitCodes exit_code)                                    \
+    : parent(std::move(ename), std::move(msg), exit_code)                                          \
+  {}                                                                                               \
+                                                                                                   \
+public:                                                                                            \
+  name(std::string msg, ExitCodes exit_code)                                                       \
+    : parent(#name, std::move(msg), exit_code)                                                     \
+  {}                                                                                               \
+  name(std::string msg, int exit_code)                                                             \
+    : parent(#name, std::move(msg), exit_code)                                                     \
   {}
 
 // This is added after the one above if a class is used directly and builds its
 // own message
-#define CLI11_ERROR_SIMPLE(name)                                                                  \
-  explicit name(std::string msg)                                                                  \
-    : name(#name, msg, ExitCodes::name)                                                           \
+#define CLI11_ERROR_SIMPLE(name)                                                                   \
+  explicit name(std::string msg)                                                                   \
+    : name(#name, msg, ExitCodes::name)                                                            \
   {}
 
   /// These codes are part of every error in CLI. They can be obtained from e
@@ -745,9 +742,7 @@ public:                                                                         
 
     CLI11_NODISCARD std::string get_name() const { return error_name; }
 
-    Error(std::string name,
-          std::string msg,
-          int exit_code = static_cast<int>(ExitCodes::BaseClass))
+    Error(std::string name, std::string msg, int exit_code = static_cast<int>(ExitCodes::BaseClass))
       : runtime_error(msg)
       , actual_exit_code(exit_code)
       , error_name(std::move(name))
@@ -869,8 +864,7 @@ public:                                                                         
   {
     CLI11_ERROR_DEF(Success, CallForHelp)
     CallForHelp()
-      : CallForHelp("This should be caught in your main function, see examples",
-                    ExitCodes::Success)
+      : CallForHelp("This should be caught in your main function, see examples", ExitCodes::Success)
     {}
   };
 
@@ -1017,8 +1011,7 @@ public:                                                                         
     }
     static ArgumentMismatch TypedAtLeast(std::string name, int num, std::string type)
     {
-      return ArgumentMismatch(name + ": " + std::to_string(num) + " required " + type +
-                              " missing");
+      return ArgumentMismatch(name + ": " + std::to_string(num) + " required " + type + " missing");
     }
     static ArgumentMismatch FlagOverride(std::string name)
     {
@@ -1367,8 +1360,8 @@ public:                                                                         
     class is_complex
     {
       template<typename TT>
-      static auto test(int)
-        -> decltype(std::declval<TT>().real(), std::declval<TT>().imag(), std::true_type());
+      static auto
+      test(int) -> decltype(std::declval<TT>().real(), std::declval<TT>().imag(), std::true_type());
 
       template<typename>
       static auto test(...) -> std::false_type;
@@ -1464,9 +1457,8 @@ public:                                                                         
     };
 
     /// Convert an object to a string (directly forward if this can become a string)
-    template<
-      typename T,
-      enable_if_t<std::is_convertible<T, std::string>::value, detail::enabler> = detail::dummy>
+    template<typename T,
+             enable_if_t<std::is_convertible<T, std::string>::value, detail::enabler> = detail::dummy>
     auto to_string(T&& value) -> decltype(std::forward<T>(value))
     {
       return std::forward<T>(value);
@@ -1558,8 +1550,8 @@ public:                                                                         
     }
     /// for other types just use the regular to_string function
     template<typename T,
-             enable_if_t<!std::is_enum<T>::value && !std::is_arithmetic<T>::value,
-                         detail::enabler> = detail::dummy>
+             enable_if_t<!std::is_enum<T>::value && !std::is_arithmetic<T>::value, detail::enabler> =
+               detail::dummy>
     auto value_string(const T& value) -> decltype(to_string(value))
     {
       return to_string(value);
@@ -1632,10 +1624,9 @@ public:                                                                         
 
     /// Type size for regular object types that do not look like a tuple
     template<typename T>
-    struct type_count<
-      T,
-      typename std::enable_if<!is_wrapper<T>::value && !is_tuple_like<T>::value &&
-                              !is_complex<T>::value && !std::is_void<T>::value>::type>
+    struct type_count<T,
+                      typename std::enable_if<!is_wrapper<T>::value && !is_tuple_like<T>::value &&
+                                              !is_complex<T>::value && !std::is_void<T>::value>::type>
     {
       static constexpr int value{1};
     };
@@ -1975,8 +1966,7 @@ public:                                                                         
       T,
       typename std::enable_if<is_tuple_like<T>::value &&
                               ((type_count<T>::value >= 2 && !is_wrapper<T>::value) ||
-                               (uncommon_type<T>::value &&
-                                !is_direct_constructible<T, double>::value &&
+                               (uncommon_type<T>::value && !is_direct_constructible<T, double>::value &&
                                 !is_direct_constructible<T, int>::value) ||
                                (uncommon_type<T>::value && type_count<T>::value >= 2))>::type>
     {
@@ -2004,8 +1994,8 @@ public:                                                                         
     /// But this is cleaner and works better in this case
 
     template<typename T,
-             enable_if_t<classify_object<T>::value == object_category::char_value,
-                         detail::enabler> = detail::dummy>
+             enable_if_t<classify_object<T>::value == object_category::char_value, detail::enabler> =
+               detail::dummy>
     constexpr const char* type_name()
     {
       return "CHAR";
@@ -2183,8 +2173,7 @@ public:                                                                         
         return false;
       }
       output = static_cast<T>(output_ll);
-      if (val == (input.c_str() + input.size()) &&
-          static_cast<std::int64_t>(output) == output_ll) {
+      if (val == (input.c_str() + input.size()) && static_cast<std::int64_t>(output) == output_ll) {
         return true;
       }
       if (input == "true") {
@@ -2246,8 +2235,8 @@ public:                                                                         
 
     /// char values
     template<typename T,
-             enable_if_t<classify_object<T>::value == object_category::char_value,
-                         detail::enabler> = detail::dummy>
+             enable_if_t<classify_object<T>::value == object_category::char_value, detail::enabler> =
+               detail::dummy>
     bool lexical_cast(const std::string& input, T& output)
     {
       if (input.size() == 1) {
@@ -2498,14 +2487,13 @@ public:                                                                         
     }
 
     /// Assign a value through lexical cast operations
-    template<
-      typename AssignTo,
-      typename ConvertTo,
-      enable_if_t<std::is_same<AssignTo, ConvertTo>::value &&
-                    std::is_assignable<AssignTo&, AssignTo>::value &&
-                    classify_object<AssignTo>::value != object_category::string_assignable &&
-                    classify_object<AssignTo>::value != object_category::string_constructible,
-                  detail::enabler> = detail::dummy>
+    template<typename AssignTo,
+             typename ConvertTo,
+             enable_if_t<std::is_same<AssignTo, ConvertTo>::value &&
+                           std::is_assignable<AssignTo&, AssignTo>::value &&
+                           classify_object<AssignTo>::value != object_category::string_assignable &&
+                           classify_object<AssignTo>::value != object_category::string_constructible,
+                         detail::enabler> = detail::dummy>
     bool lexical_assign(const std::string& input, AssignTo& output)
     {
       if (input.empty()) {
@@ -2604,12 +2592,11 @@ public:                                                                         
 
     /// Lexical conversion if there is only one element but the conversion type is
     /// for two, then call a two element constructor
-    template<
-      typename AssignTo,
-      typename ConvertTo,
-      enable_if_t<(type_count<AssignTo>::value <= 2) && expected_count<AssignTo>::value == 1 &&
-                    is_tuple_like<ConvertTo>::value && type_count_base<ConvertTo>::value == 2,
-                  detail::enabler> = detail::dummy>
+    template<typename AssignTo,
+             typename ConvertTo,
+             enable_if_t<(type_count<AssignTo>::value <= 2) && expected_count<AssignTo>::value == 1 &&
+                           is_tuple_like<ConvertTo>::value && type_count_base<ConvertTo>::value == 2,
+                         detail::enabler> = detail::dummy>
     bool lexical_conversion(const std::vector<std ::string>& strings, AssignTo& output)
     {
       // the remove const is to handle pair types coming from a container
@@ -2629,8 +2616,8 @@ public:                                                                         
     template<
       class AssignTo,
       class ConvertTo,
-      enable_if_t<is_mutable_container<AssignTo>::value &&
-                    is_mutable_container<ConvertTo>::value && type_count<ConvertTo>::value == 1,
+      enable_if_t<is_mutable_container<AssignTo>::value && is_mutable_container<ConvertTo>::value &&
+                    type_count<ConvertTo>::value == 1,
                   detail::enabler> = detail::dummy>
     bool lexical_conversion(const std::vector<std ::string>& strings, AssignTo& output)
     {
@@ -3011,13 +2998,11 @@ public:                                                                         
 
     // Returns false if not a short option. Otherwise, sets opt name and rest and
     // returns true
-    CLI11_INLINE bool
-    split_short(const std::string& current, std::string& name, std::string& rest);
+    CLI11_INLINE bool split_short(const std::string& current, std::string& name, std::string& rest);
 
     // Returns false if not a long option. Otherwise, sets opt name and other side
     // of = and returns true
-    CLI11_INLINE bool
-    split_long(const std::string& current, std::string& name, std::string& value);
+    CLI11_INLINE bool split_long(const std::string& current, std::string& name, std::string& value);
 
     // Returns false if not a windows style option. Otherwise, sets opt name and
     // value and returns true
@@ -3775,8 +3760,8 @@ public:                                                                         
     {
       using element_t = typename detail::element_type<T>::type;
       auto& setref = detail::smart_deref(set);
-      auto it = std::find_if(
-        std::begin(setref), std::end(setref), [&val](decltype(*std::begin(setref)) v) {
+      auto it =
+        std::find_if(std::begin(setref), std::end(setref), [&val](decltype(*std::begin(setref)) v) {
           return (detail::pair_adaptor<element_t>::first(v) == val);
         });
       return {(it != std::end(setref)), it};
@@ -4136,10 +4121,7 @@ public:                                                                         
 
   /// Helper function to allow ignore_underscore to be passed to IsMember or
   /// Transform
-  inline std::string ignore_underscore(std::string item)
-  {
-    return detail::remove_underscore(item);
-  }
+  inline std::string ignore_underscore(std::string item) { return detail::remove_underscore(item); }
 
   /// Helper function to allow checks to ignore spaces to be passed to IsMember or
   /// Transform
@@ -5228,10 +5210,7 @@ public:                                                                         
     ///@}
 
     /// Making an option by hand is not defined, it must be made by the App class
-    Option(std::string option_name,
-           std::string option_description,
-           callback_t callback,
-           App* parent)
+    Option(std::string option_name, std::string option_description, callback_t callback, App* parent)
       : description_(std::move(option_description))
       , parent_(parent)
       , callback_(std::move(callback))
@@ -5566,8 +5545,7 @@ public:                                                                         
     /// Requires "--" to be removed from string
     CLI11_NODISCARD bool check_lname(std::string name) const
     {
-      return (detail::find_member(std::move(name), lnames_, ignore_case_, ignore_underscore_) >=
-              0);
+      return (detail::find_member(std::move(name), lnames_, ignore_case_, ignore_underscore_) >= 0);
     }
 
     /// Requires "--" to be removed from string
@@ -5576,8 +5554,7 @@ public:                                                                         
       if (fnames_.empty()) {
         return false;
       }
-      return (detail::find_member(std::move(name), fnames_, ignore_case_, ignore_underscore_) >=
-              0);
+      return (detail::find_member(std::move(name), fnames_, ignore_case_, ignore_underscore_) >= 0);
     }
 
     /// Get the value that goes for a flag, nominally gets the default value but
@@ -5985,8 +5962,7 @@ public:                                                                         
     return this;
   }
 
-  CLI11_NODISCARD CLI11_INLINE std::string
-  Option::get_name(bool positional, bool all_options) const
+  CLI11_NODISCARD CLI11_INLINE std::string Option::get_name(bool positional, bool all_options) const
   {
     if (get_group().empty())
       return {}; // Hidden
@@ -6428,11 +6404,11 @@ public:                                                                         
   }
 
 #ifndef CLI11_PARSE
-  #define CLI11_PARSE(app, argc, argv)                                                            \
-    try {                                                                                         \
-      (app).parse((argc), (argv));                                                                \
-    } catch (const CLI::ParseError& e) {                                                          \
-      return (app).exit(e);                                                                       \
+  #define CLI11_PARSE(app, argc, argv)                                                             \
+    try {                                                                                          \
+      (app).parse((argc), (argv));                                                                 \
+    } catch (const CLI::ParseError& e) {                                                           \
+      return (app).exit(e);                                                                        \
     }
 #endif
 
@@ -6596,8 +6572,7 @@ public:                                                                         
     std::shared_ptr<FormatterBase> formatter_{new Formatter()};
 
     /// The error message printing function INHERITABLE
-    std::function<std::string(const App*, const Error& e)> failure_message_{
-      FailureMessage::simple};
+    std::function<std::string(const App*, const Error& e)> failure_message_{FailureMessage::simple};
 
     ///@}
     /// @name Parsing
@@ -6830,8 +6805,8 @@ public:                                                                         
       if (disable) {
         default_startup = startup_mode::disabled;
       } else {
-        default_startup = (default_startup == startup_mode::enabled) ? startup_mode::enabled
-                                                                     : startup_mode::stable;
+        default_startup =
+          (default_startup == startup_mode::enabled) ? startup_mode::enabled : startup_mode::stable;
       }
       return this;
     }
@@ -7023,10 +6998,10 @@ public:                                                                         
 
     /// Add option for a callback of a specific type
     template<typename ArgType>
-    Option* add_option_function(
-      std::string option_name,
-      const std::function<void(const ArgType&)>& func, ///< the callback to execute
-      std::string option_description = "")
+    Option*
+    add_option_function(std::string option_name,
+                        const std::function<void(const ArgType&)>& func, ///< the callback to execute
+                        std::string option_description = "")
     {
       auto fun = [func](const CLI::results_t& res) {
         ArgType variable;
@@ -7063,8 +7038,7 @@ public:                                                                         
     Option* set_help_flag(std::string flag_name = "", const std::string& help_description = "");
 
     /// Set a help all flag, replaced the existing one if present
-    Option*
-    set_help_all_flag(std::string help_name = "", const std::string& help_description = "");
+    Option* set_help_all_flag(std::string help_name = "", const std::string& help_description = "");
 
     /// Set a version flag and version display string, replace the existing one if
     /// present
@@ -8352,10 +8326,10 @@ public:                                                                         
       }
       for (auto c : subcommand_name) {
         if (!detail::valid_later_char(c)) {
-          throw IncorrectConstruction(
-            std::string("Subcommand name contains invalid character ('") + c +
-            "'), all characters are allowed except"
-            "'=',':','{','}', and ' '");
+          throw IncorrectConstruction(std::string("Subcommand name contains invalid character ('") +
+                                      c +
+                                      "'), all characters are allowed except"
+                                      "'=',':','{','}', and ' '");
         }
       }
     }
@@ -9771,8 +9745,7 @@ public:                                                                         
     return false;
   }
 
-  CLI11_INLINE bool
-  App::_parse_arg(std::vector<std::string>& args, detail::Classifier current_type)
+  CLI11_INLINE bool App::_parse_arg(std::vector<std::string>& args, detail::Classifier current_type)
   {
     std::string current = args.back();
 
@@ -10244,9 +10217,8 @@ public:                                                                         
 
   namespace detail {
 
-    std::string convert_arg_for_ini(const std::string& arg,
-                                    char stringQuote = '"',
-                                    char characterQuote = '\'');
+    std::string
+    convert_arg_for_ini(const std::string& arg, char stringQuote = '"', char characterQuote = '\'');
 
     /// Comma separated join, adds quotes if needed
     std::string ini_join(const std::vector<std::string>& args,
@@ -10501,8 +10473,7 @@ public:                                                                         
         } else if ((isDefaultArray || isINIArray) &&
                    item.find_first_of(aSep) != std::string::npos) {
           items_buffer = detail::split_up(item, aSep);
-        } else if ((isDefaultArray || isINIArray) &&
-                   item.find_first_of(' ') != std::string::npos) {
+        } else if ((isDefaultArray || isINIArray) && item.find_first_of(' ') != std::string::npos) {
           items_buffer = detail::split_up(item);
         } else {
           items_buffer = {item};

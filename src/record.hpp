@@ -1,5 +1,5 @@
-#ifndef _SUBSETS_H
-#define _SUBSETS_H
+#ifndef _RECORD_H
+#define _RECORD_H
 
 #define MMHSEED1 1
 #define MMHSEED0 0
@@ -11,6 +11,7 @@
 class Subset : public std::enable_shared_from_this<Subset>
 {
   friend class Record;
+  friend class CRecord;
 
 private:
   sh_t shash = 0;
@@ -51,6 +52,7 @@ public:
 
 class Record : public std::enable_shared_from_this<Record>
 {
+  friend class CRecord;
   friend class Subset;
 
 public:
@@ -61,16 +63,37 @@ public:
   void union_record(record_sptr_t source);
   void add_subset(subset_sptr_t new_subset);
   record_sptr_t getptr() { return shared_from_this(); }
+  tree_sptr_t get_tree() { return tree; }
   // bool check_collision(subset_sptr_t x);
   // bool check_conflict(record_sptr_t x);
-  void save(std::filesystem::path library_dir, std::string suffix);
-  void load(std::filesystem::path library_dir, std::string suffix);
+  void make_compact();
+  se_t map_compact(sh_t shash) { return sh_to_se[shash]; }
 
 private:
   std::unordered_map<sh_t, subset_sptr_t> sh_to_subset = {};
   std::unordered_map<sh_t, node_sptr_t> sh_to_node = {};
+  std::unordered_map<sh_t, se_t> sh_to_se = {};
   node_sptr_t subtree_root = nullptr;
   tree_sptr_t tree = nullptr;
+};
+
+class CRecord : public std::enable_shared_from_this<CRecord>
+{
+public:
+  CRecord(tree_sptr_t tree);
+  CRecord(record_sptr_t record);
+  vec<se_t> decode_se(se_t se);
+  void load(std::filesystem::path library_dir, std::string suffix);
+  void save(std::filesystem::path library_dir, std::string suffix);
+  crecord_sptr_t getptr() { return shared_from_this(); }
+  bool check_compatible(crecord_sptr_t crecord);
+  void merge(crecord_sptr_t crecord);
+
+private:
+  tree_sptr_t tree;
+  se_t nsubsets = 0;
+  std::unordered_map<se_t, std::pair<se_t, se_t>> se_to_pse = {};
+  std::unordered_map<se_t, node_sptr_t> se_to_node = {};
 };
 
 #endif

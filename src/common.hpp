@@ -13,15 +13,19 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <locale>
 #include <map>
 #include <memory>
 #include <numeric>
 #include <ostream>
+#include <queue>
 #include <random>
 #include <regex>
 #include <string>
 #include <sys/types.h>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 #include <zlib.h>
 
@@ -32,30 +36,56 @@ extern const unsigned char seq_nt4_table[128];
 extern const uint64_t nt4_lr_table[4];
 extern const uint64_t nt4_bp_table[4];
 
+typedef uint64_t sh_t;
+typedef uint64_t inc_t;
+typedef uint32_t enc_t;
+typedef uint_least32_t tuint_t;
+typedef uint32_t se_t;
+
+template<typename T>
+using vvec = std::vector<std::vector<T>>;
+template<typename T>
+using vec = std::vector<T>;
+
 class LSHF;
 class Tree;
 class Node;
 class Subset;
 class Record;
-class RefSeq;
-class DynTable;
+class CRecord;
+class RSeq;
+class QSeq;
+class DynHT;
+class FlatHT;
+class QBatch;
+class QMers;
+class Library;
 
 typedef std::shared_ptr<LSHF> lshf_sptr_t;
 typedef std::shared_ptr<Tree> tree_sptr_t;
 typedef std::shared_ptr<Node> node_sptr_t;
 typedef std::shared_ptr<Subset> subset_sptr_t;
 typedef std::shared_ptr<Record> record_sptr_t;
-typedef std::shared_ptr<RefSeq> refseq_sptr_t;
+typedef std::shared_ptr<CRecord> crecord_sptr_t;
+typedef std::shared_ptr<RSeq> rseq_sptr_t;
+typedef std::shared_ptr<QSeq> qseq_sptr_t;
+typedef std::shared_ptr<DynHT> dynht_sptr_t;
+typedef std::shared_ptr<FlatHT> flatht_sptr_t;
+typedef std::shared_ptr<QBatch> qbatch_sptr_t;
+typedef std::shared_ptr<QMers> qmers_sptr_t;
+typedef std::shared_ptr<Library> library_sptr_t;
+typedef std::pair<enc_t, se_t> cmer_t;
 
-typedef uint64_t sh_t;
-typedef uint64_t inc_t;
-typedef uint32_t enc_t;
-typedef uint_least32_t tuint_t;
-
-template<typename T>
-using vvec = std::vector<std::vector<T>>;
-template<typename T>
-using vec = std::vector<T>;
+struct mer_t
+{
+  enc_t encoding = 0;
+  sh_t shash = 0;
+  mer_t() {}
+  mer_t(enc_t encoding, sh_t shash)
+    : encoding(encoding)
+    , shash(shash)
+  {}
+};
 
 static inline uint32_t gp_hash(const std::string& str)
 {
@@ -89,7 +119,7 @@ static inline uint64_t xur64_hash(uint64_t h)
   return h;
 }
 
-static inline uint32_t hd_lr64(const uint64_t x, const uint64_t y)
+static inline uint32_t hdist_lr64(const uint64_t x, const uint64_t y)
 {
   uint64_t z1 = x ^ y;
   uint32_t z2 = z1 >> 32;
@@ -97,7 +127,7 @@ static inline uint32_t hd_lr64(const uint64_t x, const uint64_t y)
   return __builtin_popcount(zc);
 }
 
-static inline uint32_t hd_lr32(const uint32_t x, const uint32_t y)
+static inline uint32_t hdist_lr32(const uint32_t x, const uint32_t y)
 {
   uint32_t z1 = x ^ y;
   uint16_t z2 = z1 >> 16;
@@ -105,7 +135,7 @@ static inline uint32_t hd_lr32(const uint32_t x, const uint32_t y)
   return __builtin_popcount(zc);
 }
 
-static inline u_int64_t revcomp_b64(const u_int64_t& x, size_t k)
+static inline u_int64_t revcomp_bp64(const u_int64_t& x, size_t k)
 {
   uint64_t res = ~x;
   res = ((res >> 2 & 0x3333333333333333) | (res & 0x3333333333333333) << 2);
@@ -116,7 +146,7 @@ static inline u_int64_t revcomp_b64(const u_int64_t& x, size_t k)
   return (res >> (2 * (32 - k)));
 }
 
-static inline uint64_t rmoddp_b64(uint64_t x)
+static inline uint64_t rmoddp_bp64(uint64_t x)
 {
   x = x & 0x5555555555555555;
   x = (x | (x >> 1)) & 0x3333333333333333;
@@ -129,21 +159,28 @@ static inline uint64_t rmoddp_b64(uint64_t x)
 
 static inline u_int64_t conv_bp64_lr64(u_int64_t x)
 {
-  return (rmoddp_b64(x >> 1) << 32) | rmoddp_b64(x);
+  return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x);
 }
 
-struct mer_t
+static inline void compute_encoding(char* s1, char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
 {
-  enc_t encoding = 0;
-  sh_t shash = 0;
-  mer_t(){};
-  mer_t(enc_t encoding, sh_t shash)
-    : encoding(encoding)
-    , shash(shash)
-  {}
-};
-typedef uint64_t se_t;
-typedef std::pair<enc_t, se_t> cmer_t;
+  enc_lr = 0;
+  enc_bp = 0;
+  for (; s1 < s2; s1++) {
+    enc_lr <<= 1;
+    enc_bp <<= 2;
+    enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
+    enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
+  }
+}
+static inline void update_encoding(char* s1, uint64_t& enc_lr, uint64_t& enc_bp)
+{
+  enc_lr <<= 1;
+  enc_bp <<= 2;
+  enc_lr &= 0xFFFFFFFEFFFFFFFE;
+  enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
+  enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
+}
 
 #define assertm(exp, msg) assert(((void)msg, exp))
 

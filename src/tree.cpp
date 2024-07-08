@@ -1,8 +1,36 @@
 #include "tree.hpp"
+#include "common.hpp"
 
-void Tree::parse(std::string nwk_filepath)
+bool Tree::check_compatible(tree_sptr_t tree)
 {
-  std::ifstream tree_stream(nwk_filepath);
+  bool is_compatible = true;
+  node_sptr_t ndx, ndy;
+  tree->reset_traversal();
+  reset_traversal();
+  while (true) {
+    ndx = next_post_order();
+    ndy = tree->next_post_order();
+    if (!ndx && !ndy) {
+      is_compatible = true;
+      break;
+    } else if (!ndx || !ndy) {
+      is_compatible = false;
+      break;
+    } else if (ndx->name != ndy->name) {
+      is_compatible = false;
+      break;
+    } else {
+      continue;
+    }
+  }
+  tree->reset_traversal();
+  reset_traversal();
+  return is_compatible;
+}
+
+void Tree::parse(std::filesystem::path nwk_path)
+{
+  std::ifstream tree_stream(nwk_path);
   nwk_str =
     std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
   tree_stream.close();
@@ -11,7 +39,6 @@ void Tree::parse(std::string nwk_filepath)
   root = std::make_shared<Node>(getptr());
   root->parse(n_vec);
   subtree_root = root;
-  record = std::make_shared<Record>(root);
 }
 
 void Tree::split_nwk(vec<std::string>& n_vec)
@@ -176,8 +203,6 @@ void Tree::save(std::filesystem::path library_dir, std::string suffix)
     exit(EXIT_FAILURE);
   }
   tree_stream.close();
-
-  record->save(library_dir, suffix);
 }
 
 void Tree::load(std::filesystem::path library_dir, std::string suffix)
@@ -192,6 +217,4 @@ void Tree::load(std::filesystem::path library_dir, std::string suffix)
   atter = 0, nnodes = 0, total_len_branch = 0;
   root->parse(n_vec);
   subtree_root = root;
-  record = std::make_shared<Record>(root);
-  record->load(library_dir, suffix);
 }

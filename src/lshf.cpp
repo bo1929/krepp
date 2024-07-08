@@ -1,15 +1,16 @@
 #include "lshf.hpp"
 
-LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m, uint32_t r, bool frac)
+LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m)
   : k(k)
   , h(h)
   , m(m)
-  , r(r)
-  , frac(frac)
 {
-  assert(m > 0 && r < m);
-  assert(k > 0 && h > 0 && h < k);
   get_random_positions();
+  set_lshashf();
+}
+
+void LSHF::set_lshashf()
+{
   std::vector<int8_t> v;
   std::vector<int8_t> g;
   int8_t lp = 31;
@@ -49,20 +50,25 @@ uint32_t LSHF::compute_hash(uint64_t enc_bp)
   return static_cast<uint32_t>(res);
 }
 
-void LSHF::drop_ppos_enc(uint64_t enc64_bp,
-                         uint64_t enc64_lr,
-                         uint32_t& enc32_bp,
-                         uint32_t& enc32_lr)
+uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
 {
-  enc32_bp = 0;
-  enc32_lr = 0;
+  uint32_t enc32_lr = 0;
   for (int i = npos_v.size() - 1; i >= 0; i--) {
     enc32_lr += static_cast<uint32_t>((enc64_lr >> npos_v[i]) & 1);
     enc32_lr += static_cast<uint32_t>((enc64_lr >> (npos_v[i] + 32)) & 1) << 16;
-    enc32_bp += static_cast<uint32_t>((enc64_bp >> (npos_v[i] * 2)) & 3);
     enc32_lr <<= 1 * (i & 0x00000001);
+  }
+  return enc32_lr;
+}
+
+uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp)
+{
+  uint32_t enc32_bp = 0;
+  for (int i = npos_v.size() - 1; i >= 0; i--) {
+    enc32_bp += static_cast<uint32_t>((enc64_bp >> (npos_v[i] * 2)) & 3);
     enc32_bp <<= 2 * (i & 0x00000001);
   }
+  return enc32_bp;
 }
 
 void LSHF::get_random_positions()
@@ -79,12 +85,48 @@ void LSHF::get_random_positions()
       ppos_v.push_back(n);
     }
   }
-  std::sort(ppos_v.begin(), ppos_v.end(), std::greater<uint8_t>());
+  std::sort(ppos_v.begin(), ppos_v.end());
   uint8_t ix_pos = 0;
   for (uint8_t i = 0; i < k; ++i) {
     if (i != ppos_v[ix_pos])
       npos_v.push_back(i);
     else
       ix_pos++;
+  }
+  std::sort(ppos_v.begin(), ppos_v.end(), std::greater<uint8_t>());
+}
+
+LSHF::LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v)
+  : m(m)
+  , ppos_v(ppos_v)
+  , npos_v(npos_v)
+{
+  k = npos_v.size() + ppos_v.size();
+  h = ppos_v.size();
+  set_lshashf();
+}
+
+bool LSHF::check_compatible(lshf_sptr_t lshashf)
+{
+  if (!((lshashf->m == m) && (lshashf->h == h) && (lshashf->k == k) &&
+        (lshashf->npos_v == npos_v) && (lshashf->ppos_v == ppos_v))) {
+    std::cout << "m: " << m << "/" << lshashf->m << std::endl;
+    std::cout << "h: " << h << "/" << lshashf->h << std::endl;
+    std::cout << "k: " << k << "/" << lshashf->k << std::endl;
+    std::cout << "ppos_v:";
+    for (uint8_t i = 0; i < h; ++i) {
+      std::cout << " " << static_cast<uint32_t>(ppos_v[i]) << "/"
+                << static_cast<uint32_t>(lshashf->ppos_v[i]);
+    }
+    std::cout << std::endl;
+    std::cout << "npos_v:";
+    for (uint8_t i = 0; i < k - h; ++i) {
+      std::cout << " " << static_cast<uint32_t>(npos_v[i]) << "/"
+                << static_cast<uint32_t>(lshashf->npos_v[i]);
+    }
+    std::cout << std::endl;
+    return false;
+  } else {
+    return true;
   }
 }

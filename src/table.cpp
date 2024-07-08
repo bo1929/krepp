@@ -1,29 +1,33 @@
 #include "table.hpp"
 
-FlatTable::FlatTable(DynTable& source)
+FlatHT::FlatHT(DynHT& source)
 {
   nkmers = source.nkmers;
   nrows = source.nrows;
   inc_v.resize(nrows);
   cmer_v.reserve(nkmers);
+  tree = source.tree;
+  crecord = std::make_shared<CRecord>(source.record);
   inc_t limit_inc = std::numeric_limits<inc_t>::max();
   inc_t copy_inc;
   inc_t lix = 0;
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, source.mer_vvec[rix].size());
-    std::transform(source.mer_vvec[rix].begin(),
-                   std::next(source.mer_vvec[rix].begin(), copy_inc),
-                   std::back_inserter(cmer_v),
-                   conv_mer_cmer);
-    inc_v[rix] = lix;
+    for (inc_t i = 0; i < copy_inc; ++i) {
+      cmer_v.emplace_back(
+        std::make_pair(source.mer_vvec[rix][i].encoding,
+                       source.record->map_compact(source.mer_vvec[rix][i].shash)));
+    }
     lix += copy_inc;
+    inc_v[rix] = lix;
+    source.mer_vvec[rix].clear();
   }
-  // TODO: Check if deallocation is more efficient and do not reserve.
+  // TODO: Check if deallocation is more efficient and do not reserve. Benchmark.
 }
 
-FlatTable::FlatTable(std::filesystem::path library_dir, std::string suffix)
+void FlatHT::load(std::filesystem::path library_dir, std::string suffix)
 {
-  std::filesystem::path mer_path = library_dir / ("mer" + suffix);
+  std::filesystem::path mer_path = library_dir / ("cmer" + suffix);
   std::ifstream mer_stream(mer_path, std::ifstream::binary);
   if (!mer_stream.is_open()) {
     std::cerr << "Failed to open " << mer_path << std::endl;
@@ -58,11 +62,11 @@ FlatTable::FlatTable(std::filesystem::path library_dir, std::string suffix)
   inc_stream.close();
 }
 
-void FlatTable::save(std::filesystem::path library_dir, std::string suffix)
+void FlatHT::save(std::filesystem::path library_dir, std::string suffix)
 {
-  std::ofstream mer_stream(library_dir / ("mer" + suffix), std::ofstream::binary);
+  std::ofstream mer_stream(library_dir / ("cmer" + suffix), std::ofstream::binary);
   mer_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
-  mer_stream.write(reinterpret_cast<const char*>(cmer_v.data()), sizeof(cmer_t) * cmer_v.size());
+  mer_stream.write(reinterpret_cast<const char*>(cmer_v.data()), sizeof(cmer_t) * nkmers);
   if (!mer_stream.good()) {
     std::cerr << "Writing k-mer vector has failed!" << std::endl;
     exit(EXIT_FAILURE);
@@ -71,7 +75,7 @@ void FlatTable::save(std::filesystem::path library_dir, std::string suffix)
 
   std::ofstream inc_stream(library_dir / ("inc" + suffix), std::ofstream::binary);
   inc_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
-  inc_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * inc_v.size());
+  inc_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * nrows);
   if (!inc_stream.good()) {
     std::cerr << "Writing index-increment vector has failed!" << std::endl;
     exit(EXIT_FAILURE);
@@ -79,7 +83,7 @@ void FlatTable::save(std::filesystem::path library_dir, std::string suffix)
   inc_stream.close();
 }
 
-void DynTable::print_info()
+void DynHT::print_info()
 {
   // update_size_hist();
   std::cout << "size: " << nkmers << "\t";
@@ -89,14 +93,14 @@ void DynTable::print_info()
   std::cout << std::endl;
 }
 
-void DynTable::clear_rows()
+void DynHT::clear_rows()
 {
   mer_vvec.clear();
   size_hist.clear();
   nkmers = 0;
 }
 
-void DynTable::sort_columns()
+void DynHT::sort_columns()
 {
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
     if (!mer_vvec[i].empty()) {
@@ -105,7 +109,7 @@ void DynTable::sort_columns()
   }
 }
 
-void DynTable::ensure_sorted_columns()
+void DynHT::ensure_sorted_columns()
 {
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
     if ((!mer_vvec[i].empty()) &&
@@ -115,7 +119,7 @@ void DynTable::ensure_sorted_columns()
   }
 }
 
-void DynTable::update_nkmers()
+void DynHT::update_nkmers()
 {
   nkmers = 0;
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
@@ -123,7 +127,7 @@ void DynTable::update_nkmers()
   }
 }
 
-void DynTable::update_size_hist()
+void DynHT::update_size_hist()
 {
   size_hist.clear();
   nkmers = 0;
@@ -133,7 +137,7 @@ void DynTable::update_size_hist()
   }
 }
 
-void DynTable::make_unique()
+void DynHT::make_unique()
 {
   nkmers = 0;
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
@@ -145,22 +149,21 @@ void DynTable::make_unique()
   }
 }
 
-void DynTable::prune_columns(size_t max_size)
+void DynHT::prune_columns(size_t max_size)
 {
   nkmers = 0;
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
     if (mer_vvec[i].size() > max_size) {
       vec<mer_t> tmp_v;
       tmp_v.reserve(max_size);
-      std::sample(
-        mer_vvec[i].begin(), mer_vvec[i].end(), std::back_inserter(tmp_v), max_size, gen);
+      std::sample(mer_vvec[i].begin(), mer_vvec[i].end(), std::back_inserter(tmp_v), max_size, gen);
       mer_vvec[i] = std::move(tmp_v);
     }
     nkmers += max_size;
   }
 }
 
-void DynTable::union_table(DynTable& source)
+void DynHT::union_table(DynHT& source)
 {
   assertm(nrows == source.nrows, "Two tables differ in size.");
   if (source.mer_vvec.empty()) {
@@ -175,9 +178,9 @@ void DynTable::union_table(DynTable& source)
     for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
       if (!source.mer_vvec[i].empty() && !mer_vvec[i].empty()) {
 #ifdef NONSTD_UNION
-        DynTable::union_row(mer_vvec[i], source.mer_vvec[i], record);
+        DynHT::union_row(mer_vvec[i], source.mer_vvec[i], record);
 #else
-        DynTable::union_row(mer_vvec[i], source.mer_vvec[i], record, false);
+        DynHT::union_row(mer_vvec[i], source.mer_vvec[i], record, false);
 #endif
       } else if (!source.mer_vvec[i].empty()) {
         mer_vvec[i] = std::move(source.mer_vvec[i]);
@@ -189,10 +192,7 @@ void DynTable::union_table(DynTable& source)
 }
 
 #ifndef NONSTD_UNION
-void DynTable::union_row(vec<mer_t>& dest_v,
-                         vec<mer_t>& source_v,
-                         record_sptr_t record,
-                         bool in_place)
+void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t record, bool in_place)
 {
   if (in_place) {
     // Merging in-place (alternative).
@@ -222,9 +222,11 @@ void DynTable::union_row(vec<mer_t>& dest_v,
     if (result->encoding == iter->encoding) {
       // TODO: check collisions and resolve.
       // TODO: check if subset is a node and skip.
-      subset_sptr_t new_subset = std::make_shared<Subset>(iter->shash, result->shash, record);
-      record->add_subset(new_subset);
-      result->shash += iter->shash;
+      if (iter->shash + result->shash) {
+        subset_sptr_t new_subset = std::make_shared<Subset>(iter->shash, result->shash, record);
+        record->add_subset(new_subset);
+        result->shash += iter->shash;
+      }
     } else if (++result != iter) {
       *result = std::move(*iter);
     } else {
@@ -234,7 +236,7 @@ void DynTable::union_row(vec<mer_t>& dest_v,
   dest_v.erase(++result, dest_v.end());
 }
 #else
-void DynTable::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t record)
+void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t record)
 {
   vec<mer_t> temp_v;
   temp_v.reserve(source_v.size() + dest_v.size());
@@ -248,9 +250,11 @@ void DynTable::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t
     while (iter_d != dest_v.end() && iter_s->encoding == iter_d->encoding) {
       // TODO: check collisions and resolve.
       // TODO: check if subset is a node and skip.
-      subset_sptr_t new_subset = std::make_shared<Subset>(iter_d->shash, iter_s->shash, record);
-      record->add_subset(new_subset);
-      iter_s->shash += iter_d->shash;
+      if (iter_d->shash + iter_s->shash) {
+        subset_sptr_t new_subset = std::make_shared<Subset>(iter_d->shash, iter_s->shash, record);
+        record->add_subset(new_subset);
+        iter_s->shash += iter_d->shash;
+      }
       iter_d++;
     }
     temp_v.push_back(std::move(*iter_s));
@@ -261,7 +265,7 @@ void DynTable::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t
 }
 #endif
 
-void DynTable::fill_table(refseq_sptr_t rs)
+void DynHT::fill_table(rseq_sptr_t rs)
 {
   mer_vvec.resize(nrows);
   while (rs->read_next_seq() && rs->set_curr_seq()) {
