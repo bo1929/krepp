@@ -9,7 +9,6 @@
 #include "rqseq.hpp"
 #include "table.hpp"
 #include "tree.hpp"
-#include <cstdint>
 
 class Bkrmt
 {
@@ -62,15 +61,19 @@ public:
   void add_partial_tree(std::string suffix);
   void add_partial_flatht(std::string suffix);
   void add_partial_crecord(std::string suffix);
+  bool check_partial(uint32_t rix) { return r_to_flatht.find(rix % m) != r_to_flatht.end(); }
+  flatht_sptr_t get_flatht_sptr(uint32_t rix) { return r_to_flatht[rix % m]; };
   lshf_sptr_t get_lshashf() { return lshashf; }
+  crecord_sptr_t get_crecord() { return crecord; }
+  tree_sptr_t get_tree() { return tree; }
   std::vector<cmer_t>::const_iterator begin(uint32_t rix);
   std::vector<cmer_t>::const_iterator end(uint32_t rix);
-  bool partial_exists(uint32_t rix) { return r_to_flatht.find(rix % m) != r_to_flatht.end(); }
 
 private:
   uint8_t k;
   uint8_t h;
   uint32_t m;
+  uint32_t nrows;
   tree_sptr_t tree = nullptr;
   lshf_sptr_t lshashf = nullptr;
   crecord_sptr_t crecord = nullptr;

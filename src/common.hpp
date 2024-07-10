@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <curl/curl.h>
@@ -135,7 +136,7 @@ static inline uint32_t hdist_lr32(const uint32_t x, const uint32_t y)
   return __builtin_popcount(zc);
 }
 
-static inline u_int64_t revcomp_bp64(const u_int64_t& x, size_t k)
+static inline uint64_t revcomp_bp64(const uint64_t x, uint8_t k)
 {
   uint64_t res = ~x;
   res = ((res >> 2 & 0x3333333333333333) | (res & 0x3333333333333333) << 2);
@@ -157,7 +158,7 @@ static inline uint64_t rmoddp_bp64(uint64_t x)
   return x;
 }
 
-static inline u_int64_t conv_bp64_lr64(u_int64_t x)
+static inline uint64_t conv_bp64_lr64(uint64_t x)
 {
   return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x);
 }
@@ -166,7 +167,7 @@ static inline void compute_encoding(char* s1, char* s2, uint64_t& enc_lr, uint64
 {
   enc_lr = 0;
   enc_bp = 0;
-  for (; s1 < s2; s1++) {
+  for (; s1 < s2; ++s1) {
     enc_lr <<= 1;
     enc_bp <<= 2;
     enc_bp += nt4_bp_table[seq_nt4_table[*s1]];

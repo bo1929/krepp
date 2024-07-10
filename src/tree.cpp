@@ -1,5 +1,4 @@
 #include "tree.hpp"
-#include "common.hpp"
 
 bool Tree::check_compatible(tree_sptr_t tree)
 {

@@ -10,7 +10,7 @@ RSeq::RSeq(uint8_t w, uint32_t r, bool frac, sh_t shash, lshf_sptr_t lshashf, st
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   k = lshashf->get_k();
   m = lshashf->get_m();
-  mask_bp = u64m >> (32 - k) * 2;
+  mask_bp = u64m >> ((32 - k) * 2);
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   is_url = std::regex_match(input, url_regexp);
   if (is_url) {
@@ -61,12 +61,12 @@ RSeq::~RSeq()
 void RSeq::extract_mers(vvec<mer_t>& table)
 {
   uint32_t i, l;
-  uint32_t rix_res;
+  uint32_t rix, rix_res;
   uint64_t wix = 0, kix = 0;
   uint8_t ldiff = w - k + 1;
-  uint64_t enc64_bp, enc64_lr, orenc64_bp, orenc64_lr, rcenc64_bp;
-  std::vector<std::pair<uint32_t, enc_t>> lsh_enc_win(ldiff);
-  std::pair<uint32_t, enc_t> minimizer;
+  uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
+  std::vector<std::pair<uint64_t, uint64_t>> lsh_enc_win(ldiff);
+  std::pair<uint64_t, uint64_t> minimizer;
   for (i = l = 0; i < len;) {
     if (seq_nt4_table[seq[i]] >= 4) {
       l = 0, i++;
@@ -77,31 +77,29 @@ void RSeq::extract_mers(vvec<mer_t>& table)
       continue;
     }
     if (l == k) {
-      compute_encoding(seq + i - k, seq, enc64_lr, enc64_bp);
+      compute_encoding(seq + i - k, seq + i, orenc64_lr, orenc64_bp);
     } else {
-      update_encoding(seq + i - 1, enc64_lr, enc64_bp);
+      update_encoding(seq + i - 1, orenc64_lr, orenc64_bp);
     }
-    orenc64_bp = enc64_bp & mask_bp;
-    orenc64_lr = enc64_lr & mask_lr;
-    rcenc64_bp = revcomp_bp64(orenc64_bp, k);
-    if (orenc64_bp < rcenc64_bp) {
-      orenc64_bp = rcenc64_bp;
-      orenc64_lr = conv_bp64_lr64(rcenc64_bp);
-    }
-    lsh_enc_win[kix % ldiff].first = lshashf->compute_hash(orenc64_bp);
-    lsh_enc_win[kix % ldiff].second = lshashf->drop_ppos_lr(orenc64_lr);
+    lsh_enc_win[kix % ldiff].first = orenc64_bp & mask_bp;
+    lsh_enc_win[kix % ldiff].second = orenc64_lr & mask_lr;
     if (l >= w || (i == len)) {
       minimizer =
         *std::min_element(lsh_enc_win.begin(),
                           lsh_enc_win.end(),
-                          [](std::pair<uint32_t, enc_t> lhs, std::pair<uint32_t, enc_t> rhs) {
-                            return xur32_hash(lhs.second) < xur32_hash(rhs.second);
+                          [](std::pair<uint64_t, uint64_t> lhs, std::pair<uint64_t, uint64_t> rhs) {
+                            return xur64_hash(lhs.second) < xur64_hash(rhs.second);
                           });
-      rix_res = minimizer.first % m;
+      rcenc64_bp = revcomp_bp64(minimizer.first, k);
+      if (minimizer.first < rcenc64_bp) {
+        minimizer.first = rcenc64_bp;
+        minimizer.second = conv_bp64_lr64(minimizer.first);
+      }
+      rix = lshashf->compute_hash(minimizer.first);
+      rix_res = rix % m;
+      rix /= m;
       if (frac ? rix_res <= r : rix_res == r) {
-        minimizer.first = (minimizer.first / m);
-        assert(minimizer.first < table.size());
-        table[minimizer.first].emplace_back(minimizer.second, shash);
+        table[rix].emplace_back(lshashf->drop_ppos_lr(minimizer.second), shash);
         wix++;
       }
     }

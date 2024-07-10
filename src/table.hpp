@@ -4,7 +4,6 @@
 #include "common.hpp"
 #include "record.hpp"
 #include "rqseq.hpp"
-#include <cstdint>
 
 #define NONSTD_UNION
 // TODO: Choose one, one of the options has a bug.
@@ -32,10 +31,9 @@ public:
   void prune_columns(size_t max_size);
   void reserve() { mer_vvec.reserve(nrows); }
 #ifdef NONSTD_UNION // TODO: Benchmark for static vs non-static, and std non-std, in-place etc.
-  static void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t record);
+  void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v);
 #else
-  static void
-  union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t record, bool in_place);
+  void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, bool in_place);
 #endif
   static bool comp_encoding(const mer_t& left, const mer_t& right)
   {

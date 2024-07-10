@@ -82,12 +82,16 @@ class CRecord : public std::enable_shared_from_this<CRecord>
 public:
   CRecord(tree_sptr_t tree);
   CRecord(record_sptr_t record);
-  vec<se_t> decode_se(se_t se);
+  crecord_sptr_t getptr() { return shared_from_this(); }
   void load(std::filesystem::path library_dir, std::string suffix);
   void save(std::filesystem::path library_dir, std::string suffix);
-  crecord_sptr_t getptr() { return shared_from_this(); }
+  bool check_node(se_t se) { return se_to_node.find(se) != se_to_node.end(); }
+  std::pair<se_t, se_t> get_pse(se_t se) { return se_to_pse[se]; }
+  node_sptr_t get_node(se_t se) { return se_to_node[se]; }
   bool check_compatible(crecord_sptr_t crecord);
   void merge(crecord_sptr_t crecord);
+  void print_info();
+  vec<se_t> decode_se(se_t se);
 
 private:
   tree_sptr_t tree;

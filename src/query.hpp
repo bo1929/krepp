@@ -8,12 +8,12 @@
 
 struct match_t
 {
-  se_t se;
   enc_t enc_lr;
+  uint32_t pos;
   uint32_t hdist;
-  match_t(enc_t enc_lr, se_t se, uint32_t hdist)
+  match_t(enc_t enc_lr, uint32_t pos, uint32_t hdist)
     : enc_lr(enc_lr)
-    , se(se)
+    , pos(pos)
     , hdist(hdist)
   {}
 };
@@ -21,18 +21,23 @@ struct match_t
 class QMers
 {
 public:
-  QMers(library_sptr_t library, uint32_t max_hdist)
-    : library(library)
-    , max_hdist(max_hdist){};
-  QMers(library_sptr_t library)
-    : library(library)
-    , max_hdist(5){};
+  QMers(library_sptr_t library, uint64_t len, uint32_t max_hdist = 3);
   void add_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
+  void compute_coverage();
+  bool check_better_coverage(qmers_sptr_t qmers);
+  void print_info(std::string name);
 
 private:
-  vec<match_t> match_v;
+  std::unordered_map<se_t, vec<match_t>> se_to_matches;
+  std::unordered_map<uint32_t, float> hdist_to_coverage;
+  std::unordered_map<uint32_t, float> hdist_to_ratio;
+  std::unordered_map<uint32_t, uint32_t> hdist_to_nnodes;
   library_sptr_t library;
+  crecord_sptr_t crecord;
+  tree_sptr_t tree;
   uint32_t max_hdist;
+  uint32_t len;
+  uint8_t k;
 };
 
 class QBatch

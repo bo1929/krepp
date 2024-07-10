@@ -178,9 +178,9 @@ void DynHT::union_table(DynHT& source)
     for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
       if (!source.mer_vvec[i].empty() && !mer_vvec[i].empty()) {
 #ifdef NONSTD_UNION
-        DynHT::union_row(mer_vvec[i], source.mer_vvec[i], record);
+        DynHT::union_row(mer_vvec[i], source.mer_vvec[i]);
 #else
-        DynHT::union_row(mer_vvec[i], source.mer_vvec[i], record, false);
+        DynHT::union_row(mer_vvec[i], source.mer_vvec[i]);
 #endif
       } else if (!source.mer_vvec[i].empty()) {
         mer_vvec[i] = std::move(source.mer_vvec[i]);
@@ -192,7 +192,7 @@ void DynHT::union_table(DynHT& source)
 }
 
 #ifndef NONSTD_UNION
-void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t record, bool in_place)
+void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, bool in_place)
 {
   if (in_place) {
     // Merging in-place (alternative).
@@ -236,7 +236,7 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t re
   dest_v.erase(++result, dest_v.end());
 }
 #else
-void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, record_sptr_t record)
+void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 {
   vec<mer_t> temp_v;
   temp_v.reserve(source_v.size() + dest_v.size());

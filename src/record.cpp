@@ -1,6 +1,4 @@
 #include "record.hpp"
-#include "common.hpp"
-#include <cstdlib>
 
 Record::Record(node_sptr_t nd)
 {
@@ -155,7 +153,7 @@ void Record::make_compact()
     tree->reset_traversal();
     for (auto& [shash, subset_sptr] : sh_to_subset) {
       if (curr_senum < limit_senum) {
-        sh_to_se[subset_sptr->shash] = curr_senum;
+        sh_to_se[shash] = curr_senum;
         curr_senum++;
       }
     }
@@ -171,6 +169,7 @@ CRecord::CRecord(record_sptr_t record)
   node_sptr_t nd_curr;
   while (nd_curr = tree->next_post_order()) {
     se_to_node[curr_senum] = nd_curr;
+    curr_senum++;
   }
   tree->reset_traversal();
   for (auto& [shash, subset_sptr] : record->sh_to_subset) {
@@ -180,6 +179,18 @@ CRecord::CRecord(record_sptr_t record)
   }
   se_to_pse[0] = std::make_pair(0, 0);
   nsubsets = se_to_pse.size();
+}
+
+void CRecord::print_info()
+{
+  std::cout << "Total number of subsets excluding nodes: " << nsubsets << std::endl;
+  std::cout << "Number of nodes: " << se_to_node.size() << std::endl;
+  for (auto [se, nd] : se_to_node) {
+    std::cout << se << ": " << nd->get_name() << "(" << nd->get_card() << ")" << std::endl;
+  }
+  for (auto [se, pse] : se_to_pse) {
+    std::cout << se << ": " << pse.first << "+" << pse.second << std::endl;
+  }
 }
 
 CRecord::CRecord(tree_sptr_t tree)

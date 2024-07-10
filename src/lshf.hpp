@@ -4,7 +4,6 @@
 #include "common.hpp"
 #include "keremet.hpp"
 #include "rqseq.hpp"
-#include <cstdint>
 
 class LSHF
 {

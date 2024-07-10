@@ -179,7 +179,7 @@ void Library::add_partial_flatht(std::string suffix)
   std::filesystem::path metadata_path = library_dir / ("metadata" + suffix);
   std::ifstream metadata_stream(metadata_path, std::ifstream::binary);
   uint8_t k_lshashf, w, h_lshashf;
-  uint32_t m_lshashf, r, nrows;
+  uint32_t m_lshashf, r, nrows_partial;
   bool frac;
   metadata_stream.read(reinterpret_cast<char*>(&k_lshashf), sizeof(uint8_t));
   metadata_stream.read(reinterpret_cast<char*>(&w), sizeof(uint8_t));
@@ -187,7 +187,7 @@ void Library::add_partial_flatht(std::string suffix)
   metadata_stream.read(reinterpret_cast<char*>(&m_lshashf), sizeof(uint32_t));
   metadata_stream.read(reinterpret_cast<char*>(&r), sizeof(uint32_t));
   metadata_stream.read(reinterpret_cast<char*>(&frac), sizeof(bool));
-  metadata_stream.read(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
+  metadata_stream.read(reinterpret_cast<char*>(&nrows_partial), sizeof(uint32_t));
   vec<uint8_t> ppos_v(h_lshashf), npos_v(k_lshashf - h_lshashf);
   metadata_stream.read(reinterpret_cast<char*>(ppos_v.data()), ppos_v.size() * sizeof(uint8_t));
   metadata_stream.read(reinterpret_cast<char*>(npos_v.data()), npos_v.size() * sizeof(uint8_t));
@@ -210,6 +210,7 @@ void Library::add_partial_flatht(std::string suffix)
       k = k_lshashf;
       h = h_lshashf;
       m = m_lshashf;
+      nrows = pow(2, 2 * h);
     }
   }
 
@@ -287,7 +288,7 @@ void Library::add_partial_crecord(std::string suffix)
       crecord->merge(curr_crecord);
     }
   } else {
-    crecord = std::make_shared<CRecord>(tree);
+    crecord = curr_crecord;
   }
 }
 
@@ -298,6 +299,7 @@ std::vector<cmer_t>::const_iterator Library::begin(uint32_t rix)
 
 std::vector<cmer_t>::const_iterator Library::end(uint32_t rix)
 {
+  /* return rix < nrows ? (r_to_flatht[rix % m])->at(rix / m) : (r_to_flatht[rix % m])->end(); */
   return (r_to_flatht[rix % m])->at(rix / m);
 }
 
