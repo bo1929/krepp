@@ -55,6 +55,7 @@ public:
   tuint_t get_nchildren() { return nchildren; }
   tree_sptr_t get_tree() { return tree; }
   std::string get_name() { return name; }
+  node_sptr_t get_parent() { return parent; }
   bool check_leaf() { return is_leaf; }
   tuint_t get_card() { return card; }
   sh_t get_shash() { return shash; }
