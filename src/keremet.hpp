@@ -61,13 +61,13 @@ public:
   void add_partial_tree(std::string suffix);
   void add_partial_flatht(std::string suffix);
   void add_partial_crecord(std::string suffix);
+  std::vector<cmer_t>::const_iterator get_first(uint32_t rix);
+  std::vector<cmer_t>::const_iterator get_next(uint32_t rix);
   bool check_partial(uint32_t rix) { return r_to_flatht.find(rix % m) != r_to_flatht.end(); }
   flatht_sptr_t get_flatht_sptr(uint32_t rix) { return r_to_flatht[rix % m]; };
-  lshf_sptr_t get_lshashf() { return lshashf; }
   crecord_sptr_t get_crecord() { return crecord; }
+  lshf_sptr_t get_lshashf() { return lshashf; }
   tree_sptr_t get_tree() { return tree; }
-  std::vector<cmer_t>::const_iterator begin(uint32_t rix);
-  std::vector<cmer_t>::const_iterator end(uint32_t rix);
 
 private:
   uint8_t k;

@@ -292,15 +292,14 @@ void Library::add_partial_crecord(std::string suffix)
   }
 }
 
-std::vector<cmer_t>::const_iterator Library::begin(uint32_t rix)
+std::vector<cmer_t>::const_iterator Library::get_first(uint32_t rix)
 {
   return rix < m ? (r_to_flatht[rix % m])->begin() : (r_to_flatht[rix % m])->at(rix / m - 1);
 }
 
-std::vector<cmer_t>::const_iterator Library::end(uint32_t rix)
+std::vector<cmer_t>::const_iterator Library::get_next(uint32_t rix)
 {
-  /* return rix < nrows ? (r_to_flatht[rix % m])->at(rix / m) : (r_to_flatht[rix % m])->end(); */
-  return (r_to_flatht[rix % m])->at(rix / m);
+  return rix < nrows ? (r_to_flatht[rix % m])->at(rix / m) : (r_to_flatht[rix % m])->end();
 }
 
 void Pkrmt::place_sequences()
@@ -308,7 +307,7 @@ void Pkrmt::place_sequences()
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
   while (qs->read_next_batch() || !qs->is_batch_finished()) {
     QBatch qb(library, qs);
-    qb.search_batch(5);
+    qb.search_batch(3);
   }
 }
 
