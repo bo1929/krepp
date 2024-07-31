@@ -169,6 +169,7 @@ CRecord::CRecord(record_sptr_t record)
   node_sptr_t nd_curr;
   while (nd_curr = tree->next_post_order()) {
     se_to_node[curr_senum] = nd_curr;
+    shash_to_se[nd_curr->get_shash()] = curr_senum;
     curr_senum++;
   }
   tree->reset_traversal();
@@ -201,6 +202,7 @@ CRecord::CRecord(tree_sptr_t tree)
   se_t curr_senum = 1;
   while (nd_curr = tree->next_post_order()) {
     se_to_node[curr_senum] = nd_curr;
+    shash_to_se[nd_curr->get_shash()] = curr_senum;
     curr_senum++;
   }
   tree->reset_traversal();

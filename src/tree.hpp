@@ -61,9 +61,9 @@ public:
   sh_t get_shash() { return shash; }
   sh_t sum_children_shash()
   {
-    sh_t sh = 0;
-    std::for_each(children.begin(), children.end(), [&sh](node_sptr_t nd) { sh += nd->shash; });
-    return sh;
+    sh_t shash = 0;
+    std::for_each(children.begin(), children.end(), [&shash](node_sptr_t nd) { shash += nd->shash; });
+    return shash;
   }
 
 private:

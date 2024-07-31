@@ -88,6 +88,7 @@ public:
   bool check_node(se_t se) { return se_to_node.find(se) != se_to_node.end(); }
   std::pair<se_t, se_t> get_pse(se_t se) { return se_to_pse[se]; }
   node_sptr_t get_node(se_t se) { return se_to_node[se]; }
+  se_t get_se(sh_t shash) { return shash_to_se[shash]; }
   bool check_compatible(crecord_sptr_t crecord);
   void merge(crecord_sptr_t crecord);
   void print_info();
@@ -98,6 +99,7 @@ private:
   se_t nsubsets = 0;
   std::unordered_map<se_t, std::pair<se_t, se_t>> se_to_pse = {};
   std::unordered_map<se_t, node_sptr_t> se_to_node = {};
+  std::unordered_map<sh_t, se_t> shash_to_se = {};
 };
 
 #endif
