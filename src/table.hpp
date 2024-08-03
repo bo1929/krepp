@@ -44,7 +44,7 @@ public:
     return left.encoding == right.encoding;
   }
   uint64_t get_nkmers() { return nkmers; }
-  cmer_t conv_mer_cmer(mer_t x) { return std::make_pair(x.encoding, record->map_compact(x.shash)); }
+  cmer_t conv_mer_cmer(mer_t x) { return std::make_pair(x.encoding, record->map_compact(x.sh)); }
 
 private:
   uint32_t nrows;

@@ -14,9 +14,8 @@ FlatHT::FlatHT(DynHT& source)
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, source.mer_vvec[rix].size());
     for (inc_t i = 0; i < copy_inc; ++i) {
-      cmer_v.emplace_back(
-        std::make_pair(source.mer_vvec[rix][i].encoding,
-                       source.record->map_compact(source.mer_vvec[rix][i].shash)));
+      cmer_v.emplace_back(std::make_pair(source.mer_vvec[rix][i].encoding,
+                                         source.record->map_compact(source.mer_vvec[rix][i].sh)));
     }
     lix += copy_inc;
     inc_v[rix] = lix;
@@ -222,10 +221,10 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, bool in_place)
     if (result->encoding == iter->encoding) {
       // TODO: check collisions and resolve.
       // TODO: check if subset is a node and skip.
-      if (iter->shash + result->shash) {
-        subset_sptr_t new_subset = std::make_shared<Subset>(iter->shash, result->shash, record);
+      if (iter->sh + result->sh) {
+        subset_sptr_t new_subset = std::make_shared<Subset>(iter->sh, result->sh, record);
         record->add_subset(new_subset);
-        result->shash += iter->shash;
+        result->sh += iter->sh;
       }
     } else if (++result != iter) {
       *result = std::move(*iter);
@@ -250,10 +249,10 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
     while (iter_d != dest_v.end() && iter_s->encoding == iter_d->encoding) {
       // TODO: check collisions and resolve.
       // TODO: check if subset is a node and skip.
-      if (iter_d->shash + iter_s->shash) {
-        subset_sptr_t new_subset = std::make_shared<Subset>(iter_d->shash, iter_s->shash, record);
+      if (iter_d->sh + iter_s->sh) {
+        subset_sptr_t new_subset = std::make_shared<Subset>(iter_d->sh, iter_s->sh, record);
         record->add_subset(new_subset);
-        iter_s->shash += iter_d->shash;
+        iter_s->sh += iter_d->sh;
       }
       iter_d++;
     }

@@ -70,7 +70,6 @@ void Tree::split_nwk(vec<std::string>& n_vec)
 
 void Node::parse(vec<std::string>& n_vec)
 {
-  tree->nnodes++;
   if (tree->atter >= n_vec.size())
     return;
   if (n_vec[tree->atter] != "(") {
@@ -87,9 +86,12 @@ void Node::parse(vec<std::string>& n_vec)
     }
     is_leaf = true;
     card = 1;
-    shash = Subset::get_singleton_shash(name);
-    while (!shash)
-      shash = Subset::rehash(reinterpret_cast<uint64_t>(&shash));
+    sh = Subset::get_singleton_shash(name);
+    while (!sh) {
+      sh = Subset::rehash(reinterpret_cast<uint64_t>(&sh));
+    }
+    tree->nnodes++;
+    se = tree->nnodes;
     return;
   }
   if (n_vec[tree->atter] == "(") {
@@ -99,8 +101,8 @@ void Node::parse(vec<std::string>& n_vec)
       child->set_parent(getptr());
       child->ix_child = nchildren;
       child->parse(n_vec);
-      shash += child->shash;
       card += child->card;
+      sh += child->sh;
       children.push_back(std::move(child));
       nchildren++;
       if (n_vec[tree->atter] == ",")
@@ -109,6 +111,8 @@ void Node::parse(vec<std::string>& n_vec)
         break;
     }
     is_leaf = false;
+    tree->nnodes++;
+    se = tree->nnodes;
   }
   if (n_vec[tree->atter] == ")") {
     tree->atter++;
@@ -135,7 +139,7 @@ void Node::parse(vec<std::string>& n_vec)
 void Node::print_info()
 {
   std::string pname = parent ? parent->name : "";
-  std::cout << name << "\t" << shash << "\t" << len_branch << "\t" << pname << std::endl;
+  std::cout << name << "\t" << sh << "\t" << len_branch << "\t" << pname << std::endl;
 }
 
 node_sptr_t Tree::next_post_order()

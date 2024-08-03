@@ -10,6 +10,14 @@ class Tree : public std::enable_shared_from_this<Tree>
 
 public:
   Tree() {}
+  void print_info();
+  node_sptr_t next_post_order();
+  bool check_compatible(tree_sptr_t tree);
+  void split_nwk(vec<std::string>& n_vec);
+  void parse(std::filesystem::path nwk_path);
+  void save(std::filesystem::path library_dir, std::string suffix);
+  void load(std::filesystem::path library_dir, std::string suffix);
+  static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
   void set_subtree(node_sptr_t source) { subtree_root = source; }
   tree_sptr_t getptr() { return shared_from_this(); }
   node_sptr_t get_root() { return root; }
@@ -18,23 +26,15 @@ public:
     curr = nullptr;
     subtree_root = root;
   }
-  void print_info();
-  node_sptr_t next_post_order();
-  bool check_compatible(tree_sptr_t tree);
-  static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
-  void parse(std::filesystem::path nwk_path);
-  void split_nwk(vec<std::string>& n_vec);
-  void save(std::filesystem::path library_dir, std::string suffix);
-  void load(std::filesystem::path library_dir, std::string suffix);
 
 private:
   tuint_t atter = 0;
   tuint_t nnodes = 0;
-  double total_len_branch = 0;
-  node_sptr_t subtree_root = nullptr;
+  std::string nwk_str;
   node_sptr_t root = nullptr;
   node_sptr_t curr = nullptr;
-  std::string nwk_str;
+  node_sptr_t subtree_root = nullptr;
+  double total_len_branch = 0;
 };
 
 class Node : public std::enable_shared_from_this<Node>
@@ -48,29 +48,30 @@ public:
   {}
   void print_info();
   void parse(vec<std::string>& n_vec);
-  void set_shash(sh_t source) { shash = source; }
+  void set_shash(sh_t source) { sh = source; }
   void set_parent(node_sptr_t source) { parent = source; }
   node_sptr_t getptr() { return shared_from_this(); }
-  vec<node_sptr_t> get_children() { return children; }
+  node_sptr_t* get_children() { return children.data(); }
   tuint_t get_nchildren() { return nchildren; }
+  node_sptr_t get_parent() { return parent; }
   tree_sptr_t get_tree() { return tree; }
   std::string get_name() { return name; }
-  node_sptr_t get_parent() { return parent; }
-  bool check_leaf() { return is_leaf; }
   tuint_t get_card() { return card; }
-  sh_t get_shash() { return shash; }
+  sh_t get_shash() { return sh; }
+  se_t get_senc() { return se; }
+  bool check_leaf() { return is_leaf; }
   sh_t sum_children_shash()
   {
-    sh_t shash = 0;
-    std::for_each(children.begin(), children.end(), [&shash](node_sptr_t nd) { shash += nd->shash; });
-    return shash;
+    sh_t sh = 0;
+    std::for_each(children.begin(), children.end(), [&sh](node_sptr_t nd) { sh += nd->sh; });
+    return sh;
   }
 
 private:
+  vec<node_sptr_t> children;
   std::string name = "";
   node_sptr_t parent = nullptr;
   tree_sptr_t tree = nullptr;
-  vec<node_sptr_t> children;
   bool is_leaf = true;
   double len_branch = 0;
   double depth_level = 0;
@@ -78,7 +79,8 @@ private:
   tuint_t nchildren = 0;
   tuint_t ix_child = 0;
   tuint_t card = 0;
-  sh_t shash = 0;
+  sh_t sh = 0;
+  se_t se = 0;
 };
 
 #endif

@@ -19,7 +19,7 @@ class RSeq
   friend class DynHT;
 
 public:
-  RSeq(uint8_t w, uint32_t r, bool frac, sh_t shash, lshf_sptr_t lshashf, std::string input);
+  RSeq(uint8_t w, uint32_t r, bool frac, sh_t sh, lshf_sptr_t lshashf, std::string input);
   ~RSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   bool set_curr_seq()
@@ -51,7 +51,7 @@ private:
   uint64_t len;
   char* seq;
   char* name;
-  sh_t shash;
+  sh_t sh;
   uint64_t mask_bp;
   uint64_t mask_lr;
   const std::regex url_regexp = std::regex(

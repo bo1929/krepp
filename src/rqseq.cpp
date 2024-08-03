@@ -1,10 +1,10 @@
 #include "rqseq.hpp"
 
-RSeq::RSeq(uint8_t w, uint32_t r, bool frac, sh_t shash, lshf_sptr_t lshashf, std::string input)
+RSeq::RSeq(uint8_t w, uint32_t r, bool frac, sh_t sh, lshf_sptr_t lshashf, std::string input)
   : w(w)
   , r(r)
   , frac(frac)
-  , shash(shash)
+  , sh(sh)
   , lshashf(lshashf)
 {
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
@@ -99,7 +99,7 @@ void RSeq::extract_mers(vvec<mer_t>& table)
       rix_res = rix % m;
       rix /= m;
       if (frac ? rix_res <= r : rix_res == r) {
-        table[rix].emplace_back(lshashf->drop_ppos_lr(minimizer.second), shash);
+        table[rix].emplace_back(lshashf->drop_ppos_lr(minimizer.second), sh);
         wix++;
       }
     }

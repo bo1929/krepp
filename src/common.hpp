@@ -80,11 +80,11 @@ typedef std::pair<enc_t, se_t> cmer_t;
 struct mer_t
 {
   enc_t encoding = 0;
-  sh_t shash = 0;
+  sh_t sh = 0;
   mer_t() {}
-  mer_t(enc_t encoding, sh_t shash)
+  mer_t(enc_t encoding, sh_t sh)
     : encoding(encoding)
-    , shash(shash)
+    , sh(sh)
   {}
 };
 

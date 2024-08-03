@@ -14,15 +14,15 @@ class Subset : public std::enable_shared_from_this<Subset>
   friend class CRecord;
 
 private:
-  sh_t shash = 0;
-  sh_t chash = 0;
+  sh_t sh = 0;
+  sh_t ch = 0;
   tuint_t card = 0;
 
 public:
   Subset(sh_t shash1, sh_t shash2, record_sptr_t record);
-  Subset(sh_t shash, sh_t chash, tuint_t card)
-    : shash(shash)
-    , chash(chash)
+  Subset(sh_t sh, sh_t ch, tuint_t card)
+    : sh(sh)
+    , ch(ch)
     , card(card)
   {}
   subset_sptr_t getptr() { return shared_from_this(); }
@@ -67,12 +67,12 @@ public:
   // bool check_collision(subset_sptr_t x);
   // bool check_conflict(record_sptr_t x);
   void make_compact();
-  se_t map_compact(sh_t shash) { return sh_to_se[shash]; }
+  se_t map_compact(sh_t sh) { return shash_to_senc[sh]; }
 
 private:
-  std::unordered_map<sh_t, subset_sptr_t> sh_to_subset = {};
-  std::unordered_map<sh_t, node_sptr_t> sh_to_node = {};
-  std::unordered_map<sh_t, se_t> sh_to_se = {};
+  std::unordered_map<sh_t, subset_sptr_t> shash_to_subset = {};
+  std::unordered_map<sh_t, node_sptr_t> shash_to_node = {};
+  std::unordered_map<sh_t, se_t> shash_to_senc = {};
   node_sptr_t subtree_root = nullptr;
   tree_sptr_t tree = nullptr;
 };
@@ -85,21 +85,19 @@ public:
   crecord_sptr_t getptr() { return shared_from_this(); }
   void load(std::filesystem::path library_dir, std::string suffix);
   void save(std::filesystem::path library_dir, std::string suffix);
-  bool check_node(se_t se) { return se_to_node.find(se) != se_to_node.end(); }
-  std::pair<se_t, se_t> get_pse(se_t se) { return se_to_pse[se]; }
-  node_sptr_t get_node(se_t se) { return se_to_node[se]; }
-  se_t get_se(sh_t shash) { return shash_to_se[shash]; }
+  bool check_node(se_t se) { return senc_to_node.find(se) != senc_to_node.end(); }
+  std::pair<se_t, se_t> get_psenc(se_t se) { return senc_to_psenc[se]; }
+  node_sptr_t get_node(se_t se) { return senc_to_node[se]; }
   bool check_compatible(crecord_sptr_t crecord);
   void merge(crecord_sptr_t crecord);
+  vec<se_t> decode_senc(se_t se);
   void print_info();
-  vec<se_t> decode_se(se_t se);
 
 private:
   tree_sptr_t tree;
   se_t nsubsets = 0;
-  std::unordered_map<se_t, std::pair<se_t, se_t>> se_to_pse = {};
-  std::unordered_map<se_t, node_sptr_t> se_to_node = {};
-  std::unordered_map<sh_t, se_t> shash_to_se = {};
+  std::unordered_map<se_t, std::pair<se_t, se_t>> senc_to_psenc = {};
+  std::unordered_map<se_t, node_sptr_t> senc_to_node = {};
 };
 
 #endif

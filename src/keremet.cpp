@@ -37,10 +37,10 @@ void Bkrmt::build_library()
 void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
 {
   if (nd->check_leaf()) {
-    sh_t shash = nd->get_shash();
+    sh_t sh = nd->get_shash();
     if (name_to_input.find(nd->get_name()) != name_to_input.end()) {
       rseq_sptr_t rs =
-        std::make_shared<RSeq>(w, r, frac, shash, lshashf, name_to_input[nd->get_name()]);
+        std::make_shared<RSeq>(w, r, frac, sh, lshashf, name_to_input[nd->get_name()]);
       dynht.fill_table(rs);
 #pragma omp critical
       {
@@ -55,7 +55,6 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
     }
   } else {
     assert(nd->get_nchildren() > 0);
-    vec<node_sptr_t> children_nd_v = nd->get_children();
     vec<DynHT> children_dt_v;
     children_dt_v.assign(nd->get_nchildren(), DynHT(nrows, ref_tree, record));
     omp_lock_t parent_lock;
@@ -63,7 +62,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
     for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
 #pragma omp task untied shared(dynht)
       {
-        build_for_subtree(children_nd_v[i], children_dt_v[i]);
+        build_for_subtree(*std::next(nd->get_children(), i), children_dt_v[i]);
         omp_set_lock(&parent_lock);
         dynht.union_table(children_dt_v[i]);
         omp_unset_lock(&parent_lock);
@@ -307,7 +306,7 @@ void Pkrmt::place_sequences()
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
   while (qs->read_next_batch() || !qs->is_batch_finished()) {
     QBatch qb(library, qs);
-    qb.search_batch(4);
+    qb.search_batch(1);
   }
 }
 
