@@ -306,7 +306,7 @@ void Pkrmt::place_sequences()
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
   while (qs->read_next_batch() || !qs->is_batch_finished()) {
     QBatch qb(library, qs);
-    qb.search_batch(1);
+    qb.search_batch(5);
   }
 }
 

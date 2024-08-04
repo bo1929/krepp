@@ -30,19 +30,20 @@ void QBatch::search_batch(uint32_t max_hdist)
     /* qmers_or->print_coverage(); */
     qmers_or->compute_pseudoparsimony();
     std::pair<node_sptr_t, uint32_t> pmer_or = qmers_or->max_parsimonious_mer();
-    std::cout << name_batch[bix] << "\t" << pmer_or.first->get_name() << std::endl;
+    /* std::cout << name_batch[bix] << "\t" << pmer_or.first->get_name() << std::endl; */
 
     qmers_rc->compute_coverage();
     /* qmers_rc->print_coverage(); */
     qmers_rc->compute_pseudoparsimony();
     std::pair<node_sptr_t, uint32_t> pmer_rc = qmers_rc->max_parsimonious_mer();
-    std::cout << name_batch[bix] << "\t" << pmer_rc.first->get_name() << std::endl;
+    /* std::cout << name_batch[bix] << "\t" << pmer_rc.first->get_name() << std::endl; */
 
-    /* if (pmer_or.second > pmer_rc.second) { */
-    /*   std::cout << name_batch[bix] << "\t" << pmer_or.first->get_name() << std::endl; */
-    /* } else { */
-    /*   std::cout << name_batch[bix] << "\t" << pmer_rc.first->get_name() << std::endl; */
-    /* } */
+    /* std::cout << pmer_or.second << ", " << pmer_rc.second; */
+    if (pmer_or.second > pmer_rc.second) {
+      std::cout << name_batch[bix] << "\t" << pmer_or.first->get_name() << std::endl;
+    } else {
+      std::cout << name_batch[bix] << "\t" << pmer_rc.first->get_name() << std::endl;
+    }
   }
 }
 
@@ -88,8 +89,8 @@ void QMers::compute_pseudoparsimony()
     auto it_curr = node_to_score.end();
     std::set<se_t> se_set;
     for (const match_t m : match_vvec[i]) {
-      /* if (node_to_sinfo[m.nd].coverage_pos < 0.5) */
-      /*   continue; */
+      if (node_to_sinfo[m.nd].coverage_pos < 0.33)
+        continue;
       se_set.insert(m.nd->get_senc());
       node_to_score[m.nd].sub_hdist = m.hdist;
       nd_p = m.nd->get_parent();
@@ -226,8 +227,8 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
       if (crecord->check_node(se)) {
         nd = crecord->get_node(se);
         if (nd->check_leaf()) {
-          if (nd->get_name() == "G000006925")
-            continue;
+          /* if (nd->get_name() == "G001042715") */
+          /*   continue; */
           node_to_ix.try_emplace(nd, match_vvec[pos].size());
           ix = node_to_ix[nd];
           if (node_to_ix[nd] == ix) {
