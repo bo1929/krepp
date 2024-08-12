@@ -1,158 +1,224 @@
-#include "common.hpp"
 #include "query.hpp"
-#include <cstdint>
-#include <functional>
-#include <unordered_map>
 
-QMers::QMers(library_sptr_t library, uint64_t len, uint32_t max_hdist)
+QMers::QMers(library_sptr_t library, uint64_t len, uint32_t max_hdist, float min_covpos)
   : library(library)
   , len(len)
   , max_hdist(max_hdist)
+  , min_covpos(min_covpos)
 {
+  placement = nullptr;
   crecord = library->get_crecord();
   tree = library->get_tree();
   k = library->get_lshashf()->get_k();
-  match_vvec.resize(len - k + 1);
 }
 
-void QBatch::search_batch(uint32_t max_hdist)
+void QBatch::search_batch(uint32_t max_hdist, float min_covpos)
 {
   for (uint64_t bix = 0; bix < batch_size; ++bix) {
     char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
 
-    qmers_sptr_t qmers_or = std::make_shared<QMers>(library, len, max_hdist);
-    qmers_sptr_t qmers_rc = std::make_shared<QMers>(library, len, max_hdist);
+    qmers_sptr_t qmers_or = std::make_shared<QMers>(library, len, max_hdist, min_covpos);
+    qmers_sptr_t qmers_rc = std::make_shared<QMers>(library, len, max_hdist, min_covpos);
 
     search_mers(seq, len, qmers_or, qmers_rc);
 
     qmers_or->compute_coverage();
-    /* qmers_or->print_coverage(); */
-    qmers_or->compute_pseudoparsimony();
-    std::pair<node_sptr_t, uint32_t> pmer_or = qmers_or->max_parsimonious_mer();
-    /* std::cout << name_batch[bix] << "\t" << pmer_or.first->get_name() << std::endl; */
-
     qmers_rc->compute_coverage();
-    /* qmers_rc->print_coverage(); */
-    qmers_rc->compute_pseudoparsimony();
-    std::pair<node_sptr_t, uint32_t> pmer_rc = qmers_rc->max_parsimonious_mer();
-    /* std::cout << name_batch[bix] << "\t" << pmer_rc.first->get_name() << std::endl; */
 
-    /* std::cout << pmer_or.second << ", " << pmer_rc.second; */
-    if (pmer_or.second > pmer_rc.second) {
-      std::cout << name_batch[bix] << "\t" << pmer_or.first->get_name() << std::endl;
+    /* std::cout << name_batch[bix] << "\tor\t" << std::endl; */
+    qmers_or->fill_ninfo();
+    /* std::cout << name_batch[bix] << "\trc\t" << std::endl; */
+    qmers_rc->fill_ninfo();
+
+    qmers_or->compute_exchdist();
+    qmers_rc->compute_exchdist();
+
+    /* if (qmers_or->greedy_count_placement() > qmers_rc->greedy_count_placement()) { */
+    /* if (qmers_or->argmin_avghdist_placement() < qmers_rc->argmin_avghdist_placement()) { */
+    /* if (qmers_or->argmin_diffhdist_placement() < qmers_rc->argmin_diffhdist_placement()) { */
+    if (qmers_or->countpos_avghdist_placement() < qmers_rc->countpos_avghdist_placement()) {
+      /* std::cout << name_batch[bix] << "\tor\t"; */
+      /* qmers_or->display_placement(); */
     } else {
-      std::cout << name_batch[bix] << "\t" << pmer_rc.first->get_name() << std::endl;
+      /* std::cout << name_batch[bix] << "\trc\t"; */
+      /* qmers_rc->display_placement(); */
     }
   }
 }
 
-std::pair<node_sptr_t, uint32_t> QMers::max_parsimonious_mer()
-{
-  node_sptr_t nd_c, nd_p, nd_m;
-  uint32_t max_score;
-  nd_m = tree->get_root();
-  /* for (auto kv : node_to_sinfo) { */
-  /*   std::cout << kv.first->get_name() << ": " << (kv.second).parsimony_score << std::endl; */
-  /* } */
-  auto it_child = node_to_sinfo.end();
-  while (!nd_m->check_leaf()) {
-    max_score = 0;
-    nd_p = nd_m;
-    for (tuint_t i = 0; i < nd_p->get_nchildren(); ++i) {
-      nd_c = *std::next(nd_p->get_children(), i);
-      it_child = node_to_sinfo.find(nd_c);
-      if (it_child == node_to_sinfo.end()) {
-        continue;
-      }
-      if (max_score != 0 && (it_child->second).parsimony_score == max_score) {
-        nd_m = nd_m->get_parent();
-        break;
-      }
-      if ((it_child->second).parsimony_score > max_score) {
-        nd_m = nd_c;
-        max_score = (it_child->second).parsimony_score;
-      }
-    }
-    if (nd_m == nd_p)
-      break;
-  }
-  return std::make_pair(nd_m, max_score);
-}
-
-void QMers::compute_pseudoparsimony()
+void QMers::fill_ninfo()
 {
   node_sptr_t nd_p;
-  for (uint32_t i = 0; i < match_vvec.size(); ++i) {
-    std::unordered_map<node_sptr_t, cdist_t> node_to_score;
-    auto it_sibling = node_to_score.end();
-    auto it_curr = node_to_score.end();
-    std::set<se_t> se_set;
-    for (const match_t m : match_vvec[i]) {
-      if (node_to_sinfo[m.nd].coverage_pos < 0.33)
-        continue;
-      se_set.insert(m.nd->get_senc());
-      node_to_score[m.nd].sub_hdist = m.hdist;
-      nd_p = m.nd->get_parent();
-      while (nd_p) {
-        if (m.hdist < node_to_score[nd_p].sub_hdist) {
-          node_to_score[nd_p].sub_hdist = m.hdist;
-        }
-        se_set.insert(nd_p->get_senc());
+  node_to_ninfo[tree->get_root()] = std::make_shared<ninfo_t>();
+  for (auto const& [nd, mi] : node_to_minfo) {
+    if (mi->covpos > min_covpos) {
+      node_to_ninfo[nd] = std::make_shared<ninfo_t>(mi);
+      nd_p = nd;
+      while (nd_p->get_parent() && nd_p != nd_p->get_parent()) {
         nd_p = nd_p->get_parent();
-      }
-    }
-    for (auto it_se = se_set.rbegin(); it_se != se_set.rend(); ++it_se) {
-      it_curr = node_to_score.find(crecord->get_node(*it_se));
-      nd_p = it_curr->first->get_parent();
-      if (!nd_p || it_curr->first->check_leaf())
-        continue;
-      (it_curr->second).exc_hdist = node_to_score[nd_p].exc_hdist;
-      for (tuint_t i = 0; i < nd_p->get_nchildren(); ++i) {
-        it_sibling = node_to_score.find(*std::next(nd_p->get_children(), i));
-        if (it_sibling != node_to_score.end() && it_sibling->first != it_curr->first) {
-          (it_curr->second).exc_hdist =
-            std::min((it_curr->second).exc_hdist, (it_sibling->second).sub_hdist);
+        if (!node_to_ninfo.contains(nd_p))
+          node_to_ninfo[nd_p] = std::make_shared<ninfo_t>(mi);
+        else {
+          node_to_ninfo[nd_p]->add_minfo(mi);
         }
       }
     }
-    for (it_curr = node_to_score.begin(); it_curr != node_to_score.end(); ++it_curr) {
-      /* std::cout << (it_curr->second).sub_hdist << ", " << (it_curr->second).exc_hdist << std::endl; */
-      if ((it_curr->second).sub_hdist < (it_curr->second).exc_hdist) {
-        node_to_sinfo[it_curr->first].parsimony_score++;
+  }
+}
+
+void QMers::compute_exchdist()
+{
+  uint32_t root_match_count = node_to_ninfo[tree->get_root()]->match_count;
+  float root_total_hdist = root_match_count * node_to_ninfo[tree->get_root()]->avghdist;
+  for (auto const& [nd, ni] : node_to_ninfo) {
+    ni->exchdist =
+      (root_total_hdist - ni->avghdist * ni->match_count) / (root_match_count - ni->match_count);
+  }
+}
+
+float QMers::argmin_avghdist_placement()
+{
+  placement = tree->get_root();
+  float avghdist = std::numeric_limits<float>::max();
+  for (auto const& [nd, ni] : node_to_ninfo) {
+    if (ni->avghdist <= avghdist) {
+      avghdist = ni->avghdist;
+      placement = nd;
+    }
+  }
+  return avghdist;
+}
+
+float QMers::countpos_avghdist_placement()
+{
+  placement = tree->get_root();
+  for (uint32_t i = 0; i < len; ++i) {
+    for (auto const& [nd, ni] : node_to_ninfo) {
+      if (ni->pos_to_pinfo.contains(i)) {
+        ni->pavghdist += (ni->pos_to_pinfo[i]).infhdist;
       }
     }
+  }
+  for (auto const& [nd, ni] : node_to_ninfo) {
+    ni->pavghdist /= ni->pos_to_pinfo.size();
+  }
+  float pavghdist = std::numeric_limits<float>::max();
+  for (auto const& [nd, ni] : node_to_ninfo) {
+    if (ni->pavghdist < pavghdist) {
+      pavghdist = ni->pavghdist;
+    }
+  }
+  uint32_t card = std::numeric_limits<uint32_t>::min();
+  for (auto const& [nd, ni] : node_to_ninfo) {
+    if ((ni->pavghdist == pavghdist) && (nd->get_card() > card)) {
+      placement = nd;
+      card = nd->get_card();
+    }
+  }
+  for (auto const& [nd, ni] : node_to_ninfo) {
+    std::cout << nd->get_name() << "\t" << nd->get_card() << "\t" << ni->taxa_count << "\t"
+              << (ni->taxa_count - 1.0) / static_cast<float>(nd->get_card()) << "\t"
+              << ni->match_count << "\t" << ni->pavghdist << "\t" << ni->avghdist << "\t"
+              << ni->covpos << "\t" << ni->covmer << std::endl;
+  }
+  return pavghdist;
+}
+
+float QMers::argmin_diffhdist_placement()
+{
+  placement = tree->get_root();
+  float diffhdist = std::numeric_limits<float>::max();
+  for (auto const& [nd, ni] : node_to_ninfo) {
+    if ((ni->avghdist - ni->exchdist) <= diffhdist) {
+      diffhdist = ni->avghdist - ni->exchdist;
+      placement = nd;
+    }
+  }
+  return diffhdist;
+}
+
+float QMers::greedy_count_placement()
+{
+  uint32_t curr_count, max_count = 0;
+  node_sptr_t nd_p, nd_c, nd_m;
+  nd_p = tree->get_root();
+  placement = nd_p;
+  while (!nd_p->check_leaf()) {
+    max_count = 0;
+    for (tuint_t i = 0; i < nd_p->get_nchildren(); ++i) {
+      nd_c = *std::next(nd_p->get_children(), i);
+      if (!node_to_ninfo.contains(nd_c))
+        continue;
+      curr_count = node_to_ninfo[nd_c]->match_count;
+      if (curr_count > max_count) {
+        max_count = curr_count;
+        nd_m = nd_c;
+      }
+    }
+    if (max_count <= (node_to_ninfo[nd_p]->match_count / 2)) {
+      break;
+    } else {
+      nd_p = nd_m;
+      placement = nd_p;
+    }
+  }
+  return node_to_ninfo[placement]->match_count;
+}
+
+void QMers::display_placement()
+{
+  std::cout << placement->get_name() << "\t";
+  if (placement->check_leaf()) {
+    node_to_minfo[placement]->print_info();
+  } else {
+    node_to_ninfo[placement]->print_info();
   }
 }
 
 void QMers::print_coverage()
 {
-  for (auto const& [nd, ri] : node_to_sinfo) {
-    std::cout << nd->get_name() << ": " << ri.coverage_mer << ", " << ri.coverage_pos << ", "
-              << ri.min_hdist << std::endl;
+  for (auto const& [nd, mi] : node_to_minfo) {
+    std::cout << nd->get_name() << "\t" << mi->covmer << "\t" << mi->covpos << "\t" << mi->avghdist
+              << std::endl;
+  }
+}
+
+void QMers::print_matches()
+{
+  for (auto const& [nd, mi] : node_to_minfo) {
+    for (auto const& match : mi->match_v) {
+      std::cout << nd->get_name() << "\t" << match.pos << "\t" << match.hdist << std::endl;
+    }
   }
 }
 
 void QMers::compute_coverage()
 {
-  std::unordered_map<node_sptr_t, uint32_t> node_to_pos;
+  flat_phmap<node_sptr_t, uint32_t> node_to_pos;
   float irk = 1.0 / (len - k + 1);
   float irp = 1.0 / (len);
-  uint32_t pos;
-  for (uint32_t i = 0; i < match_vvec.size(); ++i) {
-    for (const match_t m : match_vvec[i]) {
-      if (node_to_sinfo[m.nd].min_hdist == m.hdist) {
-        node_to_sinfo[m.nd].coverage_mer += irk;
-        node_to_pos.try_emplace(m.nd, i);
-        pos = node_to_pos[m.nd];
-        if ((pos == i) || i > (pos + k)) {
-          node_to_sinfo[m.nd].coverage_pos += irp * k;
-        } else {
-          node_to_sinfo[m.nd].coverage_pos += irp * (i - pos);
-        }
-        node_to_pos[m.nd] = i;
+  uint32_t ix1, ix2;
+  bool fl;
+  for (auto const& [nd, mi] : node_to_minfo) {
+    mi->covmer += irk * mi->match_v.size();
+    mi->covpos += irp * k;
+    mi->avghdist = mi->match_v[0].hdist;
+    for (uint32_t i = 1; i < mi->match_v.size(); ++i) {
+      mi->avghdist += mi->match_v[i].hdist;
+      if ((mi->match_v[i].pos > mi->match_v[i - 1].pos)) {
+        ix1 = i;
+        ix2 = i - 1;
+      } else {
+        ix2 = i;
+        ix1 = i - 1;
       }
+      if (mi->match_v[ix1].pos > (mi->match_v[ix2].pos + k))
+        mi->covpos += irp * k;
+      else
+        mi->covpos += irp * (mi->match_v[ix1].pos - mi->match_v[ix2].pos);
     }
+    mi->avghdist /= mi->match_v.size();
   }
 }
 
@@ -212,7 +278,6 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
   uint32_t curr_hdist;
   std::queue<se_t> qsubset;
   std::pair<se_t, se_t> pse;
-  std::unordered_map<node_sptr_t, uint32_t> node_to_ix;
   std::vector<cmer_t>::const_iterator iter1 = library->get_first(rix);
   std::vector<cmer_t>::const_iterator iter2 = library->get_next(rix);
   for (; iter1 < iter2; ++iter1) {
@@ -226,22 +291,11 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
       qsubset.pop();
       if (crecord->check_node(se)) {
         nd = crecord->get_node(se);
-        if (nd->check_leaf()) {
-          /* if (nd->get_name() == "G001042715") */
-          /*   continue; */
-          node_to_ix.try_emplace(nd, match_vvec[pos].size());
-          ix = node_to_ix[nd];
-          if (node_to_ix[nd] == ix) {
-            match_vvec[pos].emplace_back(nd, curr_hdist, enc_lr);
-          } else if (curr_hdist < match_vvec[pos][ix].hdist) {
-            match_vvec[pos][ix].hdist = curr_hdist;
-            match_vvec[pos][ix].enc_lr = enc_lr;
-          } else {
-            continue;
+        if (nd->check_leaf() && (nd->get_name() != leave_out_ref)) { // TODO: Remove testing.
+          if (!node_to_minfo.contains(nd)) {
+            node_to_minfo[nd] = std::make_shared<minfo_t>();
           }
-          if (node_to_sinfo[nd].min_hdist > curr_hdist) {
-            node_to_sinfo[nd].min_hdist = curr_hdist;
-          }
+          node_to_minfo[nd]->update_match(pos, curr_hdist, enc_lr);
         } else {
           for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
             qsubset.push((*std::next(nd->get_children(), i))->get_senc());

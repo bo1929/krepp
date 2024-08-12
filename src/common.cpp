@@ -1,6 +1,7 @@
 #include "common.hpp"
 
 uint32_t num_threads = 1;
+std::string leave_out_ref = "";
 thread_local std::random_device rd;
 thread_local std::mt19937 gen;
 

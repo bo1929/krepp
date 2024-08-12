@@ -7,14 +7,20 @@ Record::Record(node_sptr_t nd)
   shash_to_node[nd->get_shash()] = nd;
   nd->get_tree()->set_subtree(nd);
   node_sptr_t nd_curr;
+  sh_t ch;
   while (nd_curr = nd->get_tree()->next_post_order()) {
     shash_to_node[nd_curr->get_shash()] = nd_curr;
-    /* shash_to_subset[nd_curr->get_shash()] = // TODO: Consider an alternative. */
-    /*   std::make_shared<Subset>(nd_curr->get_shash(), 0, nd_curr->get_card()); */
+    if (nd_curr->check_leaf()) {
+      ch = 0;
+    } else {
+      ch = (*nd_curr->get_children())->get_shash();
+    }
+    shash_to_subset[nd_curr->get_shash()] =
+      std::make_shared<Subset>(nd_curr->get_shash(), ch, nd_curr->get_card());
   }
   nd->get_tree()->reset_traversal();
   if (subtree_root == subtree_root->get_tree()->get_root()) {
-    while (tree_with_collision()) {
+    while (check_tree_collision()) {
       rehash_tree();
     }
   }
@@ -28,135 +34,114 @@ Record::Record(record_sptr_t source1, record_sptr_t source2)
   tree = subtree_root->get_tree();
 }
 
-bool Record::tree_with_collision()
+bool Record::check_tree_collision()
 {
   bool collision_free = true;
-#pragma omp critical(RecordLock)
-  {
-    subtree_root->get_tree()->set_subtree(subtree_root);
-    node_sptr_t nd_curr;
-    while (collision_free && (nd_curr = subtree_root->get_tree()->next_post_order())) {
-      if (shash_to_node.find(nd_curr->get_shash()) == shash_to_node.end() ||
-          (shash_to_node.at(nd_curr->get_shash()) != nd_curr) || (!nd_curr->get_shash())) {
-        collision_free = false;
-      }
+  subtree_root->get_tree()->set_subtree(subtree_root);
+  node_sptr_t nd_curr;
+  sh_t sh_curr;
+  while (collision_free && (nd_curr = subtree_root->get_tree()->next_post_order())) {
+    sh_curr = nd_curr->get_shash();
+    if (!shash_to_node.contains(sh_curr) || (shash_to_node[sh_curr] != nd_curr) || (!sh_curr)) {
+      collision_free = false;
     }
-    subtree_root->get_tree()->reset_traversal();
   }
+  subtree_root->get_tree()->reset_traversal();
   return !collision_free;
 }
 
 void Record::rehash_tree()
 {
-#pragma omp critical(RecordLock)
-  {
-    shash_to_node.clear();
-    shash_to_subset.clear();
-    subtree_root->get_tree()->set_subtree(subtree_root);
-    node_sptr_t nd_curr;
-    while (nd_curr = subtree_root->get_tree()->next_post_order()) {
-      if (nd_curr->check_leaf()) {
-        nd_curr->set_shash(Subset::rehash(nd_curr->get_shash()));
-      } else {
-        nd_curr->set_shash(nd_curr->sum_children_shash());
-      }
-      shash_to_node[nd_curr->get_shash()] = nd_curr;
-      /* shash_to_subset[nd_curr->get_shash()] = // TODO: Consider an alternative. */
-      /*   std::make_shared<Subset>(nd_curr->get_shash(), 0, nd_curr->get_card()); */
+  shash_to_node.clear();
+  shash_to_subset.clear();
+  subtree_root->get_tree()->set_subtree(subtree_root);
+  node_sptr_t nd_curr;
+  sh_t ch;
+  while (nd_curr = subtree_root->get_tree()->next_post_order()) {
+    if (nd_curr->check_leaf()) {
+      nd_curr->set_shash(Subset::rehash(nd_curr->get_shash()));
+    } else {
+      nd_curr->set_shash(nd_curr->sum_children_shash());
     }
-    subtree_root->get_tree()->reset_traversal();
+    shash_to_node[nd_curr->get_shash()] = nd_curr;
+    if (nd_curr->check_leaf()) {
+      ch = 0;
+    } else {
+      ch = (*nd_curr->get_children())->get_shash();
+    }
+    shash_to_subset[nd_curr->get_shash()] =
+      std::make_shared<Subset>(nd_curr->get_shash(), ch, nd_curr->get_card());
   }
+  subtree_root->get_tree()->reset_traversal();
 }
 
 void Record::union_record(record_sptr_t source)
 {
-#pragma omp critical(RecordLock)
-  {
-    // TODO: check conflicts and resolve.
-    // TODO: check if either of the records is empty.
-    shash_to_node.insert(source->shash_to_node.begin(),
-                         source->shash_to_node.end()); // TODO: Maybe remove.
-    shash_to_subset.insert(source->shash_to_subset.begin(), source->shash_to_subset.end());
-    subtree_root = Tree::compute_lca(subtree_root, source->subtree_root);
-    tree = subtree_root->get_tree();
+  // TODO: check conflicts and resolve.
+  // TODO: check if either of the records is empty.
+  shash_to_node.insert(source->shash_to_node.begin(),
+                       source->shash_to_node.end()); // TODO: Maybe remove.
+  shash_to_subset.insert(source->shash_to_subset.begin(), source->shash_to_subset.end());
+  subtree_root = Tree::compute_lca(subtree_root, source->subtree_root);
+  tree = subtree_root->get_tree();
+}
+
+bool Record::check_subset_collision(subset_sptr_t subset,
+                                    subset_sptr_t subset1,
+                                    subset_sptr_t subset2)
+{ // Perphaps this is enough?
+  if (subset->ch == subset1->sh || subset->ch == subset2->sh) {
+    return false;
+  } else {
+    return true; // TODO: Missing cases where, i.e., subsets other than the kept partition.
   }
 }
 
-void Record::add_subset(subset_sptr_t new_subset)
+sh_t Record::add_subset(sh_t sh1, sh_t sh2)
 {
-#pragma omp critical(RecordLock)
-  {
-    // TODO: check collisions and resolve.
-    if (shash_to_node.find(new_subset->sh) ==
-        shash_to_node.end()) { // TODO:Consider a faster alternative.
-      shash_to_subset[new_subset->sh] = new_subset;
-    } else {
-      // TODO: Collision with a node or a real node.
-    }
+  if (!(shash_to_subset.contains(sh1) && shash_to_subset.contains(sh2))) {
+    std::cerr << "Cannot make the subset for the partition: (" << sh1 << ", " << sh2 << ")\n";
+    std::quick_exit(EXIT_FAILURE);
   }
-}
-
-Subset::Subset(sh_t shash1, sh_t shash2, record_sptr_t record)
-{
-#pragma omp critical(RecordLock)
-  { // TODO: Consider a faster alternative.
-    auto& subset_map = record->shash_to_subset;
-    auto& node_map = record->shash_to_node;
-    if ((subset_map.find(shash1) != subset_map.end()) &&
-        (subset_map.find(shash2) != subset_map.end())) {
-      card = subset_map[shash1]->card + subset_map[shash2]->card;
-      sh = subset_map[shash1]->sh + subset_map[shash2]->sh;
-      ch = subset_map[shash1]->card > subset_map[shash2]->card ? subset_map[shash2]->sh
-                                                               : subset_map[shash1]->sh;
-    } else if ((node_map.find(shash1) != node_map.end()) &&
-               (node_map.find(shash2) != node_map.end())) {
-      card = node_map[shash1]->card + node_map[shash2]->card;
-      sh = node_map[shash1]->sh + node_map[shash2]->sh;
-      sh = node_map[shash1]->card > node_map[shash2]->card ? node_map[shash2]->sh
-                                                           : node_map[shash1]->sh;
-    } else if ((subset_map.find(shash1) != subset_map.end()) &&
-               (node_map.find(shash2) != node_map.end())) {
-      card = subset_map[shash1]->card + node_map[shash2]->card;
-      sh = subset_map[shash1]->sh + node_map[shash2]->sh;
-      ch = subset_map[shash1]->card > node_map[shash2]->card ? node_map[shash2]->sh
-                                                             : subset_map[shash1]->sh;
-    } else if ((node_map.find(shash1) != node_map.end()) &&
-               (subset_map.find(shash2) != subset_map.end())) {
-      card = node_map[shash1]->card + subset_map[shash2]->card;
-      sh = node_map[shash1]->sh + subset_map[shash2]->sh;
-      ch = node_map[shash1]->card > subset_map[shash2]->card ? subset_map[shash2]->sh
-                                                             : node_map[shash1]->sh;
-    } else {
-      std::cerr << "Cannot constuct subset, given record lacks the partition!";
-      std::quick_exit(EXIT_FAILURE);
-    }
-    // TODO: Consider adding another subsets to the record for further pruning.
+  subset_sptr_t subset1 = shash_to_subset[sh1];
+  subset_sptr_t subset2 = shash_to_subset[sh2];
+  sh_t sh = sh1 + sh2;
+  sh_t nonce = 0;
+  while (!(sh + nonce) || (shash_to_subset.contains(sh + nonce) &&
+                           check_subset_collision(shash_to_subset[sh + nonce], subset1, subset2))) {
+    nonce = Subset::rehash(nonce + sh1 * sh2);
   }
+  sh += nonce;
+  if (!shash_to_subset.contains(sh)) {
+    shash_to_subset[sh] =
+      std::make_shared<Subset>(sh,
+                               subset1->card > subset2->card ? subset1->sh : subset2->sh,
+                               subset1->card + subset2->card,
+                               nonce);
+  }
+  return sh;
 }
 
 void Record::make_compact()
 { // TODO: Implement pruning, probably at this point.
-#pragma omp critical(RecordLock)
-  {
-    se_t limit_senum = std::numeric_limits<se_t>::max();
-    se_t curr_senum = 1;
-    tree->reset_traversal();
-    node_sptr_t nd_curr;
-    while (nd_curr = tree->next_post_order()) {
-      if (curr_senum < limit_senum) {
-        shash_to_senc[nd_curr->get_shash()] = curr_senum;
-        curr_senum++;
-      } else {
-        std::cerr << "The current se_t size is too small to fit all nodes!" << std::endl;
-        exit(EXIT_FAILURE);
-      }
+  se_t limit_senum = std::numeric_limits<se_t>::max();
+  se_t curr_senum = 1;
+  tree->reset_traversal();
+  node_sptr_t nd_curr;
+  while (nd_curr = tree->next_post_order()) {
+    if (curr_senum < limit_senum) {
+      shash_to_senc[nd_curr->get_shash()] = curr_senum;
+      curr_senum++;
+    } else {
+      std::cerr << "The current se_t size is too small to fit all nodes!" << std::endl;
+      exit(EXIT_FAILURE);
     }
-    tree->reset_traversal();
-    for (auto& [sh, subset_sptr] : shash_to_subset) {
-      if (curr_senum < limit_senum) {
-        shash_to_senc[sh] = curr_senum;
-        curr_senum++;
-      }
+  }
+  tree->reset_traversal();
+  for (auto& [sh, subset] : shash_to_subset) {
+    if (curr_senum < limit_senum) {
+      shash_to_senc.try_emplace(sh, curr_senum);
+      curr_senum++;
     }
   }
 }
@@ -173,10 +158,10 @@ CRecord::CRecord(record_sptr_t record)
     curr_senum++;
   }
   tree->reset_traversal();
-  for (auto& [sh, subset_sptr] : record->shash_to_subset) {
+  for (auto& [sh, subset] : record->shash_to_subset) {
     senc_to_psenc[record->shash_to_senc[sh]] =
-      std::make_pair(record->shash_to_senc[subset_sptr->ch],
-                     record->shash_to_senc[subset_sptr->sh - subset_sptr->ch]);
+      std::make_pair(record->shash_to_senc[subset->ch],
+                     record->shash_to_senc[subset->sh - subset->ch - subset->nonce]);
   }
   senc_to_psenc[0] = std::make_pair(0, 0);
   nsubsets = senc_to_psenc.size();
@@ -221,7 +206,7 @@ void CRecord::load(std::filesystem::path library_dir, std::string suffix)
     crecord_stream.read(reinterpret_cast<char*>(pse_pair_v.data()),
                         sizeof(std::pair<se_t, std::pair<se_t, se_t>>) * nsubsets);
     senc_to_psenc =
-      std::unordered_map<se_t, std::pair<se_t, se_t>>(pse_pair_v.begin(), pse_pair_v.end());
+      parallel_flat_phmap<se_t, std::pair<se_t, se_t>>(pse_pair_v.begin(), pse_pair_v.end());
   }
   if (!crecord_stream.good()) {
     std::cerr << "Reading subset enumerations has failed!" << std::endl;
@@ -253,7 +238,7 @@ vec<se_t> CRecord::decode_senc(se_t se)
   while (!q.empty()) {
     se = q.front();
     q.pop();
-    if (senc_to_node.find(se) != senc_to_node.end()) {
+    if (senc_to_node.contains(se)) {
       subset.push_back(se);
     } else {
       q.push(senc_to_psenc[se].first);

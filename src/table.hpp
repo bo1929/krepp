@@ -5,8 +5,7 @@
 #include "record.hpp"
 #include "rqseq.hpp"
 
-#define NONSTD_UNION
-// TODO: Choose one, one of the options has a bug.
+/* #define NONSTD_UNION */
 
 class DynHT
 {
@@ -17,6 +16,12 @@ public:
     : nrows(nrows)
     , tree(tree)
     , record(record)
+    , nkmers(0)
+  {}
+  DynHT()
+    : nrows(0)
+    , tree(nullptr)
+    , record(nullptr)
     , nkmers(0)
   {}
   void print_info();
@@ -30,10 +35,10 @@ public:
   void fill_table(rseq_sptr_t rqseq);
   void prune_columns(size_t max_size);
   void reserve() { mer_vvec.reserve(nrows); }
-#ifdef NONSTD_UNION // TODO: Benchmark for static vs non-static, and std non-std, in-place etc.
+#ifdef NONSTD_UNION
   void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v);
 #else
-  void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, bool in_place);
+  void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, bool in_place = false);
 #endif
   static bool comp_encoding(const mer_t& left, const mer_t& right)
   {

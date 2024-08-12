@@ -14,6 +14,7 @@ FlatHT::FlatHT(DynHT& source)
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, source.mer_vvec[rix].size());
     for (inc_t i = 0; i < copy_inc; ++i) {
+      /* cmer_v.emplace_back(source.conv_mer_cmer(source.mer_vvec[rix][i])); */
       cmer_v.emplace_back(std::make_pair(source.mer_vvec[rix][i].encoding,
                                          source.record->map_compact(source.mer_vvec[rix][i].sh)));
     }
@@ -21,7 +22,6 @@ FlatHT::FlatHT(DynHT& source)
     inc_v[rix] = lix;
     source.mer_vvec[rix].clear();
   }
-  // TODO: Check if deallocation is more efficient and do not reserve. Benchmark.
 }
 
 void FlatHT::load(std::filesystem::path library_dir, std::string suffix)
@@ -84,12 +84,11 @@ void FlatHT::save(std::filesystem::path library_dir, std::string suffix)
 
 void DynHT::print_info()
 {
-  // update_size_hist();
+  update_size_hist();
   std::cout << "size: " << nkmers << "\t";
-  // for (auto kv : size_hist) {
-  //   std::cout << "H(" << kv.first << ")=" << kv.second << "/";
-  // }
-  std::cout << std::endl;
+  for (auto kv : size_hist) {
+    std::cout << "H(" << kv.first << ")=" << kv.second << "/";
+  }
 }
 
 void DynHT::clear_rows()
@@ -176,11 +175,7 @@ void DynHT::union_table(DynHT& source)
     nkmers = 0;
     for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
       if (!source.mer_vvec[i].empty() && !mer_vvec[i].empty()) {
-#ifdef NONSTD_UNION
         DynHT::union_row(mer_vvec[i], source.mer_vvec[i]);
-#else
-        DynHT::union_row(mer_vvec[i], source.mer_vvec[i]);
-#endif
       } else if (!source.mer_vvec[i].empty()) {
         mer_vvec[i] = std::move(source.mer_vvec[i]);
       } else {
@@ -212,54 +207,43 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, bool in_place)
                dest_v.end(),
                std::back_inserter(tmp_v),
                comp_encoding);
-    // tmp_v.shrink_to_fit();
     dest_v = std::move(tmp_v);
   }
   // Deal with shared k-mers.
-  auto iter = dest_v.begin(), result = dest_v.begin();
-  while (++iter != dest_v.end()) {
-    if (result->encoding == iter->encoding) {
-      // TODO: check collisions and resolve.
-      // TODO: check if subset is a node and skip.
-      if (iter->sh + result->sh) {
-        subset_sptr_t new_subset = std::make_shared<Subset>(iter->sh, result->sh, record);
-        record->add_subset(new_subset);
-        result->sh += iter->sh;
-      }
-    } else if (++result != iter) {
-      *result = std::move(*iter);
+  auto it_dest = dest_v.begin(), result = dest_v.begin();
+  while (++it_dest != dest_v.end()) {
+    if (result->encoding == it_dest->encoding) {
+      result->sh = record->add_subset(it_dest->sh, result->sh);
+    } else if (++result != it_dest) {
+      *result = *it_dest;
     } else {
-      result = iter;
+      result = it_dest;
     }
   }
-  dest_v.erase(++result, dest_v.end());
+  if (result != dest_v.end()) {
+    dest_v.erase(++result, dest_v.end());
+  }
 }
 #else
 void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 {
   vec<mer_t> temp_v;
   temp_v.reserve(source_v.size() + dest_v.size());
-  auto iter_d = dest_v.begin(), iter_s = source_v.begin();
-  for (; iter_s != source_v.end(); ++iter_s) {
-    while (iter_d != dest_v.end() && iter_s->encoding > iter_d->encoding) {
-      /* temp_v.push_back(std::move(*iter_d)); */
-      temp_v.push_back(std::move(*iter_d));
-      iter_d++;
+  auto it_dest = dest_v.begin(), it_source = source_v.begin();
+  for (; it_source != source_v.end(); ++it_source) {
+    while (it_dest != dest_v.end() && it_source->encoding > it_dest->encoding) {
+      temp_v.push_back(*it_dest);
+      it_dest++;
     }
-    while (iter_d != dest_v.end() && iter_s->encoding == iter_d->encoding) {
-      // TODO: check collisions and resolve.
-      // TODO: check if subset is a node and skip.
-      if (iter_d->sh + iter_s->sh) {
-        subset_sptr_t new_subset = std::make_shared<Subset>(iter_d->sh, iter_s->sh, record);
-        record->add_subset(new_subset);
-        iter_s->sh += iter_d->sh;
-      }
-      iter_d++;
+    while (it_dest != dest_v.end() && it_source->encoding == it_dest->encoding) {
+      it_source->sh = record->add_subset(it_dest->sh, it_source->sh);
+      it_dest++;
     }
-    temp_v.push_back(std::move(*iter_s));
+    temp_v.push_back(*it_source);
   }
-  temp_v.insert(temp_v.end(), iter_d, dest_v.end());
-  // temp_v.shrink_to_fit();
+  if (it_dest != dest_v.end()) {
+    temp_v.insert(temp_v.end(), it_dest, dest_v.end());
+  }
   dest_v = std::move(temp_v);
 }
 #endif

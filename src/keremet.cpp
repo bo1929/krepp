@@ -1,37 +1,26 @@
 #include "keremet.hpp"
 
-void Bkrmt::build_library()
+void Bkrmt::build_library(DynHT& root_dynht)
 {
-  std::cout << "Building the library..." << std::endl;
-  auto start_b = std::chrono::system_clock::now();
-
-  record = std::make_shared<Record>(ref_tree->get_root());
-  DynHT root_dt(nrows, ref_tree, record);
+  DynHT dynht(nrows, tree, record);
   omp_set_num_threads(num_threads);
   omp_set_nested(1);
 #pragma omp parallel
   {
 #pragma omp single
     {
-      build_for_subtree(ref_tree->get_root(), root_dt);
+      build_for_subtree(tree->get_root(), dynht);
     }
   }
+  root_dynht = std::move(dynht);
+}
 
-  auto end_b = std::chrono::system_clock::now();
-  std::chrono::duration<double> es_b = end_b - start_b;
-  std::cout << "Finished building, elapsed: " << es_b.count() << " seconds" << std::endl;
-
-  FlatHT root_flatht(root_dt);
+void Bkrmt::save_library(DynHT& root_dynht)
+{
+  FlatHT root_flatht(root_dynht);
   root_flatht.save(library_dir, suffix);
   root_flatht.get_tree()->save(library_dir, suffix);
   root_flatht.get_crecord()->save(library_dir, suffix);
-
-  auto end_c = std::chrono::system_clock::now();
-  std::chrono::duration<double> es_s = end_c - end_b;
-  std::cout << "Done converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
-
-  std::time_t end_time = std::chrono::system_clock::to_time_t(end_c);
-  std::cout << std::ctime(&end_time);
 }
 
 void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
@@ -44,19 +33,21 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
       dynht.fill_table(rs);
 #pragma omp critical
       {
-        std::cout << "Genome processed: " << nd->get_name() << "\t";
-        dynht.print_info();
+        std::cout << "Genome processed: " << nd->get_name() << "\tsize: " << dynht.get_nkmers()
+                  << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
+                  << std::flush;
       }
     } else {
 #pragma omp critical
       {
-        std::cout << "Genome skipped: " << nd->get_name() << std::endl;
+        std::cout << "Genome skipped: " << nd->get_name() << "\r" << std::flush;
+        build_count++;
       }
     }
   } else {
     assert(nd->get_nchildren() > 0);
     vec<DynHT> children_dt_v;
-    children_dt_v.assign(nd->get_nchildren(), DynHT(nrows, ref_tree, record));
+    children_dt_v.assign(nd->get_nchildren(), DynHT(nrows, tree, record));
     omp_lock_t parent_lock;
     omp_init_lock(&parent_lock);
     for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
@@ -72,8 +63,9 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
     omp_destroy_lock(&parent_lock);
 #pragma omp critical
     {
-      std::cout << "Internal node processed: " << nd->get_name() << "\t";
-      dynht.print_info();
+      std::cout << "Internal node processed: " << nd->get_name() << "\tsize: " << dynht.get_nkmers()
+                << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
+                << std::flush;
     }
   }
 }
@@ -100,10 +92,12 @@ void Bkrmt::save_metadata()
 
 void Bkrmt::parse_newick_tree()
 {
-  ref_tree = std::make_shared<Tree>();
-  ref_tree->parse(nwk_path);
-  ref_tree->reset_traversal();
+  tree = std::make_shared<Tree>();
+  tree->parse(nwk_path);
+  tree->reset_traversal();
 }
+
+void Bkrmt::initialize_record() { record = std::make_shared<Record>(tree->get_root()); }
 
 void Bkrmt::read_input_file()
 {
@@ -229,7 +223,7 @@ void Library::add_partial_flatht(std::string suffix)
 
 void Pkrmt::load_library()
 {
-  std::unordered_map<std::string, std::set<std::string>> suffix_to_ltype;
+  node_phmap<std::string, std::set<std::string>> suffix_to_ltype;
   for (const auto& entry : std::filesystem::directory_iterator(library_dir)) {
     std::string filename, ltype, mrcfg, fracv;
     size_t pos1, pos2;
@@ -306,7 +300,7 @@ void Pkrmt::place_sequences()
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
   while (qs->read_next_batch() || !qs->is_batch_finished()) {
     QBatch qb(library, qs);
-    qb.search_batch(5);
+    qb.search_batch(max_hdist, min_covpos);
   }
 }
 
@@ -326,6 +320,18 @@ Pkrmt::Pkrmt(CLI::App& sub_place)
       "-q,--query-file", query_path, "Path to FASTA/FASTQ query file to place on the tree.")
     ->required()
     ->check(CLI::ExistingFile);
+  sub_place.add_option(
+    "--max-hdist",
+    max_hdist,
+    "The maximum Hamming distance for a k-mer to be considered as a match. Default: 5.");
+  sub_place.add_option(
+    "--min-covpos",
+    min_covpos,
+    "The minimum coverage of a read for a reference to be considered among the matching taxa. Default: 0.5.");
+  sub_place.add_option(
+    "--leave-out-ref",
+    leave_out_ref,
+    "The reference taxon to be excluded during the placement, useful for benchmarking and testing.");
   sub_place.callback([&]() {
     std::filesystem::create_directory(output_dir);
     library = std::make_shared<Library>(library_dir);
@@ -363,14 +369,31 @@ int main(int argc, char** argv)
   CLI11_PARSE(app, argc, argv);
 
   if (sub_build.parsed()) {
+    std::cout << "Reading the tree and initializing the library..." << std::endl;
     b.set_lshashf();
     b.read_input_file();
     b.parse_newick_tree();
-    b.build_library();
+    b.initialize_record();
+    DynHT root_dynht;
+    std::cout << "Building the library..." << std::endl;
+    auto start_b = std::chrono::system_clock::now();
+    b.build_library(root_dynht);
+    auto end_b = std::chrono::system_clock::now();
+    std::chrono::duration<double> es_b = end_b - start_b;
+    std::cout << "\nFinished building, elapsed: " << es_b.count() << " seconds" << std::endl;
+    b.save_library(root_dynht);
     b.save_metadata();
+    auto end_c = std::chrono::system_clock::now();
+    std::chrono::duration<double> es_s = end_c - end_b;
+    std::cout << "Done converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
+    std::time_t end_time = std::chrono::system_clock::to_time_t(end_c);
+    std::cout << std::ctime(&end_time);
   }
   if (sub_place.parsed()) {
+    // TODO: Make this good, maybe not place or separate dist, node verbosity except the output.
+    std::cout << "Loading the library and the tree..." << std::endl;
     p.load_library();
+    std::cout << "Querying given sequences..." << std::endl;
     p.place_sequences();
   }
 

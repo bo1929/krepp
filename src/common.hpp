@@ -2,6 +2,7 @@
 #define _COMMON_H
 
 #include "omp.h"
+#include "phmap.h"
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -13,6 +14,7 @@
 #include <curl/curl.h>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <locale>
 #include <map>
@@ -24,13 +26,12 @@
 #include <regex>
 #include <string>
 #include <sys/types.h>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <zlib.h>
 
 extern uint32_t num_threads;
+extern std::string leave_out_ref;
 extern thread_local std::random_device rd;
 extern thread_local std::mt19937 gen;
 extern const unsigned char seq_nt4_table[128];
@@ -48,6 +49,7 @@ using vvec = std::vector<std::vector<T>>;
 template<typename T>
 using vec = std::vector<T>;
 
+class Pkrmt;
 class LSHF;
 class Tree;
 class Node;
@@ -184,5 +186,21 @@ static inline void update_encoding(char* s1, uint64_t& enc_lr, uint64_t& enc_bp)
 }
 
 #define assertm(exp, msg) assert(((void)msg, exp))
+
+#define EXTRAARGS                                                                                  \
+  phmap::priv::hash_default_hash<K>, phmap::priv::hash_default_eq<K>,                              \
+    std::allocator<std::pair<const K, V>>, 4
+
+template<class K, class V>
+using parallel_flat_phmap = phmap::parallel_flat_hash_map<K, V, EXTRAARGS, std::mutex>;
+
+template<class K, class V>
+using flat_phmap = phmap::flat_hash_map<K, V>;
+
+template<class K, class V>
+using node_phmap = phmap::node_hash_map<K, V>;
+
+template<class V>
+using flat_phset = phmap::flat_hash_set<V>;
 
 #endif

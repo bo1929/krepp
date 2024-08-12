@@ -1,4 +1,4 @@
-#include "tree.hpp"
+#include "phytree.hpp"
 
 bool Tree::check_compatible(tree_sptr_t tree)
 {
@@ -78,10 +78,10 @@ void Node::parse(vec<std::string>& n_vec)
       tree->atter++;
     }
     if (n_vec[tree->atter] == ":") {
-      len_branch = std::atof(n_vec[tree->atter + 1].c_str());
-      tree->total_len_branch += len_branch;
-      depth_level = parent->depth_level + 1;
-      depth_branch = parent->depth_branch + len_branch;
+      branch_len = std::atof(n_vec[tree->atter + 1].c_str());
+      tree->total_len_branch += branch_len;
+      ldepth = parent->ldepth + 1;
+      bdepth = parent->bdepth + branch_len;
       tree->atter += 2;
     }
     is_leaf = true;
@@ -124,10 +124,10 @@ void Node::parse(vec<std::string>& n_vec)
     tree->atter++;
   }
   if (n_vec[tree->atter] == ":") {
-    len_branch = std::atof(n_vec[tree->atter + 1].c_str());
-    tree->total_len_branch += len_branch;
-    depth_level = parent ? parent->depth_level + 1 : 0;
-    depth_branch = parent ? parent->depth_branch + len_branch : 0;
+    branch_len = std::atof(n_vec[tree->atter + 1].c_str());
+    tree->total_len_branch += branch_len;
+    ldepth = parent ? parent->ldepth + 1 : 0;
+    bdepth = parent ? parent->bdepth + branch_len : 0;
     tree->atter += 2;
   }
   if (!name.empty() && name[name.length() - 1] == '\n') {
@@ -139,7 +139,7 @@ void Node::parse(vec<std::string>& n_vec)
 void Node::print_info()
 {
   std::string pname = parent ? parent->name : "";
-  std::cout << name << "\t" << sh << "\t" << len_branch << "\t" << pname << std::endl;
+  std::cout << name << "\t" << sh << "\t" << branch_len << "\t" << pname << std::endl;
 }
 
 node_sptr_t Tree::next_post_order()
@@ -188,7 +188,7 @@ node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
   if (!a || !b) // LCA(x,0) = LCA(0,x) = x
     return a ? a : b;
   while (a != b) {
-    if (a->depth_level > b->depth_level)
+    if (a->ldepth > b->ldepth)
       b = b->parent;
     else
       a = a->parent;
