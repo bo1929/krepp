@@ -9,7 +9,7 @@ WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 #--------------------------------------------
 PROGRAM = keremet
 OBJECTS = build/MurmurHash3.o build/common.o \
-					build/lshf.o build/query.o build/rqseq.o build/record.o build/tree.o build/table.o \
+					build/lshf.o build/query.o build/rqseq.o build/record.o build/phytree.o build/table.o \
 					build/keremet.o
 
 # rules
