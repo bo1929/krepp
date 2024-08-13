@@ -24,6 +24,7 @@ Record::Record(node_sptr_t nd)
       rehash_tree();
     }
   }
+  shash_to_subset[0] = std::make_shared<Subset>(0, 0, 0);
 }
 
 Record::Record(record_sptr_t source1, record_sptr_t source2)
@@ -86,14 +87,19 @@ void Record::union_record(record_sptr_t source)
   tree = subtree_root->get_tree();
 }
 
-bool Record::check_subset_collision(subset_sptr_t subset,
-                                    subset_sptr_t subset1,
-                                    subset_sptr_t subset2)
-{ // Perphaps this is enough?
-  if (subset->ch == subset1->sh || subset->ch == subset2->sh) {
-    return false;
+bool Record::check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2)
+{
+  if (shash_to_subset.contains(sh)) {
+    subset_sptr_t subset = shash_to_subset[sh];
+    if (subset->ch == 0 || subset->ch == subset1->sh || subset->ch == subset2->sh) {
+      return false;
+    } else {
+      // TODO: Missing cases where, i.e., subsets other than the kept partition.
+      // Perphaps this is enough?
+      return true;
+    }
   } else {
-    return true; // TODO: Missing cases where, i.e., subsets other than the kept partition.
+    return false;
   }
 }
 
@@ -107,8 +113,7 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
   subset_sptr_t subset2 = shash_to_subset[sh2];
   sh_t sh = sh1 + sh2;
   sh_t nonce = 0;
-  while (!(sh + nonce) || (shash_to_subset.contains(sh + nonce) &&
-                           check_subset_collision(shash_to_subset[sh + nonce], subset1, subset2))) {
+  while (((sh + nonce) == 0) || check_subset_collision(sh + nonce, subset1, subset2)) {
     nonce = Subset::rehash(nonce + sh1 * sh2);
   }
   sh += nonce;
@@ -140,18 +145,21 @@ void Record::make_compact()
   tree->reset_traversal();
   for (auto& [sh, subset] : shash_to_subset) {
     if (curr_senum < limit_senum) {
-      shash_to_senc.try_emplace(sh, curr_senum);
-      curr_senum++;
+      curr_senum += static_cast<se_t>(shash_to_senc.try_emplace(sh, curr_senum).second);
+    } else {
+      std::cerr << "The current se_t size is too small to fit all subsets observed!" << std::endl;
+      exit(EXIT_FAILURE);
     }
   }
+  shash_to_senc[0] = 0;
 }
 
 CRecord::CRecord(record_sptr_t record)
 {
   record->make_compact();
   tree = record->get_tree();
-  se_t curr_senum = 1;
   tree->reset_traversal();
+  se_t curr_senum = 1;
   node_sptr_t nd_curr;
   while (nd_curr = tree->next_post_order()) {
     senc_to_node[curr_senum] = nd_curr;
@@ -159,9 +167,10 @@ CRecord::CRecord(record_sptr_t record)
   }
   tree->reset_traversal();
   for (auto& [sh, subset] : record->shash_to_subset) {
-    senc_to_psenc[record->shash_to_senc[sh]] =
+    senc_to_psenc.try_emplace(
+      record->shash_to_senc[sh],
       std::make_pair(record->shash_to_senc[subset->ch],
-                     record->shash_to_senc[subset->sh - subset->ch - subset->nonce]);
+                     record->shash_to_senc[subset->sh - subset->ch - subset->nonce]));
   }
   senc_to_psenc[0] = std::make_pair(0, 0);
   nsubsets = senc_to_psenc.size();
@@ -190,7 +199,7 @@ CRecord::CRecord(tree_sptr_t tree)
     curr_senum++;
   }
   tree->reset_traversal();
-  nsubsets = 0;
+  nsubsets = senc_to_node.size();
 }
 
 void CRecord::load(std::filesystem::path library_dir, std::string suffix)
@@ -230,22 +239,44 @@ void CRecord::save(std::filesystem::path library_dir, std::string suffix)
   crecord_stream.close();
 }
 
-vec<se_t> CRecord::decode_senc(se_t se)
+vec<node_sptr_t> Record::decode_shash(sh_t sh)
 {
-  vec<se_t> subset;
-  std::queue<se_t> q;
-  q.push(se);
-  while (!q.empty()) {
-    se = q.front();
-    q.pop();
-    if (senc_to_node.contains(se)) {
-      subset.push_back(se);
+  vec<node_sptr_t> subset_v;
+  std::queue<sh_t> qsubset;
+  node_sptr_t nd;
+  subset_sptr_t subset;
+  qsubset.push(sh);
+  while (!qsubset.empty()) {
+    sh = qsubset.front();
+    qsubset.pop();
+    if (shash_to_node.contains(sh)) {
+      nd = shash_to_node[sh];
+      subset_v.push_back(nd);
     } else {
-      q.push(senc_to_psenc[se].first);
-      q.push(senc_to_psenc[se].second);
+      subset = shash_to_subset[sh];
+      qsubset.push(subset->ch);
+      qsubset.push(subset->sh - subset->ch - subset->nonce);
     }
   }
-  return subset;
+  return subset_v;
+}
+
+vec<node_sptr_t> CRecord::decode_senc(se_t se)
+{
+  vec<node_sptr_t> subset_v;
+  std::queue<se_t> qsubset;
+  qsubset.push(se);
+  while (!qsubset.empty()) {
+    se = qsubset.front();
+    qsubset.pop();
+    if (se <= senc_to_node.size()) {
+      subset_v.push_back(senc_to_node[se]);
+    } else {
+      qsubset.push(senc_to_psenc[se].first);
+      qsubset.push(senc_to_psenc[se].second);
+    }
+  }
+  return subset_v;
 }
 
 bool CRecord::check_compatible(crecord_sptr_t crecord) { return true; } // TODO: Implement this.

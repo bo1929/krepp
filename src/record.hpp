@@ -64,8 +64,9 @@ public:
   tree_sptr_t get_tree() { return tree; }
   sh_t add_subset(sh_t sh1, sh_t sh2);
   void union_record(record_sptr_t source);
-  bool check_subset_collision(subset_sptr_t subset, subset_sptr_t subset1, subset_sptr_t subset2);
+  bool check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2);
   // bool check_record_conflict(record_sptr_t x);
+  vec<node_sptr_t> decode_shash(sh_t sh);
   bool check_tree_collision();
   void rehash_tree();
   void make_compact();
@@ -83,15 +84,16 @@ class CRecord : public std::enable_shared_from_this<CRecord>
 public:
   CRecord(tree_sptr_t tree);
   CRecord(record_sptr_t record);
-  crecord_sptr_t getptr() { return shared_from_this(); }
+  std::pair<se_t, se_t> get_psenc(se_t se) { return senc_to_psenc[se]; }
   void load(std::filesystem::path library_dir, std::string suffix);
   void save(std::filesystem::path library_dir, std::string suffix);
   bool check_node(se_t se) { return senc_to_node.contains(se); }
-  std::pair<se_t, se_t> get_psenc(se_t se) { return senc_to_psenc[se]; }
   node_sptr_t get_node(se_t se) { return senc_to_node[se]; }
+  crecord_sptr_t getptr() { return shared_from_this(); }
+  se_t get_nnodes() { return senc_to_node.size(); }
   bool check_compatible(crecord_sptr_t crecord);
+  vec<node_sptr_t> decode_senc(se_t se);
   void merge(crecord_sptr_t crecord);
-  vec<se_t> decode_senc(se_t se);
   void print_info();
 
 private:

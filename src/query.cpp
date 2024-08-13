@@ -289,14 +289,14 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
     while (!qsubset.empty()) {
       se = qsubset.front();
       qsubset.pop();
-      if (crecord->check_node(se)) {
+      if (crecord->check_node(se)) { // TODO: Use se < nnodes comparison perhaps?
         nd = crecord->get_node(se);
         if (nd->check_leaf() && (nd->get_name() != leave_out_ref)) { // TODO: Remove testing.
           if (!node_to_minfo.contains(nd)) {
             node_to_minfo[nd] = std::make_shared<minfo_t>();
           }
           node_to_minfo[nd]->update_match(pos, curr_hdist, enc_lr);
-        } else {
+        } else { // TODO: this might be not needed.
           for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
             qsubset.push((*std::next(nd->get_children(), i))->get_senc());
           }

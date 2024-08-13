@@ -157,7 +157,7 @@ namespace phmap {
         (void)x;                                                                                   \
       }
   #elif defined(__clang__)
-  // Clang will not tail call given inline volatile assembly.
+// Clang will not tail call given inline volatile assembly.
     #define PHMAP_BLOCK_TAIL_CALL_OPTIMIZATION() __asm__ __volatile__("")
   #elif defined(__GNUC__)
     // GCC will not tail call given inline volatile assembly.
