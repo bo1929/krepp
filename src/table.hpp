@@ -5,8 +5,6 @@
 #include "record.hpp"
 #include "rqseq.hpp"
 
-/* #define NONSTD_UNION */
-
 class DynHT
 {
   friend class FlatHT;
@@ -35,11 +33,7 @@ public:
   void fill_table(rseq_sptr_t rqseq);
   void prune_columns(size_t max_size);
   void reserve() { mer_vvec.reserve(nrows); }
-#ifdef NONSTD_UNION
   void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v);
-#else
-  void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, bool in_place = false);
-#endif
   static bool comp_encoding(const mer_t& left, const mer_t& right)
   {
     return left.encoding < right.encoding;

@@ -21,6 +21,7 @@ Record::Record(node_sptr_t nd)
   nd->get_tree()->reset_traversal();
   if (subtree_root == subtree_root->get_tree()->get_root()) {
     while (check_tree_collision()) {
+      std::cout << "Rehashing the tree..." << std::endl; // TODO: remove.
       rehash_tree();
     }
   }
@@ -89,14 +90,14 @@ void Record::union_record(record_sptr_t source)
 
 bool Record::check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2)
 {
-  if (shash_to_subset.contains(sh)) {
+  if (sh == 0) {
+    return true;
+  } else if (shash_to_subset.contains(sh)) {
     subset_sptr_t subset = shash_to_subset[sh];
-    if (subset->ch == 0 || subset->ch == subset1->sh || subset->ch == subset2->sh) {
+    if ((subset->ch == 0) || (subset->ch == subset1->sh || subset->ch == subset2->sh)) {
       return false;
     } else {
-      // TODO: Missing cases where, i.e., subsets other than the kept partition.
-      // Perphaps this is enough?
-      return true;
+      return true; // TODO: Missing cases?
     }
   } else {
     return false;
@@ -113,8 +114,9 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
   subset_sptr_t subset2 = shash_to_subset[sh2];
   sh_t sh = sh1 + sh2;
   sh_t nonce = 0;
-  while (((sh + nonce) == 0) || check_subset_collision(sh + nonce, subset1, subset2)) {
-    nonce = Subset::rehash(nonce + sh1 * sh2);
+  while (check_subset_collision(sh + nonce, subset1, subset2)) {
+    std::cout << "Adding nonce!" << std::endl; // TODO: Remove.
+    nonce = Subset::rehash(nonce++ * sh1 * sh2);
   }
   sh += nonce;
   if (!shash_to_subset.contains(sh)) {
@@ -135,8 +137,7 @@ void Record::make_compact()
   node_sptr_t nd_curr;
   while (nd_curr = tree->next_post_order()) {
     if (curr_senum < limit_senum) {
-      shash_to_senc[nd_curr->get_shash()] = curr_senum;
-      curr_senum++;
+      shash_to_senc[nd_curr->get_shash()] = curr_senum++;
     } else {
       std::cerr << "The current se_t size is too small to fit all nodes!" << std::endl;
       exit(EXIT_FAILURE);
@@ -162,18 +163,22 @@ CRecord::CRecord(record_sptr_t record)
   se_t curr_senum = 1;
   node_sptr_t nd_curr;
   while (nd_curr = tree->next_post_order()) {
-    senc_to_node[curr_senum] = nd_curr;
-    curr_senum++;
+    senc_to_node[record->shash_to_senc[nd_curr->get_shash()]] = nd_curr;
   }
   tree->reset_traversal();
   for (auto& [sh, subset] : record->shash_to_subset) {
+    std::cout << sh << ":" << subset->sh << "," << subset->ch << ";" << subset->nonce << std::endl;
     senc_to_psenc.try_emplace(
       record->shash_to_senc[sh],
       std::make_pair(record->shash_to_senc[subset->ch],
-                     record->shash_to_senc[subset->sh - subset->ch - subset->nonce]));
+                     record->shash_to_senc[sh - subset->ch - subset->nonce]));
+    std::cout << "[" << record->shash_to_senc[sh] << "]=" << record->shash_to_senc[subset->ch]
+              << "," << record->shash_to_senc[sh - subset->ch - subset->nonce] << std::endl;
+    // TODO Remove..!
   }
   senc_to_psenc[0] = std::make_pair(0, 0);
-  nsubsets = senc_to_psenc.size();
+  nsubsets = record->shash_to_senc.size();
+  print_info(); // TODO: Remove.
 }
 
 void CRecord::print_info()

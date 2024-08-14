@@ -185,46 +185,6 @@ void DynHT::union_table(DynHT& source)
   }
 }
 
-#ifndef NONSTD_UNION
-void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v, bool in_place)
-{
-  if (in_place) {
-    // Merging in-place (alternative).
-    dest_v.insert(dest_v.end(),
-                  std::make_move_iterator(source_v.begin()),
-                  std::make_move_iterator(source_v.end()));
-    std::inplace_merge(dest_v.begin(),
-                       std::next(dest_v.begin(), dest_v.size() - source_v.size()),
-                       dest_v.end(),
-                       comp_encoding);
-  } else {
-    // Merging with allocation.
-    vec<mer_t> tmp_v;
-    tmp_v.reserve(source_v.size() + dest_v.size());
-    std::merge(source_v.begin(),
-               source_v.end(),
-               dest_v.begin(),
-               dest_v.end(),
-               std::back_inserter(tmp_v),
-               comp_encoding);
-    dest_v = std::move(tmp_v);
-  }
-  // Deal with shared k-mers.
-  auto it_dest = dest_v.begin(), result = dest_v.begin();
-  while (++it_dest != dest_v.end()) {
-    if (result->encoding == it_dest->encoding) {
-      result->sh = record->add_subset(it_dest->sh, result->sh);
-    } else if (++result != it_dest) {
-      *result = *it_dest;
-    } else {
-      result = it_dest;
-    }
-  }
-  if (result != dest_v.end()) {
-    dest_v.erase(++result, dest_v.end());
-  }
-}
-#else
 void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 {
   vec<mer_t> temp_v;
@@ -241,12 +201,11 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
     }
     temp_v.push_back(*it_source);
   }
-  if (it_dest != dest_v.end()) {
-    temp_v.insert(temp_v.end(), it_dest, dest_v.end());
+  for (; it_dest != dest_v.end(); ++it_dest) {
+    temp_v.push_back(*it_dest);
   }
   dest_v = std::move(temp_v);
 }
-#endif
 
 void DynHT::fill_table(rseq_sptr_t rs)
 {

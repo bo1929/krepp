@@ -1,7 +1,7 @@
 # compiler options
 #--------------------------------------------
 COMPILER = g++
-LDLIBS = -lm -lz -lstdc++ -lcurl
+LDLIBS = -lstdc++fs -lm -lz -lstdc++ -lcurl
 CXXFLAGS = -std=c++17 -O3 -g -fopenmp
 WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 
