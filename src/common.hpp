@@ -39,45 +39,45 @@ extern const uint64_t nt4_lr_table[4];
 extern const uint64_t nt4_bp_table[4];
 
 typedef uint64_t sh_t;
+typedef uint32_t se_t;
 typedef uint64_t inc_t;
 typedef uint32_t enc_t;
-typedef uint_least32_t tuint_t;
-typedef uint32_t se_t;
+typedef uint32_t tuint_t;
 
 template<typename T>
 using vvec = std::vector<std::vector<T>>;
 template<typename T>
 using vec = std::vector<T>;
 
-class Pkrmt;
+class RSeq;
+class QSeq;
+class QBatch;
+class QMers;
 class LSHF;
 class Tree;
 class Node;
 class Subset;
 class Record;
 class CRecord;
-class RSeq;
-class QSeq;
 class DynHT;
 class FlatHT;
-class QBatch;
-class QMers;
 class Library;
 
+typedef std::shared_ptr<RSeq> rseq_sptr_t;
+typedef std::shared_ptr<QSeq> qseq_sptr_t;
+typedef std::shared_ptr<QBatch> qbatch_sptr_t;
+typedef std::shared_ptr<QMers> qmers_sptr_t;
 typedef std::shared_ptr<LSHF> lshf_sptr_t;
 typedef std::shared_ptr<Tree> tree_sptr_t;
 typedef std::shared_ptr<Node> node_sptr_t;
 typedef std::shared_ptr<Subset> subset_sptr_t;
 typedef std::shared_ptr<Record> record_sptr_t;
 typedef std::shared_ptr<CRecord> crecord_sptr_t;
-typedef std::shared_ptr<RSeq> rseq_sptr_t;
-typedef std::shared_ptr<QSeq> qseq_sptr_t;
 typedef std::shared_ptr<DynHT> dynht_sptr_t;
 typedef std::shared_ptr<FlatHT> flatht_sptr_t;
-typedef std::shared_ptr<QBatch> qbatch_sptr_t;
-typedef std::shared_ptr<QMers> qmers_sptr_t;
 typedef std::shared_ptr<Library> library_sptr_t;
 typedef std::pair<enc_t, se_t> cmer_t;
+typedef std::pair<se_t, se_t> pse_t;
 
 struct mer_t
 {

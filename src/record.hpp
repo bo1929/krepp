@@ -27,7 +27,7 @@ public:
     , nonce(nonce)
   {}
   subset_sptr_t getptr() { return shared_from_this(); }
-  static inline sh_t get_singleton_shash(std::string& name)
+  static inline sh_t get_singleton_sh(std::string& name)
   {
     sh_t sh = 0;
     uint32_t a1, a2;
@@ -57,26 +57,25 @@ class Record : public std::enable_shared_from_this<Record>
   friend class Subset;
 
 public:
-  Record(node_sptr_t nd);
+  Record(tree_sptr_t tree);
   Record(record_sptr_t source1, record_sptr_t source2);
-  se_t map_compact(sh_t sh) { return shash_to_senc[sh]; }
-  record_sptr_t getptr() { return shared_from_this(); }
-  tree_sptr_t get_tree() { return tree; }
-  sh_t add_subset(sh_t sh1, sh_t sh2);
-  void union_record(record_sptr_t source);
-  bool check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2);
-  // bool check_record_conflict(record_sptr_t x);
-  vec<node_sptr_t> decode_shash(sh_t sh);
   bool check_tree_collision();
   void rehash_tree();
   void make_compact();
+  sh_t add_subset(sh_t sh1, sh_t sh2);
+  void union_record(record_sptr_t source);
+  void decode_sh(sh_t sh, vec<node_sptr_t> subset_v);
+  bool check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2);
+  // bool check_record_conflict(record_sptr_t x);
+  record_sptr_t getptr() { return shared_from_this(); }
+  se_t map_compact(sh_t sh) { return sh_to_se[sh]; }
+  tree_sptr_t get_tree() { return tree; }
 
 private:
   tree_sptr_t tree = nullptr;
-  node_sptr_t subtree_root = nullptr;
-  parallel_flat_phmap<sh_t, subset_sptr_t> shash_to_subset = {};
-  parallel_flat_phmap<sh_t, node_sptr_t> shash_to_node = {};
-  parallel_flat_phmap<sh_t, se_t> shash_to_senc = {};
+  parallel_flat_phmap<sh_t, se_t> sh_to_se = {};
+  parallel_flat_phmap<sh_t, node_sptr_t> sh_to_node = {};
+  parallel_flat_phmap<sh_t, subset_sptr_t> sh_to_subset = {};
 };
 
 class CRecord : public std::enable_shared_from_this<CRecord>
@@ -84,23 +83,23 @@ class CRecord : public std::enable_shared_from_this<CRecord>
 public:
   CRecord(tree_sptr_t tree);
   CRecord(record_sptr_t record);
-  std::pair<se_t, se_t> get_psenc(se_t se) { return senc_to_psenc[se]; }
+  void print_info();
+  void merge(crecord_sptr_t crecord);
+  bool check_compatible(crecord_sptr_t crecord);
+  void decode_se(se_t se, vec<node_sptr_t> subset_v);
   void load(std::filesystem::path library_dir, std::string suffix);
   void save(std::filesystem::path library_dir, std::string suffix);
-  bool check_node(se_t se) { return senc_to_node.contains(se); }
-  node_sptr_t get_node(se_t se) { return senc_to_node[se]; }
+  bool check_node(se_t se) { return se_to_node.contains(se); }
+  node_sptr_t get_node(se_t se) { return se_to_node[se]; }
   crecord_sptr_t getptr() { return shared_from_this(); }
-  se_t get_nnodes() { return senc_to_node.size(); }
-  bool check_compatible(crecord_sptr_t crecord);
-  vec<node_sptr_t> decode_senc(se_t se);
-  void merge(crecord_sptr_t crecord);
-  void print_info();
+  se_t get_nnodes() { return se_to_node.size(); }
+  pse_t get_pse(se_t se) { return se_to_pse[se]; }
 
 private:
-  tree_sptr_t tree;
   se_t nsubsets = 0;
-  parallel_flat_phmap<se_t, std::pair<se_t, se_t>> senc_to_psenc = {};
-  parallel_flat_phmap<se_t, node_sptr_t> senc_to_node = {};
+  tree_sptr_t tree = nullptr;
+  parallel_flat_phmap<se_t, pse_t> se_to_pse = {};
+  parallel_flat_phmap<se_t, node_sptr_t> se_to_node = {};
 };
 
 #endif

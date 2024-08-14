@@ -49,7 +49,7 @@ public:
   {}
   void print_info();
   void parse(vec<std::string>& n_vec);
-  void set_shash(sh_t source) { sh = source; }
+  void set_sh(sh_t source) { sh = source; }
   void set_parent(node_sptr_t source) { parent = source; }
   node_sptr_t getptr() { return shared_from_this(); }
   node_sptr_t* get_children() { return children.data(); }
@@ -59,10 +59,10 @@ public:
   double get_bdepth() { return bdepth; }
   std::string get_name() { return name; }
   tuint_t get_card() { return card; }
-  sh_t get_shash() { return sh; }
-  se_t get_senc() { return se; }
+  sh_t get_sh() { return sh; }
+  se_t get_se() { return se; }
   bool check_leaf() { return is_leaf; }
-  sh_t sum_children_shash()
+  sh_t sum_children_sh()
   {
     sh_t sh = 0;
     std::for_each(children.begin(), children.end(), [&sh](node_sptr_t nd) { sh += nd->sh; });

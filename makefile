@@ -1,7 +1,7 @@
 # compiler options
 #--------------------------------------------
 COMPILER = g++
-LDLIBS = -lm -lz -lstdc++ -lcurl
+LDLIBS = -lstdc++fs -lm -lz -lstdc++ -lcurl
 CXXFLAGS = -std=c++17 -O3 -g -fopenmp
 WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 
@@ -9,7 +9,8 @@ WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 #--------------------------------------------
 PROGRAM = keremet
 OBJECTS = build/MurmurHash3.o build/common.o \
-					build/lshf.o build/query.o build/rqseq.o build/record.o build/phytree.o build/table.o \
+					build/lshf.o build/library.o build/query.o build/rqseq.o \
+					build/record.o build/phytree.o build/table.o \
 					build/keremet.o
 
 # rules

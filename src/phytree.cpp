@@ -86,7 +86,7 @@ void Node::parse(vec<std::string>& n_vec)
     }
     is_leaf = true;
     card = 1;
-    sh = Subset::get_singleton_shash(name);
+    sh = Subset::get_singleton_sh(name);
     while (!sh) {
       sh = Subset::rehash(reinterpret_cast<uint64_t>(&sh));
     }

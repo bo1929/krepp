@@ -7,9 +7,8 @@ QMers::QMers(library_sptr_t library, uint64_t len, uint32_t max_hdist, float min
   , min_covpos(min_covpos)
 {
   placement = nullptr;
-  crecord = library->get_crecord();
   tree = library->get_tree();
-  k = library->get_lshashf()->get_k();
+  k = library->get_lshf()->get_k();
 }
 
 void QBatch::search_batch(uint32_t max_hdist, float min_covpos)
@@ -245,13 +244,13 @@ void QBatch::search_mers(char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_s
     orenc64_lr = orenc64_lr & mask_lr;
     rcenc64_bp = revcomp_bp64(orenc64_bp, k);
     rcenc64_lr = conv_bp64_lr64(rcenc64_bp);
-    orrix = lshashf->compute_hash(orenc64_bp);
-    rcrix = lshashf->compute_hash(rcenc64_bp);
+    orrix = lshf->compute_hash(orenc64_bp);
+    rcrix = lshf->compute_hash(rcenc64_bp);
     if (library->check_partial(orrix)) {
-      qmers_or->add_matching_mer(i - k, orrix, lshashf->drop_ppos_lr(orenc64_lr));
+      qmers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
     }
     if (library->check_partial(rcrix)) {
-      qmers_rc->add_matching_mer(len - i, rcrix, lshashf->drop_ppos_lr(rcenc64_lr));
+      qmers_rc->add_matching_mer(len - i, rcrix, lshf->drop_ppos_lr(rcenc64_lr));
     }
   }
 }
@@ -260,9 +259,9 @@ QBatch::QBatch(library_sptr_t library, qseq_sptr_t qs)
   : library(library)
 {
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
-  lshashf = library->get_lshashf();
-  k = lshashf->get_k();
-  m = lshashf->get_m();
+  lshf = library->get_lshf();
+  k = lshf->get_k();
+  m = lshf->get_m();
   mask_bp = u64m >> ((32 - k) * 2);
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   std::swap(qs->seq_batch, seq_batch);
@@ -280,6 +279,7 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
   std::pair<se_t, se_t> pse;
   std::vector<cmer_t>::const_iterator iter1 = library->get_first(rix);
   std::vector<cmer_t>::const_iterator iter2 = library->get_next(rix);
+  crecord_sptr_t crecord = library->get_crecord(rix);
   for (; iter1 < iter2; ++iter1) {
     curr_hdist = hdist_lr32(iter1->first, enc_lr);
     if (curr_hdist > max_hdist) {
@@ -298,11 +298,11 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
           node_to_minfo[nd]->update_match(pos, curr_hdist, enc_lr);
         } else { // TODO: this might be not needed.
           for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
-            qsubset.push((*std::next(nd->get_children(), i))->get_senc());
+            qsubset.push((*std::next(nd->get_children(), i))->get_se());
           }
         }
       } else {
-        pse = crecord->get_psenc(se);
+        pse = crecord->get_pse(se);
         qsubset.push(pse.first);
         qsubset.push(pse.second);
       }

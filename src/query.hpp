@@ -2,6 +2,7 @@
 #define _QUERY_H
 
 #include "common.hpp"
+#include "library.hpp"
 #include "lshf.hpp"
 #include "rqseq.hpp"
 #include "table.hpp"
@@ -137,7 +138,6 @@ private:
   float min_covpos;
   tree_sptr_t tree;
   library_sptr_t library;
-  crecord_sptr_t crecord;
   node_sptr_t placement;
   flat_phmap<node_sptr_t, minfo_sptr_t> node_to_minfo;
   flat_phmap<node_sptr_t, ninfo_sptr_t> node_to_ninfo;
@@ -156,7 +156,7 @@ private:
   uint64_t mask_bp;
   uint64_t mask_lr;
   uint64_t batch_size;
-  lshf_sptr_t lshashf;
+  lshf_sptr_t lshf;
   library_sptr_t library;
   vec<std::string> name_batch;
   vec<std::string> seq_batch;
