@@ -14,9 +14,7 @@ FlatHT::FlatHT(DynHT& source)
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, source.mer_vvec[rix].size());
     for (inc_t i = 0; i < copy_inc; ++i) {
-      /* cmer_v.emplace_back(source.conv_mer_cmer(source.mer_vvec[rix][i])); */
-      cmer_v.emplace_back(std::make_pair(source.mer_vvec[rix][i].encoding,
-                                         source.record->map_compact(source.mer_vvec[rix][i].sh)));
+      cmer_v.emplace_back(source.conv_mer_cmer(source.mer_vvec[rix][i]));
     }
     lix += copy_inc;
     inc_v[rix] = lix;
@@ -185,6 +183,7 @@ void DynHT::union_table(DynHT& source)
   }
 }
 
+/*
 void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 {
   vec<mer_t> temp_v;
@@ -206,6 +205,28 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
   }
   dest_v = std::move(temp_v);
 }
+*/
+void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
+{
+  dest_v.insert(dest_v.end(), source_v.begin(), source_v.end());
+  std::inplace_merge(dest_v.begin(),
+                     std::next(dest_v.begin(), dest_v.size() - source_v.size()),
+                     dest_v.end(),
+                     comp_encoding);
+  auto it_dest = dest_v.begin(), result = dest_v.begin();
+  while (++it_dest != dest_v.end()) {
+    if (result->encoding == it_dest->encoding) {
+      result->sh = record->add_subset(it_dest->sh, result->sh);
+    } else if (++result != it_dest) {
+      *result = *it_dest;
+    } else {
+      result = it_dest;
+    }
+  }
+  if (result != dest_v.end()) {
+    dest_v.erase(++result, dest_v.end());
+  }
+}
 
 void DynHT::fill_table(rseq_sptr_t rs)
 {
@@ -217,3 +238,29 @@ void DynHT::fill_table(rseq_sptr_t rs)
   sort_columns();
   make_unique();
 }
+
+inline uint64_t DynHT::get_nkmers() { return nkmers; }
+
+inline cmer_t DynHT::conv_mer_cmer(mer_t x)
+{
+  return std::make_pair(x.encoding, record->map_compact(x.sh));
+}
+
+inline void FlatHT::set_crecord(crecord_sptr_t source) { crecord = source; }
+
+inline void FlatHT::set_tree(tree_sptr_t source) { tree = source; }
+
+inline crecord_sptr_t FlatHT::get_crecord() { return crecord; }
+
+inline tree_sptr_t FlatHT::get_tree() { return tree; }
+
+inline std::vector<cmer_t>::const_iterator FlatHT::begin() { return cmer_v.begin(); }
+
+inline std::vector<cmer_t>::const_iterator FlatHT::end() { return cmer_v.end(); }
+
+inline std::vector<cmer_t>::const_iterator FlatHT::at(uint32_t rix)
+{
+  return std::next(cmer_v.begin(), inc_v[rix]);
+}
+
+inline inc_t FlatHT::get_inc(uint32_t rix) { return inc_v[rix]; }

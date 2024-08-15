@@ -1,5 +1,36 @@
 #include "keremet.hpp"
 
+void Bkrmt::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m); }
+
+void Bkrmt::initialize_record() { record = std::make_shared<Record>(tree); }
+
+void Bkrmt::parse_newick_tree()
+{
+  tree = std::make_shared<Tree>();
+  tree->parse(nwk_path);
+  tree->reset_traversal();
+}
+
+void Bkrmt::read_input_file()
+{
+  std::ifstream input_file(input_path);
+  if (!input_file.good()) {
+    std::cerr << "Error opening " << input_path << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  std::string line;
+  while (std::getline(input_file, line)) {
+    std::istringstream iss(line);
+    std::string input, name;
+    if (!(std::getline(iss, name, '\t') && std::getline(iss, input, '\t'))) {
+      std::cerr << "Failed to read file for mapping of reference names to paths" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    name_to_input[name] = input;
+  }
+  input_file.close();
+}
+
 void Bkrmt::build_library(DynHT& root_dynht)
 {
   DynHT dynht(nrows, tree, record);
@@ -26,10 +57,9 @@ void Bkrmt::save_library(DynHT& root_dynht)
 void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
 {
   if (nd->check_leaf()) {
-    sh_t sh = nd->get_shash();
+    sh_t sh = nd->get_sh();
     if (name_to_input.find(nd->get_name()) != name_to_input.end()) {
-      rseq_sptr_t rs =
-        std::make_shared<RSeq>(w, r, frac, sh, lshashf, name_to_input[nd->get_name()]);
+      rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, sh, lshf, name_to_input[nd->get_name()]);
       dynht.fill_table(rs);
 #pragma omp critical
       {
@@ -81,45 +111,14 @@ void Bkrmt::save_metadata()
   metadata_stream.write(reinterpret_cast<char*>(&r), sizeof(uint32_t));
   metadata_stream.write(reinterpret_cast<char*>(&frac), sizeof(frac));
   metadata_stream.write(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
-  metadata_stream.write(reinterpret_cast<char*>(lshashf->ppos_data()), (h) * sizeof(uint8_t));
-  metadata_stream.write(reinterpret_cast<char*>(lshashf->npos_data()), (k - h) * sizeof(uint8_t));
+  metadata_stream.write(reinterpret_cast<char*>(lshf->ppos_data()), (h) * sizeof(uint8_t));
+  metadata_stream.write(reinterpret_cast<char*>(lshf->npos_data()), (k - h) * sizeof(uint8_t));
   if (!metadata_stream.good()) {
     std::cerr << "Writing the metadata for the library has failed!" << std::endl;
     exit(EXIT_FAILURE);
   }
   metadata_stream.close();
 }
-
-void Bkrmt::parse_newick_tree()
-{
-  tree = std::make_shared<Tree>();
-  tree->parse(nwk_path);
-  tree->reset_traversal();
-}
-
-void Bkrmt::initialize_record() { record = std::make_shared<Record>(tree->get_root()); }
-
-void Bkrmt::read_input_file()
-{
-  std::ifstream input_file(input_path);
-  if (!input_file.good()) {
-    std::cerr << "Error opening " << input_path << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  std::string line;
-  while (std::getline(input_file, line)) {
-    std::istringstream iss(line);
-    std::string input, name;
-    if (!(std::getline(iss, name, '\t') && std::getline(iss, input, '\t'))) {
-      std::cerr << "Failed to read file for mapping of reference names to paths" << std::endl;
-      exit(EXIT_FAILURE);
-    }
-    name_to_input[name] = input;
-  }
-  input_file.close();
-}
-
-void Bkrmt::set_lshashf() { lshashf = std::make_shared<LSHF>(k, h, m); }
 
 Bkrmt::Bkrmt(CLI::App& sub_build)
 {
@@ -147,7 +146,7 @@ Bkrmt::Bkrmt(CLI::App& sub_build)
   sub_build.add_flag(
     "--frac,!--no-frac", frac, "If --frac, all k-mers with r < LSH(x) mod m will be excluded.");
   sub_build.callback([&]() {
-    uint32_t hash_size = pow(2, 2 * h);
+    uint32_t hash_size = 4 << h;
     uint32_t full_residue = hash_size % m;
     if (frac) {
       nrows = (hash_size / m) * r;
@@ -171,17 +170,17 @@ void Library::add_partial_flatht(std::string suffix)
 {
   std::filesystem::path metadata_path = library_dir / ("metadata" + suffix);
   std::ifstream metadata_stream(metadata_path, std::ifstream::binary);
-  uint8_t k_lshashf, w, h_lshashf;
-  uint32_t m_lshashf, r, nrows_partial;
+  uint8_t k_lshf, w, h_lshf;
+  uint32_t m_lshf, r, nrows_partial;
   bool frac;
-  metadata_stream.read(reinterpret_cast<char*>(&k_lshashf), sizeof(uint8_t));
+  metadata_stream.read(reinterpret_cast<char*>(&k_lshf), sizeof(uint8_t));
   metadata_stream.read(reinterpret_cast<char*>(&w), sizeof(uint8_t));
-  metadata_stream.read(reinterpret_cast<char*>(&h_lshashf), sizeof(uint8_t));
-  metadata_stream.read(reinterpret_cast<char*>(&m_lshashf), sizeof(uint32_t));
+  metadata_stream.read(reinterpret_cast<char*>(&h_lshf), sizeof(uint8_t));
+  metadata_stream.read(reinterpret_cast<char*>(&m_lshf), sizeof(uint32_t));
   metadata_stream.read(reinterpret_cast<char*>(&r), sizeof(uint32_t));
   metadata_stream.read(reinterpret_cast<char*>(&frac), sizeof(bool));
   metadata_stream.read(reinterpret_cast<char*>(&nrows_partial), sizeof(uint32_t));
-  vec<uint8_t> ppos_v(h_lshashf), npos_v(k_lshashf - h_lshashf);
+  vec<uint8_t> ppos_v(h_lshf), npos_v(k_lshf - h_lshf);
   metadata_stream.read(reinterpret_cast<char*>(ppos_v.data()), ppos_v.size() * sizeof(uint8_t));
   metadata_stream.read(reinterpret_cast<char*>(npos_v.data()), npos_v.size() * sizeof(uint8_t));
   if (!metadata_stream.good()) {
@@ -190,25 +189,29 @@ void Library::add_partial_flatht(std::string suffix)
   }
   metadata_stream.close();
 
-  lshf_sptr_t curr_lshashf = std::make_shared<LSHF>(m_lshashf, ppos_v, npos_v);
+  lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_lshf, ppos_v, npos_v);
 #pragma omp critical
   {
-    if (lshashf != nullptr) {
-      if (!lshashf->check_compatible(curr_lshashf)) {
+    if (lshf != nullptr) {
+      if (!lshf->check_compatible(curr_lshf)) {
         std::cerr << "Partial libraries have incompatible hash functions." << std::endl;
         exit(EXIT_FAILURE);
       }
     } else {
-      lshashf = curr_lshashf;
-      k = k_lshashf;
-      h = h_lshashf;
-      m = m_lshashf;
+      lshf = curr_lshf;
+      k = k_lshf;
+      h = h_lshf;
+      m = m_lshf;
       nrows = pow(2, 2 * h);
     }
   }
 
+  crecord_sptr_t curr_crecord = std::make_shared<CRecord>(tree);
+  curr_crecord->load(library_dir, suffix);
+
   flatht_sptr_t curr_flatht = std::make_shared<FlatHT>(tree, crecord);
   curr_flatht->load(library_dir, suffix);
+
 #pragma omp critical
   {
     if (frac) {
@@ -240,9 +243,6 @@ void Pkrmt::load_library()
     suffixes.push_back(suffix);
     library->add_partial_tree(suffix);
   }
-  for (auto const& [suffix, ltypes] : suffix_to_ltype) {
-    library->add_partial_crecord(suffix);
-  }
   std::set<std::string> lall{"cmer", "crecord", "inc", "metadata", "tree"};
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
@@ -269,22 +269,6 @@ void Library::add_partial_tree(std::string suffix)
   }
 }
 
-void Library::add_partial_crecord(std::string suffix)
-{
-  crecord_sptr_t curr_crecord = std::make_shared<CRecord>(tree);
-  curr_crecord->load(library_dir, suffix);
-  if (crecord != nullptr) {
-    if (!crecord->check_compatible(curr_crecord)) {
-      std::cerr << "Partial libraries have incompatible subset records." << std::endl;
-      exit(EXIT_FAILURE);
-    } else {
-      crecord->merge(curr_crecord);
-    }
-  } else {
-    crecord = curr_crecord;
-  }
-}
-
 std::vector<cmer_t>::const_iterator Library::get_first(uint32_t rix)
 {
   return rix < m ? (r_to_flatht[rix % m])->begin() : (r_to_flatht[rix % m])->at(rix / m - 1);
@@ -293,6 +277,12 @@ std::vector<cmer_t>::const_iterator Library::get_first(uint32_t rix)
 std::vector<cmer_t>::const_iterator Library::get_next(uint32_t rix)
 {
   return rix < nrows ? (r_to_flatht[rix % m])->at(rix / m) : (r_to_flatht[rix % m])->end();
+}
+
+crecord_sptr_t Library::get_crecord(uint32_t rix)
+{
+  return rix < nrows ? (r_to_flatht[rix % m])->get_crecord()
+                     : (r_to_flatht[rix % m])->get_crecord();
 }
 
 void Pkrmt::place_sequences()
@@ -370,7 +360,7 @@ int main(int argc, char** argv)
 
   if (sub_build.parsed()) {
     std::cout << "Reading the tree and initializing the library..." << std::endl;
-    b.set_lshashf();
+    b.set_lshf();
     b.read_input_file();
     b.parse_newick_tree();
     b.initialize_record();

@@ -1,15 +1,15 @@
 #include "rqseq.hpp"
 
-RSeq::RSeq(uint8_t w, uint32_t r, bool frac, sh_t sh, lshf_sptr_t lshashf, std::string input)
+RSeq::RSeq(uint8_t w, uint32_t r, bool frac, sh_t sh, lshf_sptr_t lshf, std::string input)
   : w(w)
   , r(r)
   , frac(frac)
   , sh(sh)
-  , lshashf(lshashf)
+  , lshf(lshf)
 {
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
-  k = lshashf->get_k();
-  m = lshashf->get_m();
+  k = lshf->get_k();
+  m = lshf->get_m();
   mask_bp = u64m >> ((32 - k) * 2);
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   is_url = std::regex_match(input, url_regexp);
@@ -95,11 +95,11 @@ void RSeq::extract_mers(vvec<mer_t>& table)
         minimizer.first = rcenc64_bp;
         minimizer.second = conv_bp64_lr64(minimizer.first);
       }
-      rix = lshashf->compute_hash(minimizer.first);
+      rix = lshf->compute_hash(minimizer.first);
       rix_res = rix % m;
       rix /= m;
       if (frac ? rix_res <= r : rix_res == r) {
-        table[rix].emplace_back(lshashf->drop_ppos_lr(minimizer.second), sh);
+        table[rix].emplace_back(lshf->drop_ppos_lr(minimizer.second), sh);
         wix++;
       }
     }

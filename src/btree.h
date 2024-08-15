@@ -326,7 +326,8 @@ namespace phmap {
   {
     explicit constexpr weak_equality(compare_internal::eq v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     friend struct compare_internal::weak_equality_base<weak_equality>;
 
   public:
@@ -361,7 +362,8 @@ namespace phmap {
   {
     explicit constexpr strong_equality(compare_internal::eq v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     friend struct compare_internal::strong_equality_base<strong_equality>;
 
   public:
@@ -410,13 +412,16 @@ namespace phmap {
   {
     explicit constexpr partial_ordering(compare_internal::eq v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     explicit constexpr partial_ordering(compare_internal::ord v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     explicit constexpr partial_ordering(compare_internal::ncmp v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     friend struct compare_internal::partial_ordering_base<partial_ordering>;
 
     constexpr bool is_ordered() const noexcept
@@ -510,10 +515,12 @@ namespace phmap {
   {
     explicit constexpr weak_ordering(compare_internal::eq v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     explicit constexpr weak_ordering(compare_internal::ord v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     friend struct compare_internal::weak_ordering_base<weak_ordering>;
 
   public:
@@ -593,10 +600,12 @@ namespace phmap {
   {
     explicit constexpr strong_ordering(compare_internal::eq v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     explicit constexpr strong_ordering(compare_internal::ord v) noexcept
       : value_(static_cast<compare_internal::value_type>(v))
-    {}
+    {
+    }
     friend struct compare_internal::strong_ordering_base<strong_ordering>;
 
   public:
@@ -974,7 +983,8 @@ namespace phmap {
         value_compare() = default;
         explicit value_compare(const key_compare& cmp)
           : key_compare(cmp)
-        {}
+        {
+        }
 
         template<typename T, typename U>
         auto operator()(const T& left, const U& right) const
@@ -1066,7 +1076,8 @@ namespace phmap {
     {
       explicit upper_bound_adapter(const Compare& c)
         : comp(c)
-      {}
+      {
+      }
       template<typename K, typename LK>
       bool operator()(const K& a, const LK& b) const
       {
@@ -1573,11 +1584,13 @@ namespace phmap {
       btree_iterator()
         : node(nullptr)
         , position(-1)
-      {}
+      {
+      }
       btree_iterator(Node* n, int p)
         : node(n)
         , position(p)
-      {}
+      {
+      }
 
       // NOTE: this SFINAE allows for implicit conversions from iterator to
       // const_iterator, but it specifically avoids defining copy constructors so
@@ -1592,7 +1605,8 @@ namespace phmap {
       btree_iterator(const btree_iterator<N, R, P>& x) // NOLINT
         : node(x.node)
         , position(x.position)
-      {}
+      {
+      }
 
     private:
       // This SFINAE allows explicit conversions from const_iterator to
@@ -1608,7 +1622,8 @@ namespace phmap {
       explicit btree_iterator(const btree_iterator<N, R, P>& x)
         : node(const_cast<node_type*>(x.node))
         , position(x.position)
-      {}
+      {
+      }
 
       // Increment/decrement the iterator.
       void increment()
@@ -1717,11 +1732,13 @@ namespace phmap {
         // MSVC has constexpr code generations bugs here.
         EmptyNodeType()
           : parent(this)
-        {}
+        {
+        }
 #else
         constexpr EmptyNodeType(node_type* p)
           : parent(p)
-        {}
+        {
+        }
 #endif
       };
 
@@ -1751,7 +1768,8 @@ namespace phmap {
         node_stats(size_type l, size_type i)
           : leaf_nodes(l)
           , internal_nodes(i)
-        {}
+        {
+        }
 
         node_stats& operator+=(const node_stats& x)
         {
@@ -2633,7 +2651,8 @@ namespace phmap {
       : root_(comp, alloc, EmptyNode())
       , rightmost_(EmptyNode())
       , size_(0)
-    {}
+    {
+    }
 
     template<typename P>
     btree<P>::btree(const btree& x)
@@ -2670,8 +2689,9 @@ namespace phmap {
 
     template<typename P>
     template<typename... Args>
-    inline auto btree<P>::insert_hint_unique(iterator position, const key_type& key, Args&&... args)
-      -> std::pair<iterator, bool>
+    inline auto btree<P>::insert_hint_unique(iterator position,
+                                             const key_type& key,
+                                             Args&&... args) -> std::pair<iterator, bool>
     {
       if (!empty()) {
         if (position == end() || compare_keys(key, position.key())) {
@@ -3257,8 +3277,8 @@ namespace phmap {
 
     template<typename P>
     template<typename K>
-    inline auto btree<P>::internal_locate(const K& key) const
-      -> SearchResult<iterator, is_key_compare_to::value>
+    inline auto
+    btree<P>::internal_locate(const K& key) const -> SearchResult<iterator, is_key_compare_to::value>
     {
       return internal_locate_impl(key, is_key_compare_to());
     }
@@ -3431,11 +3451,13 @@ namespace phmap {
       // Constructors/assignments.
       btree_container()
         : tree_(key_compare(), allocator_type())
-      {}
+      {
+      }
       explicit btree_container(const key_compare& comp,
                                const allocator_type& alloc = allocator_type())
         : tree_(comp, alloc)
-      {}
+      {
+      }
       btree_container(const btree_container& x) = default;
       btree_container(btree_container&& x) noexcept = default;
       btree_container& operator=(const btree_container& x) = default;
@@ -3641,11 +3663,13 @@ namespace phmap {
                           const key_compare& comp = key_compare(),
                           const allocator_type& alloc = allocator_type())
         : btree_set_container(init.begin(), init.end(), comp, alloc)
-      {}
+      {
+      }
 
       btree_set_container(std::initializer_list<init_type> init, const allocator_type& alloc)
         : btree_set_container(init.begin(), init.end(), alloc)
-      {}
+      {
+      }
 
       // Lookup routines.
       template<typename K = key_type>
@@ -3912,7 +3936,8 @@ namespace phmap {
                                const key_compare& comp = key_compare(),
                                const allocator_type& alloc = allocator_type())
         : btree_multiset_container(init.begin(), init.end(), comp, alloc)
-      {}
+      {
+      }
 
       // Lookup routines.
       template<typename K = key_type>

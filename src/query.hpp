@@ -20,7 +20,8 @@ struct match_t
     : pos(pos)
     , enc_lr(enc_lr)
     , hdist(hdist)
-  {}
+  {
+  }
 };
 
 struct minfo_t
@@ -156,7 +157,7 @@ private:
   uint64_t mask_bp;
   uint64_t mask_lr;
   uint64_t batch_size;
-  lshf_sptr_t lshashf;
+  lshf_sptr_t lshf;
   library_sptr_t library;
   vec<std::string> name_batch;
   vec<std::string> seq_batch;
