@@ -94,7 +94,9 @@ bool Record::check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_
     return true;
   } else if (shash_to_subset.contains(sh)) {
     subset_sptr_t subset = shash_to_subset[sh];
-    if ((subset->ch == 0) || (subset->ch == subset1->sh || subset->ch == subset2->sh)) {
+    if (subset->ch == 0) {
+      return true;
+    } else if ((subset->ch == subset1->sh || subset->ch == subset2->sh)) {
       return false;
     } else {
       return true; // TODO: Missing cases?
@@ -167,18 +169,18 @@ CRecord::CRecord(record_sptr_t record)
   }
   tree->reset_traversal();
   for (auto& [sh, subset] : record->shash_to_subset) {
-    std::cout << sh << ":" << subset->sh << "," << subset->ch << ";" << subset->nonce << std::endl;
+    /* std::cout << sh << ":" << subset->sh << "," << subset->ch << ";" << subset->nonce << std::endl; */
     senc_to_psenc.try_emplace(
       record->shash_to_senc[sh],
       std::make_pair(record->shash_to_senc[subset->ch],
                      record->shash_to_senc[sh - subset->ch - subset->nonce]));
-    std::cout << "[" << record->shash_to_senc[sh] << "]=" << record->shash_to_senc[subset->ch]
-              << "," << record->shash_to_senc[sh - subset->ch - subset->nonce] << std::endl;
+    /* std::cout << "[" << record->shash_to_senc[sh] << "]=" << record->shash_to_senc[subset->ch] */
+    /*           << "," << record->shash_to_senc[sh - subset->ch - subset->nonce] << std::endl; */
     // TODO Remove..!
   }
   senc_to_psenc[0] = std::make_pair(0, 0);
   nsubsets = record->shash_to_senc.size();
-  print_info(); // TODO: Remove.
+  /* print_info(); // TODO: Remove. */
 }
 
 void CRecord::print_info()
