@@ -108,6 +108,8 @@ LSHF::LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v)
 
 bool LSHF::check_compatible(lshf_sptr_t lshf)
 {
+  if (!lshf)
+    return true;
   if (!((lshf->m == m) && (lshf->h == h) && (lshf->k == k) && (lshf->npos_v == npos_v) &&
         (lshf->ppos_v == ppos_v))) {
     std::cout << "m: " << m << "/" << lshf->m << std::endl;

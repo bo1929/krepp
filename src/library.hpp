@@ -12,8 +12,7 @@ class Library
 public:
   Library(std::filesystem::path library_dir)
     : library_dir(library_dir){};
-  void add_partial_tree(std::string suffix);
-  void add_partial_flatht(std::string suffix);
+  void add_partial_library(std::string suffix);
   crecord_sptr_t get_crecord(uint32_t rix);
   std::vector<cmer_t>::const_iterator get_first(uint32_t rix);
   std::vector<cmer_t>::const_iterator get_next(uint32_t rix);

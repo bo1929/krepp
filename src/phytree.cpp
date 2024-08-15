@@ -2,6 +2,8 @@
 
 bool Tree::check_compatible(tree_sptr_t tree)
 {
+  if (!tree)
+    return true;
   bool is_compatible = true;
   node_sptr_t ndx, ndy;
   tree->reset_traversal();

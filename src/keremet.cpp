@@ -183,13 +183,12 @@ void Pkrmt::load_library()
   std::vector<std::string> suffixes;
   for (auto const& [suffix, ltypes] : suffix_to_ltype) {
     suffixes.push_back(suffix);
-    library->add_partial_tree(suffix);
   }
   std::set<std::string> lall{"cmer", "crecord", "inc", "metadata", "tree"};
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
     if (suffix_to_ltype[suffixes[lix]] == lall) {
-      library->add_partial_flatht(suffixes[lix]);
+      library->add_partial_library(suffixes[lix]);
     } else {
       std::cerr << "There is a partial library with a missing file!" << std::endl;
       exit(EXIT_FAILURE);

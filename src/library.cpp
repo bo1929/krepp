@@ -1,6 +1,6 @@
 #include "library.hpp"
 
-void Library::add_partial_flatht(std::string suffix)
+void Library::add_partial_library(std::string suffix)
 {
   std::filesystem::path metadata_path = library_dir / ("metadata" + suffix);
   std::ifstream metadata_stream(metadata_path, std::ifstream::binary);
@@ -24,26 +24,44 @@ void Library::add_partial_flatht(std::string suffix)
   metadata_stream.close();
 
   lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_lshf, ppos_v, npos_v);
+
 #pragma omp critical
   {
-    if (lshf != nullptr) {
-      if (!lshf->check_compatible(curr_lshf)) {
-        std::cerr << "Partial libraries have incompatible hash functions." << std::endl;
-        exit(EXIT_FAILURE);
-      }
-    } else {
-      lshf = curr_lshf;
+    if (curr_lshf->check_compatible(lshf)) {
+      lshf = !lshf ? curr_lshf : lshf;
       k = k_lshf;
       h = h_lshf;
       m = m_lshf;
       nrows = pow(2, 2 * h);
+    } else {
+      std::cerr << "Partial libraries have incompatible hash functions." << std::endl;
+      exit(EXIT_FAILURE);
     }
   }
 
-  crecord_sptr_t curr_crecord = std::make_shared<CRecord>(tree);
-  curr_crecord->load(library_dir, suffix);
+  tree_sptr_t curr_tree = std::make_shared<Tree>();
+  curr_tree->load(library_dir, suffix);
 
-  flatht_sptr_t curr_flatht = std::make_shared<FlatHT>(tree, curr_crecord);
+#pragma omp critical
+  {
+    if (curr_tree->check_compatible(tree)) {
+      tree = !tree ? curr_tree : tree;
+    } else {
+      std::cerr << "Partial libraries are based on different trees." << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  crecord_sptr_t curr_crecord;
+  flatht_sptr_t curr_flatht;
+
+#pragma omp critical
+  {
+    curr_crecord = std::make_shared<CRecord>(tree);
+    curr_flatht = std::make_shared<FlatHT>(tree, curr_crecord);
+  }
+
+  curr_crecord->load(library_dir, suffix);
   curr_flatht->load(library_dir, suffix);
 
 #pragma omp critical
@@ -55,20 +73,6 @@ void Library::add_partial_flatht(std::string suffix)
     } else {
       r_to_flatht[r] = curr_flatht;
     }
-  }
-}
-
-void Library::add_partial_tree(std::string suffix)
-{
-  tree_sptr_t curr_tree = std::make_shared<Tree>();
-  curr_tree->load(library_dir, suffix);
-  if (tree != nullptr) {
-    if (!tree->check_compatible(curr_tree)) {
-      std::cerr << "Partial libraries are based on different trees." << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  } else {
-    tree = curr_tree;
   }
 }
 

@@ -67,8 +67,8 @@ public:
   void save(std::filesystem::path library_dir, std::string suffix);
   void set_crecord(crecord_sptr_t source) { crecord = source; }
   void set_tree(tree_sptr_t source) { tree = source; }
-  crecord_sptr_t get_crecord() { return crecord; }
   tree_sptr_t get_tree() { return tree; }
+  crecord_sptr_t get_crecord() { return crecord; }
   inc_t get_inc(uint32_t rix) { return inc_v[rix]; }
   std::vector<cmer_t>::const_iterator begin() { return cmer_v.begin(); }
   std::vector<cmer_t>::const_iterator end() { return cmer_v.end(); }
