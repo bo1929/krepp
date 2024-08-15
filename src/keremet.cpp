@@ -2,8 +2,6 @@
 
 void Bkrmt::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m); }
 
-void Bkrmt::initialize_record() { record = std::make_shared<Record>(tree); }
-
 void Bkrmt::parse_newick_tree()
 {
   tree = std::make_shared<Tree>();
@@ -31,39 +29,39 @@ void Bkrmt::read_input_file()
   input_file.close();
 }
 
-void Bkrmt::build_library(DynHT& root_dynht)
+void Bkrmt::build_library()
 {
-  DynHT dynht(nrows, tree, record);
+  record_sptr_t record = std::make_shared<Record>(tree);
+  root_dynht = std::make_shared<DynHT>(nrows, tree, record);
   omp_set_num_threads(num_threads);
   omp_set_nested(1);
 #pragma omp parallel
   {
 #pragma omp single
     {
-      build_for_subtree(tree->get_root(), dynht);
+      build_for_subtree(tree->get_root(), root_dynht);
     }
   }
-  root_dynht = std::move(dynht);
 }
 
-void Bkrmt::save_library(DynHT& root_dynht)
+void Bkrmt::save_library()
 {
-  FlatHT root_flatht(root_dynht);
-  root_flatht.save(library_dir, suffix);
-  root_flatht.get_tree()->save(library_dir, suffix);
-  root_flatht.get_crecord()->save(library_dir, suffix);
+  flatht_sptr_t root_flatht = std::make_shared<FlatHT>(root_dynht);
+  root_flatht->save(library_dir, suffix);
+  root_flatht->get_tree()->save(library_dir, suffix);
+  root_flatht->get_crecord()->save(library_dir, suffix);
 }
 
-void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
+void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
 {
   if (nd->check_leaf()) {
     sh_t sh = nd->get_sh();
     if (name_to_input.find(nd->get_name()) != name_to_input.end()) {
       rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, sh, lshf, name_to_input[nd->get_name()]);
-      dynht.fill_table(rs);
+      dynht->fill_table(rs);
 #pragma omp critical
       {
-        std::cout << "Genome processed: " << nd->get_name() << "\tsize: " << dynht.get_nkmers()
+        std::cout << "Genome processed: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
                   << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
                   << std::flush;
       }
@@ -76,16 +74,16 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
     }
   } else {
     assert(nd->get_nchildren() > 0);
-    vec<DynHT> children_dt_v;
-    children_dt_v.assign(nd->get_nchildren(), DynHT(nrows, tree, record));
+    vec<dynht_sptr_t> children_dynht_v;
     omp_lock_t parent_lock;
     omp_init_lock(&parent_lock);
     for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
+      children_dynht_v.emplace_back(std::make_shared<DynHT>(nrows, tree, dynht->get_record()));
 #pragma omp task untied shared(dynht)
       {
-        build_for_subtree(*std::next(nd->get_children(), i), children_dt_v[i]);
+        build_for_subtree(*std::next(nd->get_children(), i), children_dynht_v[i]);
         omp_set_lock(&parent_lock);
-        dynht.union_table(children_dt_v[i]);
+        dynht->union_table(children_dynht_v[i]);
         omp_unset_lock(&parent_lock);
       }
     }
@@ -93,9 +91,9 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, DynHT& dynht)
     omp_destroy_lock(&parent_lock);
 #pragma omp critical
     {
-      std::cout << "Internal node processed: " << nd->get_name() << "\tsize: " << dynht.get_nkmers()
-                << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
-                << std::flush;
+      std::cout << "Internal node processed: " << nd->get_name()
+                << "\tsize: " << dynht->get_nkmers() << "\tprogress: " << (++build_count) << "/"
+                << tree->get_nnodes() << "\r" << std::flush;
     }
   }
 }
@@ -270,19 +268,17 @@ int main(int argc, char** argv)
   CLI11_PARSE(app, argc, argv);
 
   if (sub_build.parsed()) {
-    std::cout << "Reading the tree and initializing the library..." << std::endl;
+    std::cout << "Reading the tree andinitializing the library..." << std::endl;
     b.set_lshf();
     b.read_input_file();
     b.parse_newick_tree();
-    b.initialize_record();
-    DynHT root_dynht;
     std::cout << "Building the library..." << std::endl;
     auto start_b = std::chrono::system_clock::now();
-    b.build_library(root_dynht);
+    b.build_library();
     auto end_b = std::chrono::system_clock::now();
     std::chrono::duration<double> es_b = end_b - start_b;
     std::cout << "\nFinished building, elapsed: " << es_b.count() << " seconds" << std::endl;
-    b.save_library(root_dynht);
+    b.save_library();
     b.save_metadata();
     auto end_c = std::chrono::system_clock::now();
     std::chrono::duration<double> es_s = end_c - end_b;

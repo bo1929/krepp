@@ -29,11 +29,15 @@ public:
   void update_nkmers();
   void update_size_hist();
   void ensure_sorted_columns();
-  void union_table(DynHT& source);
+  void union_table(dynht_sptr_t source);
   void fill_table(rseq_sptr_t rqseq);
   void prune_columns(size_t max_size);
-  void reserve() { mer_vvec.reserve(nrows); }
   void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v);
+  void reserve() { mer_vvec.reserve(nrows); }
+  void set_record(record_sptr_t source) { record = source; }
+  void set_tree(tree_sptr_t source) { tree = source; }
+  record_sptr_t get_record() { return record; }
+  tree_sptr_t get_tree() { return tree; }
   uint64_t get_nkmers() { return nkmers; }
   cmer_t conv_mer_cmer(mer_t x) { return std::make_pair(x.encoding, record->map_compact(x.sh)); }
   static bool comp_encoding(const mer_t& left, const mer_t& right)
@@ -59,7 +63,7 @@ class FlatHT
   friend class DynHT;
 
 public:
-  FlatHT(DynHT& source);
+  FlatHT(dynht_sptr_t source);
   FlatHT(tree_sptr_t tree, crecord_sptr_t crecord)
     : tree(tree)
     , crecord(crecord){};

@@ -1,24 +1,24 @@
 #include "table.hpp"
 
-FlatHT::FlatHT(DynHT& source)
+FlatHT::FlatHT(dynht_sptr_t source)
 {
-  nkmers = source.nkmers;
-  nrows = source.nrows;
+  nkmers = source->nkmers;
+  nrows = source->nrows;
   inc_v.resize(nrows);
   cmer_v.reserve(nkmers);
-  tree = source.tree;
-  crecord = std::make_shared<CRecord>(source.record);
+  tree = source->tree;
+  crecord = std::make_shared<CRecord>(source->get_record());
   inc_t limit_inc = std::numeric_limits<inc_t>::max();
   inc_t copy_inc;
   inc_t lix = 0;
   for (uint32_t rix = 0; rix < nrows; ++rix) {
-    copy_inc = std::min(limit_inc, source.mer_vvec[rix].size());
+    copy_inc = std::min(limit_inc, source->mer_vvec[rix].size());
     for (inc_t i = 0; i < copy_inc; ++i) {
-      cmer_v.emplace_back(source.conv_mer_cmer(source.mer_vvec[rix][i]));
+      cmer_v.emplace_back(source->conv_mer_cmer(source->mer_vvec[rix][i]));
     }
     lix += copy_inc;
     inc_v[rix] = lix;
-    source.mer_vvec[rix].clear();
+    source->mer_vvec[rix].clear();
   }
 }
 
@@ -159,23 +159,23 @@ void DynHT::prune_columns(size_t max_size)
   }
 }
 
-void DynHT::union_table(DynHT& source)
+void DynHT::union_table(dynht_sptr_t source)
 {
-  assertm(nrows == source.nrows, "Two tables differ in size.");
-  if (source.mer_vvec.empty()) {
+  assertm(nrows == source->nrows, "Two tables differ in size.");
+  if (source->mer_vvec.empty()) {
     return;
   } else if (mer_vvec.empty()) {
-    mer_vvec = std::move(source.mer_vvec);
-    size_hist = std::move(source.size_hist);
-    nkmers = source.nkmers;
+    mer_vvec = std::move(source->mer_vvec);
+    size_hist = std::move(source->size_hist);
+    nkmers = source->nkmers;
     return;
   } else {
     nkmers = 0;
     for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
-      if (!source.mer_vvec[i].empty() && !mer_vvec[i].empty()) {
-        DynHT::union_row(mer_vvec[i], source.mer_vvec[i]);
-      } else if (!source.mer_vvec[i].empty()) {
-        mer_vvec[i] = std::move(source.mer_vvec[i]);
+      if (!source->mer_vvec[i].empty() && !mer_vvec[i].empty()) {
+        DynHT::union_row(mer_vvec[i], source->mer_vvec[i]);
+      } else if (!source->mer_vvec[i].empty()) {
+        mer_vvec[i] = std::move(source->mer_vvec[i]);
       } else {
       }
       nkmers += mer_vvec[i].size();

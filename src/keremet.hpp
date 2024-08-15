@@ -18,11 +18,10 @@ public:
   void set_lshf();
   void save_metadata();
   void read_input_file();
-  void initialize_record();
   void parse_newick_tree();
-  void save_library(DynHT& root_dynht);
-  void build_library(DynHT& root_dynht);
-  void build_for_subtree(node_sptr_t nd, DynHT& dynht);
+  void save_library();
+  void build_library();
+  void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht);
 
 private:
   uint8_t k = 29;
@@ -37,9 +36,9 @@ private:
   std::filesystem::path nwk_path;
   std::filesystem::path input_path;
   std::filesystem::path library_dir;
-  tree_sptr_t tree = nullptr;
-  record_sptr_t record = nullptr;
   lshf_sptr_t lshf = nullptr;
+  tree_sptr_t tree = nullptr;
+  dynht_sptr_t root_dynht = nullptr;
   parallel_flat_phmap<std::string, std::string> name_to_input;
 };
 
