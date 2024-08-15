@@ -183,7 +183,6 @@ void DynHT::union_table(DynHT& source)
   }
 }
 
-/*
 void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 {
   vec<mer_t> temp_v;
@@ -205,7 +204,8 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
   }
   dest_v = std::move(temp_v);
 }
-*/
+
+/*
 void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 {
   dest_v.insert(dest_v.end(), source_v.begin(), source_v.end());
@@ -227,6 +227,7 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
     dest_v.erase(++result, dest_v.end());
   }
 }
+*/
 
 void DynHT::fill_table(rseq_sptr_t rs)
 {

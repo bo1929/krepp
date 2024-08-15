@@ -8,8 +8,10 @@ WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 # project files
 #--------------------------------------------
 PROGRAM = keremet
-OBJECTS = build/MurmurHash3.o build/common.o \
-					build/lshf.o build/library.o build/query.o build/rqseq.o \
+OBJECTS = build/common.o \
+					build/MurmurHash3.o \
+					build/lshf.o \
+					build/library.o build/query.o build/rqseq.o \
 					build/record.o build/phytree.o build/table.o \
 					build/keremet.o
 
