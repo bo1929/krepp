@@ -1,4 +1,5 @@
 #include "lshf.hpp"
+#include <cstdint>
 
 LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m)
   : k(k)
@@ -54,9 +55,9 @@ uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
 {
   uint32_t enc32_lr = 0;
   for (int i = npos_v.size() - 1; i >= 0; --i) {
+    enc32_lr <<= 1;
     enc32_lr += static_cast<uint32_t>((enc64_lr >> npos_v[i]) & 1);
     enc32_lr += static_cast<uint32_t>((enc64_lr >> (npos_v[i] + 32)) & 1) << 16;
-    enc32_lr <<= 1 * (i & 0x00000001);
   }
   return enc32_lr;
 }
@@ -69,6 +70,12 @@ uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp)
     enc32_bp <<= 2 * (i & 0x00000001);
   }
   return enc32_bp;
+}
+
+uint32_t LSHF::get_ppos_diff(uint32_t zc, uint32_t i)
+{
+  zc = zc >> i;
+  return npos_v[__builtin_ctz(zc) + 1];
 }
 
 void LSHF::get_random_positions()

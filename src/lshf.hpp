@@ -10,15 +10,16 @@ public:
   LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v);
   void set_lshf();
   void get_random_positions();
-  uint32_t compute_hash(uint64_t enc_bp);
-  uint32_t drop_ppos_lr(uint64_t enc64_lr);
-  uint32_t drop_ppos_bp(uint64_t enc64_bp);
-  bool check_compatible(lshf_sptr_t lshf);
   uint8_t get_k() { return k; }
   uint8_t get_h() { return h; }
   uint32_t get_m() { return m; }
   vec<uint8_t> get_npos() { return npos_v; }
   vec<uint8_t> get_ppos() { return ppos_v; }
+  bool check_compatible(lshf_sptr_t lshf);
+  uint32_t compute_hash(uint64_t enc_bp);
+  uint32_t drop_ppos_lr(uint64_t enc64_lr);
+  uint32_t drop_ppos_bp(uint64_t enc64_bp);
+  uint32_t get_ppos_diff(uint32_t zc, uint32_t i);
   char* npos_data() { return reinterpret_cast<char*>(npos_v.data()); }
   char* ppos_data() { return reinterpret_cast<char*>(ppos_v.data()); }
 

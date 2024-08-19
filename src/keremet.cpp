@@ -266,6 +266,7 @@ int main(int argc, char** argv)
   Pkrmt p(sub_place);
 
   CLI11_PARSE(app, argc, argv);
+  /* std::ios::sync_with_stdio(false); */
 
   if (sub_build.parsed()) {
     std::cout << "Reading the tree andinitializing the library..." << std::endl;

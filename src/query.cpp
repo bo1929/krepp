@@ -7,42 +7,28 @@ QMers::QMers(library_sptr_t library, uint64_t len, uint32_t max_hdist, float min
   , min_covpos(min_covpos)
 {
   placement = nullptr;
+  lshf = library->get_lshf();
   tree = library->get_tree();
-  k = library->get_lshf()->get_k();
+  k = lshf->get_k();
 }
 
 void QBatch::search_batch(uint32_t max_hdist, float min_covpos)
 {
   for (uint64_t bix = 0; bix < batch_size; ++bix) {
-    char* seq = seq_batch[bix].data();
+    const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
+    std::cout << name_batch[bix] << std::endl;
 
     qmers_sptr_t qmers_or = std::make_shared<QMers>(library, len, max_hdist, min_covpos);
     qmers_sptr_t qmers_rc = std::make_shared<QMers>(library, len, max_hdist, min_covpos);
 
     search_mers(seq, len, qmers_or, qmers_rc);
 
-    qmers_or->compute_coverage();
-    qmers_rc->compute_coverage();
+    qmers_or->summarize_matches();
+    qmers_rc->summarize_matches();
 
-    /* std::cout << name_batch[bix] << "\tor\t" << std::endl; */
-    qmers_or->fill_ninfo();
-    /* std::cout << name_batch[bix] << "\trc\t" << std::endl; */
-    qmers_rc->fill_ninfo();
-
-    qmers_or->compute_exchdist();
-    qmers_rc->compute_exchdist();
-
-    /* if (qmers_or->greedy_count_placement() > qmers_rc->greedy_count_placement()) { */
-    /* if (qmers_or->argmin_avghdist_placement() < qmers_rc->argmin_avghdist_placement()) { */
-    /* if (qmers_or->argmin_diffhdist_placement() < qmers_rc->argmin_diffhdist_placement()) { */
-    if (qmers_or->countpos_avghdist_placement() < qmers_rc->countpos_avghdist_placement()) {
-      /* std::cout << name_batch[bix] << "\tor\t"; */
-      /* qmers_or->display_placement(); */
-    } else {
-      /* std::cout << name_batch[bix] << "\trc\t"; */
-      /* qmers_rc->display_placement(); */
-    }
+    qmers_or->print_summary(name_batch[bix]);
+    qmers_rc->print_summary(name_batch[bix]);
   }
 }
 
@@ -175,35 +161,26 @@ void QMers::display_placement()
   }
 }
 
-void QMers::print_coverage()
+void QMers::summarize_matches()
 {
-  for (auto const& [nd, mi] : node_to_minfo) {
-    std::cout << nd->get_name() << "\t" << mi->covmer << "\t" << mi->covpos << "\t" << mi->avghdist
-              << std::endl;
-  }
-}
-
-void QMers::print_matches()
-{
-  for (auto const& [nd, mi] : node_to_minfo) {
-    for (auto const& match : mi->match_v) {
-      std::cout << nd->get_name() << "\t" << match.pos << "\t" << match.hdist << std::endl;
-    }
-  }
-}
-
-void QMers::compute_coverage()
-{
-  flat_phmap<node_sptr_t, uint32_t> node_to_pos;
   float irk = 1.0 / (len - k + 1);
   float irp = 1.0 / (len);
   uint32_t ix1, ix2;
-  bool fl;
+  uint32_t itp;
   for (auto const& [nd, mi] : node_to_minfo) {
-    mi->covmer += irk * mi->match_v.size();
-    mi->covpos += irp * k;
-    mi->avghdist = mi->match_v[0].hdist;
-    for (uint32_t i = 1; i < mi->match_v.size(); ++i) {
+    for (uint32_t i = 0; i < mi->match_v.size(); ++i) {
+      for (uint32_t j = 0; j < k; ++j) {
+        mi->homoc_v[mi->match_v[i].pos + j]++;
+      }
+      for (uint32_t j = 0; j < mi->match_v[i].hdist; ++j) {
+        mi->subsc_v[mi->match_v[i].pos + lshf->get_ppos_diff(mi->match_v[i].zc, j)]++;
+      }
+      if (i == 0) {
+        mi->covmer += irk * mi->match_v.size();
+        mi->covpos += irp * k;
+        mi->avghdist = mi->match_v[i].hdist;
+        continue;
+      }
       mi->avghdist += mi->match_v[i].hdist;
       if ((mi->match_v[i].pos > mi->match_v[i - 1].pos)) {
         ix1 = i;
@@ -212,16 +189,28 @@ void QMers::compute_coverage()
         ix2 = i;
         ix1 = i - 1;
       }
-      if (mi->match_v[ix1].pos > (mi->match_v[ix2].pos + k))
+      if (mi->match_v[ix1].pos > (mi->match_v[ix2].pos + k)) {
         mi->covpos += irp * k;
-      else
+      } else {
         mi->covpos += irp * (mi->match_v[ix1].pos - mi->match_v[ix2].pos);
+      }
     }
     mi->avghdist /= mi->match_v.size();
+    itp = 0;
+    mi->wpehidst = 0.25;
+    for (uint32_t i = 0; i < len; ++i) {
+      if (mi->homoc_v[i] > 0) {
+        mi->wpehidst += static_cast<float>(mi->subsc_v[i]) / static_cast<float>(mi->homoc_v[i]);
+        itp++;
+      } else {
+        mi->wpehidst += 0.25;
+      }
+    }
+    mi->wpehidst = mi->wpehidst / len;
   }
 }
 
-void QBatch::search_mers(char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
+void QBatch::search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
 {
   uint32_t i, l;
   uint32_t orrix, rcrix;
@@ -259,14 +248,15 @@ QBatch::QBatch(library_sptr_t library, qseq_sptr_t qs)
   : library(library)
 {
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
+  mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
+  mask_bp = u64m >> ((32 - k) * 2);
   lshf = library->get_lshf();
+  tree = library->get_tree();
   k = lshf->get_k();
   m = lshf->get_m();
-  mask_bp = u64m >> ((32 - k) * 2);
-  mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
+  batch_size = qs->batch_size;
   std::swap(qs->seq_batch, seq_batch);
   std::swap(qs->name_batch, name_batch);
-  batch_size = qs->batch_size;
 }
 
 void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
@@ -274,14 +264,15 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
   se_t se;
   node_sptr_t nd;
   uint32_t ix;
-  uint32_t curr_hdist;
+  uint32_t curr_hdist, curr_zc;
   std::queue<se_t> qsubset;
   std::pair<se_t, se_t> pse;
   std::vector<cmer_t>::const_iterator iter1 = library->get_first(rix);
   std::vector<cmer_t>::const_iterator iter2 = library->get_next(rix);
   crecord_sptr_t crecord = library->get_crecord(rix);
   for (; iter1 < iter2; ++iter1) {
-    curr_hdist = hdist_lr32(iter1->first, enc_lr);
+    curr_zc = zc_lr32(iter1->first, enc_lr);
+    curr_hdist = __builtin_popcount(curr_zc);
     if (curr_hdist > max_hdist) {
       continue;
     }
@@ -289,23 +280,57 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
     while (!qsubset.empty()) {
       se = qsubset.front();
       qsubset.pop();
-      if (crecord->check_node(se)) { // TODO: Use se < nnodes comparison perhaps?
-        nd = crecord->get_node(se);
-        if (nd->check_leaf() && (nd->get_name() != leave_out_ref)) { // TODO: Remove testing.
-          if (!node_to_minfo.contains(nd)) {
-            node_to_minfo[nd] = std::make_shared<minfo_t>();
-          }
-          node_to_minfo[nd]->update_match(pos, curr_hdist, enc_lr);
-        } else { // TODO: this might be not needed.
-          for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
-            qsubset.push((*std::next(nd->get_children(), i))->get_se());
-          }
-        }
-      } else {
+      if (!crecord->check_node(se)) { // TODO: Use se < nnodes comparison perhaps?
         pse = crecord->get_pse(se);
         qsubset.push(pse.first);
         qsubset.push(pse.second);
+        continue;
       }
+      nd = crecord->get_node(se);
+      if (nd->check_leaf() && (nd->get_name() != leave_out_ref)) { // TODO: Remove testing.
+        if (!node_to_minfo.contains(nd)) {
+          node_to_minfo[nd] = std::make_shared<minfo_t>(len);
+        }
+        node_to_minfo[nd]->update_match(pos, curr_zc, curr_hdist);
+      } else { // TODO: this might be not needed.
+        for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
+          qsubset.push((*std::next(nd->get_children(), i))->get_se());
+        }
+      }
+    }
+  }
+}
+
+void QMers::print_summary(const std::string& name)
+{
+  for (auto const& [nd, mi] : node_to_minfo) {
+    std::cout << nd->get_name() << "\t" << name << "\t" << mi->wpehidst << "\t" << mi->avghdist
+              << "\t" << mi->covpos << "\n";
+  }
+}
+
+void QMers::print_dist(const std::string& name)
+{
+  for (auto const& [nd, mi] : node_to_minfo) {
+    std::cout << nd->get_name() << "\t" << name << "\t" << mi->avghdist << "\t" << mi->wpehidst
+              << std::endl;
+  }
+}
+
+void QMers::print_coverage(const std::string& name)
+{
+  for (auto const& [nd, mi] : node_to_minfo) {
+    std::cout << name << "\t" << nd->get_name() << "\t" << mi->covmer << "\t" << mi->covpos
+              << std::endl;
+  }
+}
+
+void QMers::print_matches(const std::string& name)
+{
+  for (auto const& [nd, mi] : node_to_minfo) {
+    for (auto const& match : mi->match_v) {
+      std::cout << name << "\t" << nd->get_name() << "\t" << match.pos << "\t" << match.hdist
+                << std::endl;
     }
   }
 }

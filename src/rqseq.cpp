@@ -133,6 +133,8 @@ QSeq::QSeq(std::filesystem::path input_path)
 
 bool QSeq::read_next_batch()
 {
+  seq_batch.clear();
+  name_batch.clear();
   seq_batch.reserve(BATCH_SIZE);
   name_batch.reserve(BATCH_SIZE);
   bool cont_reading = false;

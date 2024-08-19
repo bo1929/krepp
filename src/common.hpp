@@ -125,17 +125,19 @@ static inline uint64_t xur64_hash(uint64_t h)
 static inline uint32_t hdist_lr64(const uint64_t x, const uint64_t y)
 {
   uint64_t z1 = x ^ y;
-  uint32_t z2 = z1 >> 32;
-  uint32_t zc = z1 | z2;
-  return __builtin_popcount(zc);
+  return __builtin_popcount(z1 | (z1 >> 32));
+}
+
+static inline uint32_t zc_lr32(const uint32_t x, const uint32_t y)
+{
+  uint32_t z1 = x ^ y;
+  return z1 | (z1 >> 16);
 }
 
 static inline uint32_t hdist_lr32(const uint32_t x, const uint32_t y)
 {
   uint32_t z1 = x ^ y;
-  uint16_t z2 = z1 >> 16;
-  uint16_t zc = z1 | z2;
-  return __builtin_popcount(zc);
+  return __builtin_popcount(z1 | (z1 >> 16));
 }
 
 static inline uint64_t revcomp_bp64(const uint64_t x, uint8_t k)
@@ -165,7 +167,7 @@ static inline uint64_t conv_bp64_lr64(uint64_t x)
   return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x);
 }
 
-static inline void compute_encoding(char* s1, char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
+static inline void compute_encoding(const char* s1, const char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
@@ -176,7 +178,7 @@ static inline void compute_encoding(char* s1, char* s2, uint64_t& enc_lr, uint64
     enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
   }
 }
-static inline void update_encoding(char* s1, uint64_t& enc_lr, uint64_t& enc_bp)
+static inline void update_encoding(const char* s1, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr <<= 1;
   enc_bp <<= 2;
