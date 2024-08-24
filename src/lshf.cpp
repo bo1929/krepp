@@ -1,5 +1,4 @@
 #include "lshf.hpp"
-#include <cstdint>
 
 LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m)
   : k(k)

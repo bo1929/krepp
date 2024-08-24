@@ -62,11 +62,11 @@ void RSeq::extract_mers(vvec<mer_t>& table)
 {
   uint32_t i, l;
   uint32_t rix, rix_res;
-  uint64_t wix = 0, kix = 0;
   uint8_t ldiff = w - k + 1;
+  uint64_t wcix = 0, wnix = 0, kix = 0;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
   std::vector<std::pair<uint64_t, uint64_t>> lsh_enc_win(ldiff);
-  std::pair<uint64_t, uint64_t> minimizer;
+  std::pair<uint64_t, uint64_t> cminimizer, pminimizer;
   for (i = l = 0; i < len;) {
     if (seq_nt4_table[seq[i]] >= 4) {
       l = 0, i++;
@@ -84,27 +84,32 @@ void RSeq::extract_mers(vvec<mer_t>& table)
     lsh_enc_win[kix % ldiff].first = orenc64_bp & mask_bp;
     lsh_enc_win[kix % ldiff].second = orenc64_lr & mask_lr;
     if (l >= w || (i == len)) {
-      minimizer =
+      cminimizer =
         *std::min_element(lsh_enc_win.begin(),
                           lsh_enc_win.end(),
                           [](std::pair<uint64_t, uint64_t> lhs, std::pair<uint64_t, uint64_t> rhs) {
                             return xur64_hash(lhs.second) < xur64_hash(rhs.second);
                           });
-      rcenc64_bp = revcomp_bp64(minimizer.first, k);
-      if (minimizer.first < rcenc64_bp) {
-        minimizer.first = rcenc64_bp;
-        minimizer.second = conv_bp64_lr64(minimizer.first);
+      rcenc64_bp = revcomp_bp64(cminimizer.first, k); // TODO: No need for cannonical.
+      if (cminimizer.first < rcenc64_bp) {
+        cminimizer.first = rcenc64_bp;
+        cminimizer.second = conv_bp64_lr64(cminimizer.first);
       }
-      rix = lshf->compute_hash(minimizer.first);
+      rix = lshf->compute_hash(cminimizer.first);
       rix_res = rix % m;
       rix /= m;
       if (frac ? rix_res <= r : rix_res == r) {
-        table[rix].emplace_back(lshf->drop_ppos_lr(minimizer.second), sh);
-        wix++;
+        table[rix].emplace_back(lshf->drop_ppos_lr(cminimizer.second), sh);
+        wnix++;
+        if (cminimizer.first != pminimizer.first) {
+          wcix++;
+        }
+        pminimizer = cminimizer;
       }
     }
     kix++;
   }
+  wdensity = static_cast<float>(wcix) / static_cast<float>(wnix);
 }
 
 QSeq::~QSeq()

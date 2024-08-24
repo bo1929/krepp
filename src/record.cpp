@@ -1,3 +1,4 @@
+#include "common.hpp"
 #include "record.hpp"
 
 Record::Record(tree_sptr_t tree)
@@ -160,27 +161,34 @@ CRecord::CRecord(record_sptr_t record)
   se_t curr_senum = 1;
   node_sptr_t nd_curr;
   tree->reset_traversal();
+  nsubsets = record->sh_to_se.size() + 1;
+  nnodes = record->sh_to_node.size() + 1;
+  se_to_pse.resize(nsubsets);
+  se_to_node.resize(nnodes);
+  se_to_wdensity.resize(nnodes);
   while (nd_curr = tree->next_post_order()) {
-    se_to_node[record->sh_to_se[nd_curr->get_sh()]] = nd_curr;
+    se_to_node[nd_curr->get_se()] = nd_curr;
+    se_to_wdensity[nd_curr->get_se()] = record->sh_to_wdensity[nd_curr->get_sh()];
   }
   tree->reset_traversal();
   for (auto& [sh, subset] : record->sh_to_subset) {
-    se_to_pse.try_emplace(record->sh_to_se[sh],
-                          std::make_pair(record->sh_to_se[subset->ch],
-                                         record->sh_to_se[sh - subset->ch - subset->nonce]));
+    se_to_pse[record->sh_to_se[sh]] = std::make_pair(
+      record->sh_to_se[subset->ch], record->sh_to_se[sh - subset->ch - subset->nonce]);
   }
   se_to_pse[0] = std::make_pair(0, 0);
-  nsubsets = record->sh_to_se.size();
+  se_to_node[0] = nullptr;
 }
 
 void CRecord::print_info()
 {
   std::cout << "Total number of subsets excluding nodes: " << nsubsets << std::endl;
   std::cout << "Number of nodes: " << se_to_node.size() << std::endl;
-  for (auto [se, nd] : se_to_node) {
+  for (uint32_t se = 1; se < nnodes; ++se) {
+    node_sptr_t nd = se_to_node[se];
     std::cout << se << ": " << nd->get_name() << "(" << nd->get_card() << ")" << std::endl;
   }
-  for (auto [se, pse] : se_to_pse) {
+  for (uint32_t se = 1; se < nsubsets; ++se) {
+    pse_t& pse = se_to_pse[se];
     std::cout << se << ": " << pse.first << "+" << pse.second << std::endl;
   }
 }
@@ -191,12 +199,16 @@ CRecord::CRecord(tree_sptr_t tree)
   node_sptr_t nd_curr;
   se_t curr_senum = 1;
   tree->reset_traversal();
+  nnodes = tree->get_nnodes() + 1;
+  nsubsets = nnodes;
+  se_to_node.resize(nnodes);
+  se_to_wdensity.resize(nnodes);
   while (nd_curr = tree->next_post_order()) {
     se_to_node[curr_senum] = nd_curr;
+    se_to_wdensity[curr_senum] = 0;
     curr_senum++;
   }
   tree->reset_traversal();
-  nsubsets = se_to_node.size();
 }
 
 void CRecord::load(std::filesystem::path library_dir, std::string suffix)
@@ -207,12 +219,12 @@ void CRecord::load(std::filesystem::path library_dir, std::string suffix)
     std::cerr << "Failed to open " << crecord_path << std::endl;
     exit(EXIT_FAILURE);
   } else {
+    crecord_stream.read(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
     crecord_stream.read(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
-    std::vector<std::pair<se_t, pse_t>> pse_pair_v(nsubsets);
-    crecord_stream.read(reinterpret_cast<char*>(pse_pair_v.data()),
-                        sizeof(std::pair<se_t, pse_t>) * nsubsets);
-    se_to_pse =
-      parallel_flat_phmap<se_t, std::pair<se_t, se_t>>(pse_pair_v.begin(), pse_pair_v.end());
+    se_to_pse.resize(nsubsets);
+    crecord_stream.read(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
+    se_to_wdensity.resize(nnodes);
+    crecord_stream.read(reinterpret_cast<char*>(se_to_wdensity.data()), sizeof(float) * nnodes);
   }
   if (!crecord_stream.good()) {
     std::cerr << "Reading subset enumerations has failed!" << std::endl;
@@ -224,10 +236,10 @@ void CRecord::load(std::filesystem::path library_dir, std::string suffix)
 void CRecord::save(std::filesystem::path library_dir, std::string suffix)
 {
   std::ofstream crecord_stream(library_dir / ("crecord" + suffix), std::ofstream::binary);
+  crecord_stream.write(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
   crecord_stream.write(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
-  std::vector<std::pair<se_t, pse_t>> pse_pair_v(se_to_pse.begin(), se_to_pse.end());
-  crecord_stream.write(reinterpret_cast<char*>(pse_pair_v.data()),
-                       sizeof(std::pair<se_t, std::pair<se_t, se_t>>) * nsubsets);
+  crecord_stream.write(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
+  crecord_stream.write(reinterpret_cast<char*>(se_to_wdensity.data()), sizeof(float) * nnodes);
   if (!crecord_stream.good()) {
     std::cerr << "Writing subset enumerations has failed!" << std::endl;
     exit(EXIT_FAILURE);
@@ -269,18 +281,4 @@ void CRecord::decode_se(se_t se, vec<node_sptr_t> subset_v)
       qsubset.push(pse.second);
     }
   }
-}
-
-bool CRecord::check_compatible(crecord_sptr_t crecord)
-{
-  // TODO: Implement this.
-  return true;
-}
-
-void CRecord::merge(crecord_sptr_t crecord)
-{ // TODO: Make sure that nodes are mapped correctly.
-  for (auto const& [se, pse] : crecord->se_to_pse) {
-    se_to_pse[se] = pse; // TODO: Handle collisions across partials.
-  }
-  nsubsets = se_to_pse.size();
 }

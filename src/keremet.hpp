@@ -32,14 +32,14 @@ private:
   bool frac = false;
   tuint_t build_count = 0;
   uint32_t nrows = pow(2, 2 * h - 1);
+  dynht_sptr_t root_dynht = nullptr;
+  lshf_sptr_t lshf = nullptr;
+  tree_sptr_t tree = nullptr;
   std::string suffix;
   std::filesystem::path nwk_path;
   std::filesystem::path input_path;
   std::filesystem::path library_dir;
-  lshf_sptr_t lshf = nullptr;
-  tree_sptr_t tree = nullptr;
-  dynht_sptr_t root_dynht = nullptr;
-  parallel_flat_phmap<std::string, std::string> name_to_input;
+  parallel_flat_phmap<std::string, std::string> name_to_path;
 };
 
 class Pkrmt
@@ -54,7 +54,7 @@ private:
   std::filesystem::path library_dir;
   std::filesystem::path query_path;
   library_sptr_t library = nullptr;
-  uint32_t max_hdist = 5;
+  uint32_t hdist_th = 5;
   float min_covpos = 0.5;
 };
 

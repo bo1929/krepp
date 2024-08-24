@@ -30,11 +30,13 @@ struct minfo_t
   std::vector<match_t> match_v;
   std::vector<uint32_t> homoc_v;
   std::vector<uint32_t> subsc_v;
+  std::vector<uint32_t> hdisthist_v;
   uint32_t match_count = 0;
   float covmer = 0.0;
   float covpos = 0.0;
-  float wpehidst =  std::numeric_limits<float>::max();
+  float wschdist =  std::numeric_limits<float>::max();
   float avghdist = std::numeric_limits<float>::max();
+  uint32_t maxhdist = std::numeric_limits<uint32_t>::max();
   minfo_t(uint32_t len) {
     homoc_v.resize(len, 0);
     subsc_v.resize(len, 0);
@@ -53,7 +55,7 @@ struct minfo_t
   }
   void print_info()
   {
-    std::cout << covpos << "\t" << covmer << "\t" << wpehidst <<"\t" << avghdist << "\t" << match_count
+    std::cout << covpos << "\t" << covmer << "\t" << wschdist <<"\t" << avghdist << "\t" << match_count
               << std::endl;
   }
 };
@@ -124,7 +126,7 @@ class QMers
   friend class QBatch;
 
 public:
-  QMers(library_sptr_t library, uint64_t len, uint32_t max_hdist = 3, float min_covpos = 0.5);
+  QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th = 3, float min_covpos = 0.5);
   void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
   void summarize_matches();
   void print_matches(const std::string &name);
@@ -143,12 +145,12 @@ public:
 private:
   uint8_t k;
   uint32_t len;
-  uint32_t max_hdist = 0;
+  uint32_t hdist_th = 0;
   float min_covpos = 0.0;
   tree_sptr_t tree = nullptr;
   lshf_sptr_t lshf = nullptr;
   library_sptr_t library = nullptr;
-  flat_phmap<node_sptr_t, minfo_sptr_t> node_to_minfo;
+  flat_phmap<node_sptr_t, minfo_sptr_t> node_to_minfo; // TODO: Consider using parallel if not too slow.
   // TODO: Tentative below.
   node_sptr_t placement = nullptr;
   flat_phmap<node_sptr_t, ninfo_sptr_t> node_to_ninfo;
@@ -158,7 +160,8 @@ class QBatch
 {
 public:
   QBatch(library_sptr_t library, qseq_sptr_t qs);
-  void search_batch(uint32_t max_hdist, float min_covpos);
+  void search_batch(uint32_t hdist_th, float min_covpos);
+  void print_summary(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
   void search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
 
 private:

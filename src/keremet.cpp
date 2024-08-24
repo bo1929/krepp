@@ -24,7 +24,7 @@ void Bkrmt::read_input_file()
       std::cerr << "Failed to read file for mapping of reference names to paths" << std::endl;
       exit(EXIT_FAILURE);
     }
-    name_to_input[name] = input;
+    name_to_path[name] = input;
   }
   input_file.close();
 }
@@ -56,9 +56,10 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
 {
   if (nd->check_leaf()) {
     sh_t sh = nd->get_sh();
-    if (name_to_input.find(nd->get_name()) != name_to_input.end()) {
-      rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, sh, lshf, name_to_input[nd->get_name()]);
+    if (name_to_path.find(nd->get_name()) != name_to_path.end()) {
+      rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, sh, lshf, name_to_path[nd->get_name()]);
       dynht->fill_table(rs);
+      dynht->get_record()->insert_density(nd->get_sh(), rs->get_density());
 #pragma omp critical
       {
         std::cout << "Genome processed: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
@@ -134,15 +135,15 @@ Bkrmt::Bkrmt(CLI::App& sub_build)
     .add_option("-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree.")
     ->required()
     ->check(CLI::ExistingFile);
-  sub_build.add_option("-k,--kmer-len", k, "Length of k-mers. Default: 29.");
-  sub_build.add_option("-w,--win-len", w, "Length of minimizer windows (w>k). Default: k+3.");
-  sub_build.add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 13.");
+  sub_build.add_option("-k,--kmer-len", k, "Length of k-mers [29].");
+  sub_build.add_option("-w,--win-len", w, "Length of minimizer windows (w>k) [k+3].");
+  sub_build.add_option("-h,--num-positions", h, "Number of positions for the LSH [13].");
   sub_build.add_option(
-    "-m,--modulo-lsh", m, "Mudulo value to partition LSH space, must be smaller. Default: 2.");
+    "-m,--modulo-lsh", m, "Mudulo value to partition LSH space, must be smaller [2].");
   sub_build.add_option(
-    "-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. Default: 1.");
+    "-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
   sub_build.add_flag(
-    "--frac,!--no-frac", frac, "If --frac, all k-mers with r < LSH(x) mod m will be excluded.");
+    "--frac,!--no-frac", frac, "Only k-mers with r > LSH(x) mod m will be excluded [false].");
   sub_build.callback([&]() {
     uint32_t hash_size = pow(2, 2 * h);
     uint32_t full_residue = hash_size % m;
@@ -196,10 +197,22 @@ void Pkrmt::load_library()
 
 void Pkrmt::place_sequences()
 {
+  /* omp_set_num_threads(num_threads); */
+  /* omp_set_nested(1); */
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
-  while (qs->read_next_batch() || !qs->is_batch_finished()) {
-    QBatch qb(library, qs);
-    qb.search_batch(max_hdist, min_covpos);
+  /* #pragma omp parallel shared(qs) */
+  {
+    /* #pragma omp single */
+    {
+      while (qs->read_next_batch() || !qs->is_batch_finished()) {
+        QBatch qb(library, qs);
+        /* #pragma omp task untied */
+        {
+          qb.search_batch(hdist_th, min_covpos);
+        }
+      }
+      /* #pragma omp taskwait */
+    }
   }
 }
 
@@ -210,23 +223,20 @@ Pkrmt::Pkrmt(CLI::App& sub_place)
       "-l,--library-dir", library_dir, "Path to the directory containing reference library.")
     ->required()
     ->check(CLI::ExistingDirectory);
-  sub_place.add_option("-o,--output-dir",
-                       output_dir,
-                       "Path to the directory to output place results. "
-                       "Default:the current working directory.");
+  sub_place.add_option(
+    "-o,--output-dir", output_dir, "Path to the directory to output place results [./].");
   sub_place
     .add_option(
       "-q,--query-file", query_path, "Path to FASTA/FASTQ query file to place on the tree.")
     ->required()
     ->check(CLI::ExistingFile);
-  sub_place.add_option(
-    "--max-hdist",
-    max_hdist,
-    "The maximum Hamming distance for a k-mer to be considered as a match. Default: 5.");
+  sub_place.add_option("--hdist-th",
+                       hdist_th,
+                       "The maximum Hamming distance for a k-mer to be considered as a match [5].");
   sub_place.add_option(
     "--min-covpos",
     min_covpos,
-    "The minimum coverage of a read for a reference to be considered among the matching taxa. Default: 0.5.");
+    "The minimum coverage of a read for a reference to be considered among the matching taxa [0.5].");
   sub_place.add_option(
     "--leave-out-ref",
     leave_out_ref,
