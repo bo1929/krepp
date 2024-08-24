@@ -99,13 +99,12 @@ void Node::parse(vec<std::string>& n_vec)
   if (n_vec[tree->atter] == "(") {
     while (1) {
       tree->atter++;
-      node_sptr_t child = std::make_shared<Node>(tree);
-      child->set_parent(getptr());
-      child->ix_child = nchildren;
-      child->parse(n_vec);
-      card += child->card;
-      sh += child->sh;
-      children.push_back(std::move(child));
+      children.emplace_back(std::make_shared<Node>(tree));
+      (children.back())->set_parent(getptr());
+      (children.back())->ix_child = nchildren;
+      (children.back())->parse(n_vec);
+      card += (children.back())->card;
+      sh += (children.back())->sh;
       nchildren++;
       if (n_vec[tree->atter] == ",")
         continue;

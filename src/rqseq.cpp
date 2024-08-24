@@ -90,7 +90,7 @@ void RSeq::extract_mers(vvec<mer_t>& table)
                           [](std::pair<uint64_t, uint64_t> lhs, std::pair<uint64_t, uint64_t> rhs) {
                             return xur64_hash(lhs.second) < xur64_hash(rhs.second);
                           });
-      rcenc64_bp = revcomp_bp64(cminimizer.first, k); // TODO: No need for cannonical.
+      rcenc64_bp = revcomp_bp64(cminimizer.first, k); // TODO: Perhaps no need for cannonical.
       if (cminimizer.first < rcenc64_bp) {
         cminimizer.first = rcenc64_bp;
         cminimizer.second = conv_bp64_lr64(cminimizer.first);

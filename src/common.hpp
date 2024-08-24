@@ -167,7 +167,8 @@ static inline uint64_t conv_bp64_lr64(uint64_t x)
   return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x);
 }
 
-static inline void compute_encoding(const char* s1, const char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
+static inline void
+compute_encoding(const char* s1, const char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;

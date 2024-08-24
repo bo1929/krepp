@@ -62,14 +62,14 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
       dynht->get_record()->insert_density(nd->get_sh(), rs->get_density());
 #pragma omp critical
       {
-        std::cout << "Genome processed: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
+        std::cerr << "Genome processed: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
                   << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
                   << std::flush;
       }
     } else {
 #pragma omp critical
       {
-        std::cout << "Genome skipped: " << nd->get_name() << "\r" << std::flush;
+        std::cerr << "Genome skipped: " << nd->get_name() << "\r" << std::flush;
         build_count++;
       }
     }
@@ -92,7 +92,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
     omp_destroy_lock(&parent_lock);
 #pragma omp critical
     {
-      std::cout << "Internal node processed: " << nd->get_name()
+      std::cerr << "Internal node processed: " << nd->get_name()
                 << "\tsize: " << dynht->get_nkmers() << "\tprogress: " << (++build_count) << "/"
                 << tree->get_nnodes() << "\r" << std::flush;
     }
@@ -276,32 +276,34 @@ int main(int argc, char** argv)
   Pkrmt p(sub_place);
 
   CLI11_PARSE(app, argc, argv);
-  /* std::ios::sync_with_stdio(false); */
 
   if (sub_build.parsed()) {
-    std::cout << "Reading the tree andinitializing the library..." << std::endl;
+    std::cerr << "Reading the tree andinitializing the library..." << std::endl;
     b.set_lshf();
     b.read_input_file();
     b.parse_newick_tree();
-    std::cout << "Building the library..." << std::endl;
-    auto start_b = std::chrono::system_clock::now();
+
+    auto tstart = std::chrono::system_clock::now();
+    std::cerr << "Building the library..." << std::endl;
     b.build_library();
-    auto end_b = std::chrono::system_clock::now();
-    std::chrono::duration<double> es_b = end_b - start_b;
-    std::cout << "\nFinished building, elapsed: " << es_b.count() << " seconds" << std::endl;
+    auto tend_b = std::chrono::system_clock::now();
+    std::chrono::duration<double> es_b = tend_b - tstart;
+    std::cerr << "\nFinished building, elapsed: " << es_b.count() << " seconds" << std::endl;
+
     b.save_library();
     b.save_metadata();
-    auto end_c = std::chrono::system_clock::now();
-    std::chrono::duration<double> es_s = end_c - end_b;
-    std::cout << "Done converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
-    std::time_t end_time = std::chrono::system_clock::to_time_t(end_c);
-    std::cout << std::ctime(&end_time);
+    auto tend_c = std::chrono::system_clock::now();
+    std::chrono::duration<double> es_s = tend_c - tend_b;
+    std::cerr << "Done converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
+
+    std::time_t tend_f = std::chrono::system_clock::to_time_t(tend_c);
+    std::cerr << std::ctime(&tend_f);
   }
   if (sub_place.parsed()) {
-    // TODO: Make this good, maybe not place or separate dist, node verbosity except the output.
-    std::cout << "Loading the library and the tree..." << std::endl;
+    std::cerr << "Loading the library and the tree..." << std::endl;
     p.load_library();
-    std::cout << "Querying given sequences..." << std::endl;
+
+    std::cerr << "Querying given sequences..." << std::endl;
     p.place_sequences();
   }
 

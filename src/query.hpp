@@ -6,12 +6,10 @@
 #include "lshf.hpp"
 #include "rqseq.hpp"
 #include "table.hpp"
-#include <cstdint>
 
 struct minfo_t;
 typedef std::shared_ptr<minfo_t> minfo_sptr_t;
-struct ninfo_t;
-typedef std::shared_ptr<ninfo_t> ninfo_sptr_t;
+typedef std::unique_ptr<minfo_t> minfo_uptr_t;
 
 struct match_t
 {
@@ -34,16 +32,17 @@ struct minfo_t
   uint32_t match_count = 0;
   float covmer = 0.0;
   float covpos = 0.0;
-  float wschdist =  std::numeric_limits<float>::max();
+  float wschdist = std::numeric_limits<float>::max();
   float avghdist = std::numeric_limits<float>::max();
   uint32_t maxhdist = std::numeric_limits<uint32_t>::max();
-  minfo_t(uint32_t len) {
+  minfo_t(uint32_t len)
+  {
     homoc_v.resize(len, 0);
     subsc_v.resize(len, 0);
   }
   void update_match(uint32_t pos, uint32_t zc, uint32_t curr_hdist)
   {
-    if (match_v.empty() || (match_v.back()).pos != pos) {
+    if (match_v.empty() || ((match_v.back()).pos != pos)) {
       match_v.emplace_back(pos, zc, curr_hdist);
       match_count++;
     } else {
@@ -55,68 +54,7 @@ struct minfo_t
   }
   void print_info()
   {
-    std::cout << covpos << "\t" << covmer << "\t" << wschdist <<"\t" << avghdist << "\t" << match_count
-              << std::endl;
-  }
-};
-
-struct pinfo_t // TODO: May simplify, might be storing too much information.
-{
-  uint32_t infhdist = std::numeric_limits<uint32_t>::max();
-  uint32_t suphdist = std::numeric_limits<uint32_t>::min();
-  float avghdist = std::numeric_limits<float>::max();
-  uint32_t match_count = 0;
-};
-
-struct ninfo_t
-{
-  std::vector<minfo_sptr_t> minfo_v;
-  flat_phmap<uint32_t, pinfo_t>
-    pos_to_pinfo; // TODO: You could potentially keep matches as they are instead of positional info and compute on demand.
-  float score = 0;     // TODO: This is a score but which? Does this have to be float?
-  float pavghdist = 0; // TODO: Remove?
-  uint32_t taxa_count = 0;
-  uint32_t match_count = 0;
-  float covmer = 0.0;
-  float covpos = 0.0;
-  float avghdist = std::numeric_limits<float>::max();
-  float exchdist = std::numeric_limits<float>::max();
-  ninfo_t() {}
-  ninfo_t(minfo_sptr_t mi)
-  {
-    taxa_count = 1;
-    match_count = mi->match_count;
-    avghdist = mi->avghdist;
-    covmer = mi->covmer;
-    covpos = mi->covpos;
-    minfo_v.push_back(mi);
-    map_pinfo(mi);
-  }
-  void add_minfo(minfo_sptr_t mi)
-  {
-    taxa_count++;
-    avghdist = (avghdist * match_count + (mi->avghdist * mi->match_count));
-    match_count += mi->match_count;
-    avghdist /= match_count;
-    covmer = std::max(mi->covmer, covmer);
-    covpos = std::max(mi->covpos, covpos);
-    minfo_v.push_back(mi);
-    map_pinfo(mi);
-  }
-  void map_pinfo(minfo_sptr_t mi)
-  {
-    for (auto const& match : mi->match_v) {
-      pinfo_t& pi = pos_to_pinfo[match.pos];
-      pi.avghdist = (pi.avghdist * pi.match_count) + match.hdist;
-      pi.match_count++;
-      pi.avghdist /= pi.match_count;
-      pi.infhdist = std::min(match.hdist, pi.infhdist);
-      pi.suphdist = std::max(match.hdist, pi.suphdist);
-    }
-  }
-  void print_info()
-  {
-    std::cout << covpos << "\t" << covmer << "\t" << avghdist << "\t" << taxa_count << "\t"
+    std::cout << covpos << "\t" << covmer << "\t" << wschdist << "\t" << avghdist << "\t"
               << match_count << std::endl;
   }
 };
@@ -129,18 +67,10 @@ public:
   QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th = 3, float min_covpos = 0.5);
   void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
   void summarize_matches();
-  void print_matches(const std::string &name);
-  void print_coverage(const std::string &name);
-  void print_dist(const std::string &name);
+  void print_matches(const std::string& name);
+  void print_coverage(const std::string& name);
+  void print_dist(const std::string& name);
   void print_summary(const std::string& name);
-  // TODO: Tentative below.
-  void fill_ninfo();
-  void compute_exchdist();
-  float greedy_count_placement();
-  float argmin_avghdist_placement();
-  float argmin_diffhdist_placement();
-  float countpos_avghdist_placement(); // TODO: Perhaps better naming;
-  void display_placement();
 
 private:
   uint8_t k;
@@ -150,10 +80,7 @@ private:
   tree_sptr_t tree = nullptr;
   lshf_sptr_t lshf = nullptr;
   library_sptr_t library = nullptr;
-  flat_phmap<node_sptr_t, minfo_sptr_t> node_to_minfo; // TODO: Consider using parallel if not too slow.
-  // TODO: Tentative below.
-  node_sptr_t placement = nullptr;
-  flat_phmap<node_sptr_t, ninfo_sptr_t> node_to_ninfo;
+  flat_phmap<node_sptr_t, minfo_uptr_t> node_to_minfo;
 };
 
 class QBatch

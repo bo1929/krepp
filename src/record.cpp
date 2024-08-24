@@ -1,4 +1,3 @@
-#include "common.hpp"
 #include "record.hpp"
 
 Record::Record(tree_sptr_t tree)
