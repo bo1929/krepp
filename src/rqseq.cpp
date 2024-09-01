@@ -63,7 +63,7 @@ void RSeq::extract_mers(vvec<mer_t>& table)
   uint32_t i, l;
   uint32_t rix, rix_res;
   uint8_t ldiff = w - k + 1;
-  uint64_t wcix = 0, wnix = 0, kix = 0;
+  uint64_t kix = 0;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
   std::vector<std::pair<uint64_t, uint64_t>> lsh_enc_win(ldiff);
   std::pair<uint64_t, uint64_t> cminimizer, pminimizer;
@@ -109,7 +109,6 @@ void RSeq::extract_mers(vvec<mer_t>& table)
     }
     kix++;
   }
-  wdensity = static_cast<float>(wcix) / static_cast<float>(wnix);
 }
 
 QSeq::~QSeq()

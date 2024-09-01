@@ -2,7 +2,6 @@
 #define _COMMON_H
 
 #include "omp.h"
-#include "phmap.h"
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -21,6 +20,7 @@
 #include <memory>
 #include <numeric>
 #include <ostream>
+#include <parallel_hashmap/phmap.h>
 #include <queue>
 #include <random>
 #include <regex>

@@ -1,0 +1,21 @@
+[submodule "external/l-bfgs-b"]
+	path = external/l-bfgs-b
+	url = https://github.com/droemer7/l-bfgs-b.git
+[submodule "external/eigen"]
+	path = external/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "external/parallel-hashmap"]
+	path = external/parallel-hashmap
+	url = https://github.com/greg7mdp/parallel-hashmap.git
+[submodule "external/CLI11"]
+	path = external/CLI11
+	url = https://github.com/CLIUtils/CLI11.git
+[submodule "CLI11"]
+	path = CLI11
+	url = https://github.com/CLIUtils/CLI11.git
+[submodule "external/--force"]
+	path = external/--force
+	url = https://github.com/CLIUtils/CLI11.git
+[submodule "external/eigen-3.4.0"]
+	path = external/eigen-3.4.0
+	url = https://gitlab.com/libeigen/eigen.git

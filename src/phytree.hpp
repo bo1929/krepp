@@ -35,7 +35,7 @@ private:
   node_sptr_t root = nullptr;
   node_sptr_t curr = nullptr;
   node_sptr_t subtree_root = nullptr;
-  double total_len_branch = 0;
+  float total_len_branch = 0;
 };
 
 class Node : public std::enable_shared_from_this<Node>
@@ -56,7 +56,7 @@ public:
   tuint_t get_nchildren() { return nchildren; }
   node_sptr_t get_parent() { return parent; }
   tree_sptr_t get_tree() { return tree; }
-  double get_bdepth() { return bdepth; }
+  float get_bdepth() { return bdepth; }
   std::string get_name() { return name; }
   tuint_t get_card() { return card; }
   sh_t get_sh() { return sh; }
@@ -74,8 +74,8 @@ private:
   std::string name = "";
   node_sptr_t parent = nullptr;
   tree_sptr_t tree = nullptr;
-  double branch_len = 0;
-  double bdepth = 0;
+  float branch_len = 0;
+  float bdepth = 0;
   uint32_t ldepth = 0;
   bool is_leaf = true;
   tuint_t nchildren = 0;

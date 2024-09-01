@@ -93,6 +93,7 @@ public:
   node_sptr_t get_node(se_t se) const { return se_to_node[se]; }
   se_t get_nnodes() const { return se_to_node.size(); }
   pse_t get_pse(se_t se) const { return se_to_pse[se]; }
+  float get_wdensity(se_t se) const { return se_to_wdensity[se]; }
 
 private:
   se_t nnodes = 0;

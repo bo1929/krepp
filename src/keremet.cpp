@@ -59,10 +59,10 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
     if (name_to_path.find(nd->get_name()) != name_to_path.end()) {
       rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, sh, lshf, name_to_path[nd->get_name()]);
       dynht->fill_table(rs);
-      dynht->get_record()->insert_density(nd->get_sh(), rs->get_density());
+      dynht->get_record()->insert_density(nd->get_sh(), rs->get_wdensity());
 #pragma omp critical
       {
-        std::cerr << "Genome processed: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
+        std::cerr << "Leaf node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
                   << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
                   << std::flush;
       }
@@ -92,9 +92,9 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
     omp_destroy_lock(&parent_lock);
 #pragma omp critical
     {
-      std::cerr << "Internal node processed: " << nd->get_name()
-                << "\tsize: " << dynht->get_nkmers() << "\tprogress: " << (++build_count) << "/"
-                << tree->get_nnodes() << "\r" << std::flush;
+      std::cerr << "Internal node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
+                << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
+                << std::flush;
     }
   }
 }
@@ -183,7 +183,7 @@ void Pkrmt::load_library()
   for (auto const& [suffix, ltypes] : suffix_to_ltype) {
     suffixes.push_back(suffix);
   }
-  std::set<std::string> lall{"cmer", "crecord", "inc", "metadata", "tree"};
+  std::set<std::string> lall{ "cmer", "crecord", "inc", "metadata", "tree" };
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
     if (suffix_to_ltype[suffixes[lix]] == lall) {
@@ -249,9 +249,9 @@ Pkrmt::Pkrmt(CLI::App& sub_place)
 
 int main(int argc, char** argv)
 {
-  CLI::App app{"Keremet: "
-               "a tool for k-mer-based search in large genome collections & "
-               "metagenomic analysis!"};
+  CLI::App app{ "Keremet: "
+                "a tool for k-mer-based search in large genome collections & "
+                "metagenomic analysis!" };
   app.set_help_flag("--help");
   bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
@@ -278,7 +278,7 @@ int main(int argc, char** argv)
   CLI11_PARSE(app, argc, argv);
 
   if (sub_build.parsed()) {
-    std::cerr << "Reading the tree andinitializing the library..." << std::endl;
+    std::cerr << "Reading the tree and initializing the library..." << std::endl;
     b.set_lshf();
     b.read_input_file();
     b.parse_newick_tree();
@@ -287,13 +287,13 @@ int main(int argc, char** argv)
     std::cerr << "Building the library..." << std::endl;
     b.build_library();
     auto tend_b = std::chrono::system_clock::now();
-    std::chrono::duration<double> es_b = tend_b - tstart;
+    std::chrono::duration<float> es_b = tend_b - tstart;
     std::cerr << "\nFinished building, elapsed: " << es_b.count() << " seconds" << std::endl;
 
     b.save_library();
     b.save_metadata();
     auto tend_c = std::chrono::system_clock::now();
-    std::chrono::duration<double> es_s = tend_c - tend_b;
+    std::chrono::duration<float> es_s = tend_c - tend_b;
     std::cerr << "Done converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
 
     std::time_t tend_f = std::chrono::system_clock::to_time_t(tend_c);

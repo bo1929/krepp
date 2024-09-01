@@ -1,7 +1,6 @@
 #ifndef _KEREMET_H
 #define _KEREMET_H
 
-#include "CLI11.hpp"
 #include "common.hpp"
 #include "library.hpp"
 #include "lshf.hpp"
@@ -10,6 +9,7 @@
 #include "record.hpp"
 #include "rqseq.hpp"
 #include "table.hpp"
+#include <CLI.hpp>
 
 class Bkrmt
 {
@@ -55,7 +55,7 @@ private:
   std::filesystem::path query_path;
   library_sptr_t library = nullptr;
   uint32_t hdist_th = 5;
-  float min_covpos = 0.5;
+  double min_covpos = 0.5;
 };
 
 #endif
