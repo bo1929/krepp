@@ -2,6 +2,7 @@
 #define _LSHF_H
 
 #include "common.hpp"
+#include <cstdint>
 
 class LSHF
 {
@@ -19,7 +20,8 @@ public:
   uint32_t compute_hash(uint64_t enc_bp);
   uint32_t drop_ppos_lr(uint64_t enc64_lr);
   uint32_t drop_ppos_bp(uint64_t enc64_bp);
-  uint32_t get_ppos_diff(uint32_t& zc);
+  uint32_t get_npos_diff(uint32_t zc);
+  uint32_t get_npos_accdiff(uint32_t& zc, uint32_t& i);
   char* npos_data() { return reinterpret_cast<char*>(npos_v.data()); }
   char* ppos_data() { return reinterpret_cast<char*>(ppos_v.data()); }
 

@@ -4,6 +4,10 @@
 #include <lbfgsb.h>
 
 namespace optimize {
+  const Vector d_init{{0.01}}; // Initial guess
+  const Vector d_lb{{0.0}};    // Lower bounds on d_llh
+  const Vector d_ub{{0.5}};    // Upper bounds on d_llh
+
   class HDistHistLLH : public Function
   {
   private:
@@ -27,7 +31,7 @@ namespace optimize {
       uint32_t uc = nmers;
       double ps = pow(1 - d[0], h - 1);
       grad[0] = 0;
-      for (uint32_t i = 0; i < hdist_th; ++i) {
+      for (uint32_t i = 0; i <= hdist_th; ++i) {
         uc -= *(mc_ptr + i);
         fx -= (log(1 - d[0]) * (k - i) + (log(d[0]) * i)) * (*(mc_ptr + i));
         grad[0] -= (i / d[0] - (k - i) / (1 - d[0])) * (*(mc_ptr + i));
@@ -41,7 +45,7 @@ namespace optimize {
     {
       double fx = 0.0;
       uint32_t uc = nmers;
-      for (uint32_t i = 0; i < hdist_th; ++i) {
+      for (uint32_t i = 0; i <= hdist_th; ++i) {
         uc -= *(mc_ptr + i);
         fx -= (log(1 - d[0]) * (k - i) + (log(d[0]) * i)) * (*(mc_ptr + i));
       }
@@ -55,7 +59,7 @@ namespace optimize {
       uint32_t uc = nmers;
       double ps = pow(1 - d[0], h - 1);
       grad[0] = 0;
-      for (uint32_t i = 0; i < hdist_th; ++i) {
+      for (uint32_t i = 0; i <= hdist_th; ++i) {
         uc -= *(mc_ptr + i);
         grad[0] -= (i / d[0] - (k - i) / (1 - d[0])) * (*(mc_ptr + i));
       }

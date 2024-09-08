@@ -32,6 +32,6 @@ NamespaceIndentation: All
 PenaltyExcessCharacter: 100
 PenaltyReturnTypeOnItsOwnLine: 1
 ReflowComments: false
-SortIncludes: true
+SortIncludes: false
 BreakStringLiterals: false
 ---

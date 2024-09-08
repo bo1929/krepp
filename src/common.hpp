@@ -131,13 +131,13 @@ static inline uint32_t hdist_lr64(const uint64_t x, const uint64_t y)
 static inline uint32_t zc_lr32(const uint32_t x, const uint32_t y)
 {
   uint32_t z1 = x ^ y;
-  return z1 | (z1 >> 16);
+  return (z1 | (z1 >> 16)) & 0x0000ffff;
 }
 
 static inline uint32_t hdist_lr32(const uint32_t x, const uint32_t y)
 {
   uint32_t z1 = x ^ y;
-  return __builtin_popcount(z1 | (z1 >> 16));
+  return __builtin_popcount((z1 | (z1 >> 16)) & 0x0000ffff);
 }
 
 static inline uint64_t revcomp_bp64(const uint64_t x, uint8_t k)

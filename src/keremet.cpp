@@ -183,7 +183,7 @@ void Pkrmt::load_library()
   for (auto const& [suffix, ltypes] : suffix_to_ltype) {
     suffixes.push_back(suffix);
   }
-  std::set<std::string> lall{ "cmer", "crecord", "inc", "metadata", "tree" };
+  std::set<std::string> lall{"cmer", "crecord", "inc", "metadata", "tree"};
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
     if (suffix_to_ltype[suffixes[lix]] == lall) {
@@ -249,9 +249,9 @@ Pkrmt::Pkrmt(CLI::App& sub_place)
 
 int main(int argc, char** argv)
 {
-  CLI::App app{ "Keremet: "
-                "a tool for k-mer-based search in large genome collections & "
-                "metagenomic analysis!" };
+  CLI::App app{"Keremet: "
+               "a tool for k-mer-based search in large genome collections & "
+               "metagenomic analysis!"};
   app.set_help_flag("--help");
   bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");

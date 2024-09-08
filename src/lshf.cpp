@@ -71,11 +71,19 @@ uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp)
   return enc32_bp;
 }
 
-uint32_t LSHF::get_ppos_diff(uint32_t& zc)
+uint32_t LSHF::get_npos_diff(uint32_t zc)
 {
   uint32_t i = __builtin_ctz(zc);
   zc = zc >> (i + 1);
   return npos_v[i];
+}
+
+uint32_t LSHF::get_npos_accdiff(uint32_t& zc, uint32_t& i)
+{
+  uint32_t j = __builtin_ctz(zc) + 1;
+  i += j;
+  zc >>= j;
+  return npos_v.rbegin()[i - 1];
 }
 
 void LSHF::get_random_positions()

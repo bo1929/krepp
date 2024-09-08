@@ -7,76 +7,50 @@
 #include "rqseq.hpp"
 #include "table.hpp"
 
-struct minfo_t;
-typedef std::shared_ptr<minfo_t> minfo_sptr_t;
-typedef std::unique_ptr<minfo_t> minfo_uptr_t;
+namespace optimize {
+  class HDistHistLLH;
+}
+
+class Minfo;
+typedef std::shared_ptr<Minfo> minfo_sptr_t;
+typedef std::unique_ptr<Minfo> minfo_uptr_t;
 
 struct match_t
 {
+  enc_t enc_lr;
   uint32_t pos;
   uint32_t zc;
   uint32_t hdist;
-  match_t(uint32_t pos, uint32_t zc, uint32_t hdist)
-    : pos(pos)
+  match_t(enc_t enc_lr, uint32_t pos, uint32_t zc, uint32_t hdist)
+    : enc_lr(enc_lr)
+    , pos(pos)
     , zc(zc)
     , hdist(hdist)
   {}
 };
 
-struct minfo_t
-{
-  float ro = 1;
-  double covmer = 0.0;
-  double covpos = 0.0;
-  uint32_t match_count = 0;
-  double wschdist = std::numeric_limits<double>::max();
-  double llhhdist = std::numeric_limits<double>::max();
-  double avghdist = std::numeric_limits<double>::max();
-  uint32_t maxhdist = std::numeric_limits<uint32_t>::max();
-  std::vector<match_t> match_v;
-  std::vector<uint32_t> homoc_v;
-  std::vector<uint32_t> subsc_v;
-  std::vector<uint32_t> hdisthist_v;
-  minfo_t(uint32_t len, uint32_t hdist_th, float ro)
-    : ro(ro)
-  {
-    homoc_v.resize(len, 0);
-    subsc_v.resize(len, 0);
-    hdisthist_v.resize(hdist_th + 1, 0);
-  }
-  void update_match(uint32_t pos, uint32_t zc, uint32_t curr_hdist)
-  {
-    if (match_v.empty() || ((match_v.back()).pos != pos)) {
-      match_v.emplace_back(pos, zc, curr_hdist);
-      match_count++;
-    } else {
-      if ((match_v.back()).hdist > curr_hdist) {
-        (match_v.back()).zc = zc;
-        (match_v.back()).hdist = curr_hdist;
-      }
-    }
-  }
-};
-
-class QMers
+class QMers : public std::enable_shared_from_this<QMers>
 {
   friend class QBatch;
+  friend class Minfo;
 
 public:
   QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th = 3, double min_covpos = 0.5);
   void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
-  void summarize_matches();
+  void summarize_mers();
+  qmers_sptr_t getptr() { return shared_from_this(); }
 
 private:
   uint32_t k;
   uint32_t h;
   uint32_t len;
+  uint32_t num_kmers;
   uint32_t hdist_th = 0;
   double min_covpos = 0.0;
   tree_sptr_t tree = nullptr;
   lshf_sptr_t lshf = nullptr;
   library_sptr_t library = nullptr;
-  flat_phmap<node_sptr_t, minfo_uptr_t> node_to_minfo;
+  parallel_flat_phmap<node_sptr_t, minfo_uptr_t> node_to_minfo = {};
 };
 
 class QBatch
@@ -100,6 +74,54 @@ private:
   library_sptr_t library;
   vec<std::string> name_batch;
   vec<std::string> seq_batch;
+};
+
+class Minfo
+{
+  friend class QBatch;
+
+public:
+  Minfo(qmers_sptr_t qmers, float ro)
+    : qmers(qmers)
+    , ro(ro)
+  {
+    homoc_v.resize(qmers->len, 0);
+    subsc_v.resize(qmers->len, 0);
+    obsbp_v.resize(qmers->len, 0);
+    hdisthist_v.resize(qmers->hdist_th + 1, 0);
+    match_v.clear();
+  }
+  void update_match(enc_t enc_lr, uint32_t pos, uint32_t zc, uint32_t curr_hdist)
+  {
+    if (match_v.empty() || ((match_v.back()).pos != pos)) {
+      match_v.emplace_back(enc_lr, pos, zc, curr_hdist);
+      match_count++;
+    } else {
+      if ((match_v.back()).hdist > curr_hdist) {
+        (match_v.back()).enc_lr = enc_lr;
+        (match_v.back()).zc = zc;
+        (match_v.back()).hdist = curr_hdist;
+      }
+    }
+  }
+  void estimate_distance(optimize::HDistHistLLH& llhfunc);
+  void summarize_matches();
+
+private:
+  float ro = 1;
+  double covmer = 0.0;
+  double covpos = 0.0;
+  uint32_t match_count = 0;
+  double d_was = std::numeric_limits<double>::max();
+  double d_llh = std::numeric_limits<double>::max();
+  double avg_hdist = std::numeric_limits<double>::max();
+  uint32_t sup_hdist = std::numeric_limits<uint32_t>::max();
+  std::vector<match_t> match_v;
+  std::vector<uint32_t> homoc_v;
+  std::vector<uint32_t> subsc_v;
+  std::vector<uint32_t> obsbp_v;
+  std::vector<uint32_t> hdisthist_v;
+  qmers_sptr_t qmers = nullptr;
 };
 
 #endif

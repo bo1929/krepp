@@ -6,6 +6,7 @@
 #include "table.hpp"
 
 #define BATCH_SIZE 262144
+/* #define CANONICAL */
 
 extern "C"
 {
