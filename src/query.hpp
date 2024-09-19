@@ -44,7 +44,7 @@ private:
   uint32_t k;
   uint32_t h;
   uint32_t len;
-  uint32_t num_kmers;
+  uint32_t nmers;
   uint32_t hdist_th = 0;
   double min_covpos = 0.0;
   tree_sptr_t tree = nullptr;
@@ -81,9 +81,9 @@ class Minfo
   friend class QBatch;
 
 public:
-  Minfo(qmers_sptr_t qmers, float ro)
+  Minfo(qmers_sptr_t qmers, float rho)
     : qmers(qmers)
-    , ro(ro)
+    , rho(rho)
   {
     homoc_v.resize(qmers->len, 0);
     subsc_v.resize(qmers->len, 0);
@@ -108,7 +108,7 @@ public:
   void summarize_matches();
 
 private:
-  float ro = 1;
+  float rho = 1;
   double covmer = 0.0;
   double covpos = 0.0;
   uint32_t match_count = 0;

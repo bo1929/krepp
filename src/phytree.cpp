@@ -82,8 +82,10 @@ void Node::parse(vec<std::string>& n_vec)
     if (n_vec[tree->atter] == ":") {
       branch_len = std::atof(n_vec[tree->atter + 1].c_str());
       tree->total_len_branch += branch_len;
-      ldepth = parent->ldepth + 1;
-      bdepth = parent->bdepth + branch_len;
+      if (parent) {
+        ldepth = parent->ldepth + 1;
+        bdepth = parent->bdepth + branch_len;
+      }
       tree->atter += 2;
     }
     is_leaf = true;

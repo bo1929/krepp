@@ -7,7 +7,7 @@
 class Tree : public std::enable_shared_from_this<Tree>
 {
   friend class Node;
-
+  // TODO: Make parsing more robust, especially for trees with nodes < 3.
 public:
   Tree() {}
   void print_info();

@@ -4,7 +4,7 @@
 QMers::QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th, double min_covpos)
   : library(library)
   , len(len)
-  , num_kmers(0)
+  , nmers(0)
   , hdist_th(hdist_th)
   , min_covpos(min_covpos)
 {
@@ -101,11 +101,13 @@ void Minfo::estimate_distance(optimize::HDistHistLLH& llhfunc)
   d_was = 0;
   d_llh = 0;
   llhfunc.set_mc(hdisthist_v.data());
-  llhfunc.set_ro(static_cast<double>(ro)); // TODO: fix this
+  llhfunc.set_ro(static_cast<double>(rho)); // TODO: fix this
   optimize::Lbfgsb solver;
   optimize::State state =
     solver.minimize(llhfunc, optimize::d_init, optimize::d_lb, optimize::d_ub);
   d_llh = (state.x().transpose())(0);
+  /* #pragma omp critical */
+  /*   std::cout << d_llh << ", " << state.f() << std::endl; */
   uint32_t ddd = 0;
   for (uint32_t i = 0; i < qmers->len; ++i) {
     if (homoc_v[i] > 0) {
@@ -146,7 +148,7 @@ void QBatch::place_wrt_closest(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uin
 
 void QMers::summarize_mers()
 {
-  optimize::HDistHistLLH llhfunc(h, k, hdist_th, num_kmers);
+  optimize::HDistHistLLH llhfunc(h, k, hdist_th, nmers);
   for (auto& [nd, mi] : node_to_minfo) {
     mi->summarize_matches();
     mi->estimate_distance(llhfunc);
@@ -255,38 +257,38 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
       }
     }
   }
-  num_kmers++;
+  nmers++;
 }
 
 void QBatch::print_summary(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix)
 {
   for (auto const& [nd, mi] : qmers_or->node_to_minfo) {
-    /* if (mi->covpos > qmers_or->min_covpos && !(qmers_rc->node_to_minfo.contains(nd) && */
-    /*                                            mi->covpos < qmers_rc->node_to_minfo[nd]->covpos)) { */
-    std::cout << name_batch[bix] << "\t"
-              << "or"
-              << "\t" << mi->match_count << "\t" << mi->qmers->len << "\t" << mi->ro << "\t"
-              << nd->get_name() << "\t" << mi->d_was << "\t" << mi->d_llh << "\t" << mi->covpos
-              << "\t" << mi->covmer;
-    for (uint32_t i = 0; i < mi->hdisthist_v.size(); ++i) {
-      std::cout << "\t" << mi->hdisthist_v[i];
+    if (mi->covpos > qmers_or->min_covpos &&
+        !(qmers_rc->node_to_minfo.contains(nd) && mi->d_llh > qmers_rc->node_to_minfo[nd]->d_llh)) {
+      std::cout << name_batch[bix] << "\t"
+                << "or"
+                << "\t" << mi->match_count << "\t" << qmers_or->nmers << "\t" << mi->rho << "\t"
+                << nd->get_name() << "\t" << mi->d_was << "\t" << mi->d_llh << "\t" << mi->covpos
+                << "\t" << mi->covmer;
+      for (uint32_t i = 0; i < mi->hdisthist_v.size(); ++i) {
+        std::cout << "\t" << mi->hdisthist_v[i];
+      }
+      std::cout << "\n";
     }
-    std::cout << "\n";
-    /* } */
   }
   for (auto const& [nd, mi] : qmers_rc->node_to_minfo) {
-    /* if (mi->covpos > qmers_rc->min_covpos && !(qmers_or->node_to_minfo.contains(nd) && */
-    /*                                            mi->covpos < qmers_or->node_to_minfo[nd]->covpos)) { */
-    std::cout << name_batch[bix] << "\t"
-              << "rc"
-              << "\t" << mi->match_count << "\t" << mi->qmers->len << "\t" << mi->ro << "\t"
-              << nd->get_name() << "\t" << mi->d_was << "\t" << mi->d_llh << "\t" << mi->covpos
-              << "\t" << mi->covmer;
-    for (uint32_t i = 0; i < mi->hdisthist_v.size(); ++i) {
-      std::cout << "\t" << mi->hdisthist_v[i];
+    if (mi->covpos > qmers_rc->min_covpos &&
+        !(qmers_or->node_to_minfo.contains(nd) && mi->d_llh > qmers_or->node_to_minfo[nd]->d_llh)) {
+      std::cout << name_batch[bix] << "\t"
+                << "rc"
+                << "\t" << mi->match_count << "\t" << qmers_rc->nmers << "\t" << mi->rho << "\t"
+                << nd->get_name() << "\t" << mi->d_was << "\t" << mi->d_llh << "\t" << mi->covpos
+                << "\t" << mi->covmer;
+      for (uint32_t i = 0; i < mi->hdisthist_v.size(); ++i) {
+        std::cout << "\t" << mi->hdisthist_v[i];
+      }
+      std::cout << "\n";
     }
-    std::cout << "\n";
-    /* } */
   }
 }
 

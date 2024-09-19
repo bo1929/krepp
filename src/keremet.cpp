@@ -46,6 +46,7 @@ void Bkrmt::build_library()
 
 void Bkrmt::save_library()
 {
+  assertm(root_dynht->get_nkmers() > 0, "No k-mers to to save!");
   flatht_sptr_t root_flatht = std::make_shared<FlatHT>(root_dynht);
   root_flatht->save(library_dir, suffix);
   root_flatht->get_tree()->save(library_dir, suffix);
@@ -62,6 +63,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
       dynht->get_record()->insert_density(nd->get_sh(), rs->get_wdensity());
 #pragma omp critical
       {
+        std::cerr << "\33[2K\r" << std::flush;
         std::cerr << "Leaf node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
                   << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
                   << std::flush;
@@ -69,6 +71,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
     } else {
 #pragma omp critical
       {
+        std::cerr << "\33[2K\r" << std::flush;
         std::cerr << "Genome skipped: " << nd->get_name() << "\r" << std::flush;
         build_count++;
       }
@@ -92,6 +95,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
     omp_destroy_lock(&parent_lock);
 #pragma omp critical
     {
+      std::cerr << "\33[2K\r" << std::flush;
       std::cerr << "Internal node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
                 << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
                 << std::flush;

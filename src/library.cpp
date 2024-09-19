@@ -67,7 +67,7 @@ void Library::add_partial_library(std::string suffix)
 #pragma omp critical
   {
     if (frac) {
-      for (uint32_t ix = 0; ix < r; ++ix) {
+      for (uint32_t ix = 0; ix <= r; ++ix) {
         r_to_flatht[ix] = curr_flatht;
       }
     } else {
