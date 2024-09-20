@@ -72,6 +72,7 @@ void Tree::split_nwk(vec<std::string>& n_vec)
 
 void Node::parse(vec<std::string>& n_vec)
 {
+  ldepth = parent ? parent->ldepth + 1 : 0;
   if (tree->atter >= n_vec.size())
     return;
   if (n_vec[tree->atter] != "(") {
@@ -82,10 +83,7 @@ void Node::parse(vec<std::string>& n_vec)
     if (n_vec[tree->atter] == ":") {
       branch_len = std::atof(n_vec[tree->atter + 1].c_str());
       tree->total_len_branch += branch_len;
-      if (parent) {
-        ldepth = parent->ldepth + 1;
-        bdepth = parent->bdepth + branch_len;
-      }
+      bdepth = parent ? parent->bdepth + branch_len : 0;
       tree->atter += 2;
     }
     is_leaf = true;
@@ -129,7 +127,6 @@ void Node::parse(vec<std::string>& n_vec)
   if (n_vec[tree->atter] == ":") {
     branch_len = std::atof(n_vec[tree->atter + 1].c_str());
     tree->total_len_branch += branch_len;
-    ldepth = parent ? parent->ldepth + 1 : 0;
     bdepth = parent ? parent->bdepth + branch_len : 0;
     tree->atter += 2;
   }
@@ -190,13 +187,30 @@ node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
 {
   if (!a || !b) // LCA(x,0) = LCA(0,x) = x
     return a ? a : b;
-  while (a != b) {
-    if (a->ldepth > b->ldepth)
+  while (a->get_name() != b->get_name()) {
+    if (a->ldepth < b->ldepth)
       b = b->parent;
     else
       a = a->parent;
   }
   return a;
+}
+
+double Tree::compute_distance(node_sptr_t a, node_sptr_t b)
+{
+  double distance = 0;
+  if (!a || !b)
+    return std::numeric_limits<double>::max();
+  while (a->get_name() != b->get_name()) {
+    if (a->ldepth < b->ldepth) {
+      distance += b->get_blen();
+      b = b->parent;
+    } else {
+      distance += a->get_blen();
+      a = a->parent;
+    }
+  }
+  return distance;
 }
 
 void Tree::save(std::filesystem::path library_dir, std::string suffix)

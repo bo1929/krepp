@@ -63,18 +63,18 @@ namespace optimize {
 
     double prob_hit(const double d, const uint32_t x)
     {
-      return  rho*prob_collide(x)*prob_mutate(d, x);
+      return rho * prob_collide(x) * prob_mutate(d, x);
     }
 
-    Scalar computeValue(const Vector& d) override { 
+    Scalar computeValue(const Vector& d) override
+    {
       uint32_t uc = nmers;
       double sum = 0;
       for (uint32_t x = 0; x <= hdist_th; ++x) {
         uc -= *(mc_ptr + x);
         sum -= log(prob_hit(d[0], x)) * (*(mc_ptr + x));
       }
-      return sum - log(prob_miss(d[0]))*uc; 
-
+      return sum - log(prob_miss(d[0])) * uc;
     }
 
     Vector computeGradient(const Vector& d) override
@@ -88,7 +88,8 @@ namespace optimize {
       double mg_n = 0;
       for (uint32_t x = 0; x <= k; ++x) {
         if (x <= hdist_th) {
-          mg_n += ((1.0 - prob_collide(x)) * prob_mutate(d[0], x) * (static_cast<double>(x) - k) / (1.0 - d[0]));
+          mg_n += ((1.0 - prob_collide(x)) * prob_mutate(d[0], x) * (static_cast<double>(x) - k) /
+                   (1.0 - d[0]));
           mg_n += ((1.0 - prob_collide(x)) * prob_mutate(d[0], x) * (x) / d[0]);
         } else {
           mg_n += (prob_mutate(d[0], x) * (static_cast<double>(x) - k) / (1.0 - d[0]));
@@ -99,14 +100,14 @@ namespace optimize {
       double mg_d = prob_miss(d[0]);
       Vector grad_v(d.size());
       grad_v[0] = grad - mg_n / mg_d;
-/* #pragma omp critical */
-/*       { */
-/*         std::cout << "d : " << d[0] << std::endl; */
-/*         std::cout << "hllhg : " << grad << std::endl; */
-/*         std::cout << "grad : " << grad - mg_n / mg_d << std::endl; */
-/*         std::cout << "mg_n : " << mg_n << std::endl; */
-/*         std::cout << "mg_d : " << mg_d << std::endl; */
-/*       } */
+      /* #pragma omp critical */
+      /*       { */
+      /*         std::cout << "d : " << d[0] << std::endl; */
+      /*         std::cout << "hllhg : " << grad << std::endl; */
+      /*         std::cout << "grad : " << grad - mg_n / mg_d << std::endl; */
+      /*         std::cout << "mg_n : " << mg_n << std::endl; */
+      /*         std::cout << "mg_d : " << mg_d << std::endl; */
+      /*       } */
       return grad_v;
     }
     void set_mc(uint32_t* curr_mc_ptr) { mc_ptr = curr_mc_ptr; }

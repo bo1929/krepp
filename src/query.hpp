@@ -60,6 +60,8 @@ public:
   void search_batch(uint32_t hdist_th, double min_covpos);
   void print_summary(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
   void place_wrt_closest(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
+  void place_wrt_tau(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
+  double corr_dist_blen(node_sptr_t nd_c, qmers_sptr_t qmers_placement);
   void print_matches(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
   void search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
 

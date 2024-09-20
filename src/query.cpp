@@ -1,4 +1,5 @@
 #include "query.hpp"
+#include "common.hpp"
 #include "hdhistllh.hpp"
 
 QMers::QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th, double min_covpos)
@@ -34,6 +35,7 @@ void QBatch::search_batch(uint32_t hdist_th, double min_covpos)
       print_summary(qmers_or, qmers_rc, bix);
       /* print_matches(qmers_or, qmers_rc, bix); */
       /* place_wrt_closest(qmers_or, qmers_rc, bix); */
+      /* place_wrt_tau(qmers_or, qmers_rc, bix); */
     }
   }
 }
@@ -120,21 +122,101 @@ void Minfo::estimate_distance(optimize::HDistHistLLH& llhfunc)
   d_was = d_was / ddd;
 }
 
-void QBatch::place_wrt_closest(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix)
+void QBatch::place_wrt_tau(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix)
 {
-  node_sptr_t nd_placement = nullptr;
-  double dmin_was = std::numeric_limits<double>::max();
+  double tau_c, tau_p, tau_s;
+  double dmin_llh = std::numeric_limits<double>::max();
+  node_sptr_t nd_c = nullptr, nd_p = nullptr, nd_s = nullptr;
+  qmers_sptr_t qmers_placement = nullptr;
   std::cout << name_batch[bix] << "\t";
   for (auto const& [nd, mi] : qmers_or->node_to_minfo) {
-    if (mi->covpos > qmers_or->min_covpos && mi->d_was < dmin_was) {
-      nd_placement = nd;
-      dmin_was = mi->d_was;
+    if (mi->d_llh < dmin_llh) {
+      nd_c = nd;
+      dmin_llh = mi->d_llh;
+      qmers_placement = qmers_or;
     }
   }
   for (auto const& [nd, mi] : qmers_rc->node_to_minfo) {
-    if (mi->covpos > qmers_or->min_covpos && mi->d_was < dmin_was) {
+    if (mi->d_llh < dmin_llh) {
+      nd_c = nd;
+      dmin_llh = mi->d_llh;
+      qmers_placement = qmers_rc;
+    }
+  }
+  if (!nd_c) {
+    std::cout << "UP\tnan\tnan\n";
+    return;
+  }
+  tau_c = corr_dist_blen(nd_c, qmers_placement);
+  bool changed = false;
+  do {
+    changed = false;
+    nd_p = nd_c->get_parent();
+    for (tuint_t i = 0; i < nd_p->get_nchildren(); ++i) {
+      nd_s = (*std::next(nd_p->get_children(), i));
+      tau_s = corr_dist_blen(nd_s, qmers_placement);
+      if (tau_c < tau_s) {
+        nd_c = nd_s;
+        tau_c = tau_s;
+        changed = true;
+      }
+    }
+    tau_p = corr_dist_blen(nd_p, qmers_placement);
+    if (tau_c < tau_p) {
+      nd_c = nd_p;
+      tau_c = tau_p;
+      changed = true;
+    }
+    for (tuint_t i = 0; i < nd_c->get_nchildren(); ++i) {
+      nd_s = (*std::next(nd_c->get_children(), i));
+      tau_s = corr_dist_blen(nd_s, qmers_placement);
+      if (tau_c < tau_s) {
+        nd_c = nd_s;
+        tau_c = tau_s;
+        changed = true;
+      }
+    }
+  } while (changed);
+  nd_p = nd_c->get_parent();
+  std::cout << nd_p->get_name() << "\t" << dmin_llh << "\t" << tau_c << "\n";
+}
+
+double QBatch::corr_dist_blen(node_sptr_t nd_c, qmers_sptr_t qmers_placement)
+{
+  node_sptr_t nd_p = nd_c->get_parent();
+  double hblen_c = nd_c->get_blen() / 2.0;
+  vec<double> d_llh_v, d_branch_v;
+  d_llh_v.reserve(qmers_placement->node_to_minfo.size());
+  d_branch_v.reserve(qmers_placement->node_to_minfo.size());
+  for (auto const& [nd, mi] : qmers_placement->node_to_minfo) {
+    d_llh_v.push_back(mi->d_llh);
+    if (nd == nd_c) {
+      d_branch_v.push_back(hblen_c);
+    } else {
+      d_branch_v.push_back(Tree::compute_distance(nd, nd_p) + hblen_c);
+    }
+  }
+  double tau = -1;
+  if (d_llh_v.size() > 1)
+    tau = kendalls_tau(d_branch_v, d_llh_v);
+  return tau;
+}
+
+void QBatch::place_wrt_closest(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix)
+{
+  node_sptr_t nd_placement = nullptr;
+  double dmin_llh = std::numeric_limits<double>::max();
+  std::cout << name_batch[bix] << "\t";
+  for (auto const& [nd, mi] : qmers_or->node_to_minfo) {
+    if (mi->covpos > qmers_or->min_covpos && mi->d_llh < dmin_llh) {
       nd_placement = nd;
-      dmin_was = mi->d_was;
+      dmin_llh = mi->d_llh;
+    }
+  }
+  for (auto const& [nd, mi] : qmers_rc->node_to_minfo) {
+    if (mi->covpos > qmers_or->min_covpos && mi->d_llh < dmin_llh) {
+      nd_placement = nd;
+      dmin_llh = mi->d_llh;
     }
   }
   if (nd_placement) {

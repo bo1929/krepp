@@ -17,7 +17,8 @@ public:
   void parse(std::filesystem::path nwk_path);
   void save(std::filesystem::path library_dir, std::string suffix);
   void load(std::filesystem::path library_dir, std::string suffix);
-  static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
+  static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y); // TODO: Fix ldepth.
+  static double compute_distance(node_sptr_t a, node_sptr_t b);
   void set_subtree(node_sptr_t source) { subtree_root = source; }
   tree_sptr_t getptr() { return shared_from_this(); }
   node_sptr_t get_root() { return root; }
@@ -56,7 +57,18 @@ public:
   tuint_t get_nchildren() { return nchildren; }
   node_sptr_t get_parent() { return parent; }
   tree_sptr_t get_tree() { return tree; }
-  float get_bdepth() { return bdepth; }
+  double get_bdepth()
+  {
+    return static_cast<double>(bdepth);
+  } // TODO: Fix variable name. Fix float to double.
+  double get_blen()
+  {
+    return static_cast<double>(branch_len);
+  } // TODO: Fix variable name. Fix float to double.
+  double get_ldepth()
+  {
+    return static_cast<double>(ldepth);
+  } // TODO: Fix variable name. Fix float to double.
   std::string get_name() { return name; }
   tuint_t get_card() { return card; }
   sh_t get_sh() { return sh; }
@@ -75,7 +87,7 @@ private:
   node_sptr_t parent = nullptr;
   tree_sptr_t tree = nullptr;
   float branch_len = 0;
-  float bdepth = 0;
+  float bdepth = 0; // TODO: Fix.
   uint32_t ldepth = 0;
   bool is_leaf = true;
   tuint_t nchildren = 0;

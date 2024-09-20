@@ -17,6 +17,7 @@
 #include <iostream>
 #include <locale>
 #include <map>
+#include <math.h>
 #include <memory>
 #include <numeric>
 #include <ostream>
@@ -29,6 +30,7 @@
 #include <utility>
 #include <vector>
 #include <zlib.h>
+#include <stdio.h>
 
 extern uint32_t num_threads;
 extern std::string leave_out_ref;
@@ -205,5 +207,31 @@ using node_phmap = phmap::node_hash_map<K, V>;
 
 template<class V>
 using flat_phset = phmap::flat_hash_set<V>;
+
+static inline double kendalls_tau(vec<double>& d_branch_v, vec<double>& d_llh_v)
+{
+  uint32_t len;
+  len = d_branch_v.size();
+  assert(len > 1);
+  int i, j;
+  int nC = 0, nD = 0;
+  int n0 = len * (len - 1) / 2;
+  int n1 = 0, n2 = 0;
+  for (i = 0; i < (len - 1); i++) {
+    for (j = i + 1; j < len; j++) {
+      if ((d_branch_v[i] > d_branch_v[j] && d_llh_v[i] > d_llh_v[j]) ||
+          (d_branch_v[i] < d_branch_v[j] && d_llh_v[i] < d_llh_v[j]))
+        ++nC;
+      if ((d_branch_v[i] > d_branch_v[j] && d_llh_v[i] < d_llh_v[j]) ||
+          (d_branch_v[i] < d_branch_v[j] && d_llh_v[i] > d_llh_v[j]))
+        ++nD;
+      if (d_branch_v[i] == d_branch_v[j])
+        ++n1;
+      if (d_llh_v[i] == d_llh_v[j])
+        ++n2;
+    }
+  }
+  return static_cast<double>(nC - nD) / sqrt((n0 - n1) * (n0 - n2));
+}
 
 #endif
