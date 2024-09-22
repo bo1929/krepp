@@ -235,7 +235,7 @@ void DynHT::fill_table(rseq_sptr_t rs)
   while (rs->read_next_seq() && rs->set_curr_seq()) {
     rs->extract_mers(mer_vvec);
   }
-  rs->compute_wdensity();
+  rs->compute_rho();
   // update_nkmers();
   sort_columns();
   make_unique();

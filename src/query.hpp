@@ -19,12 +19,10 @@ struct match_t
 {
   enc_t enc_lr;
   uint32_t pos;
-  uint32_t zc;
   uint32_t hdist;
-  match_t(enc_t enc_lr, uint32_t pos, uint32_t zc, uint32_t hdist)
+  match_t(enc_t enc_lr, uint32_t pos, uint32_t hdist)
     : enc_lr(enc_lr)
     , pos(pos)
-    , zc(zc)
     , hdist(hdist)
   {}
 };
@@ -35,10 +33,10 @@ class QMers : public std::enable_shared_from_this<QMers>
   friend class Minfo;
 
 public:
-  QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th = 3, double min_covpos = 0.5);
-  void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
-  void summarize_mers();
+  QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th = 3, double min_gamma = 0.5);
   qmers_sptr_t getptr() { return shared_from_this(); }
+  void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
+  void summarize_minfo();
 
 private:
   uint32_t k;
@@ -46,7 +44,7 @@ private:
   uint32_t len;
   uint32_t nmers;
   uint32_t hdist_th = 0;
-  double min_covpos = 0.0;
+  double min_gamma = 0.0;
   tree_sptr_t tree = nullptr;
   lshf_sptr_t lshf = nullptr;
   library_sptr_t library = nullptr;
@@ -57,13 +55,9 @@ class QBatch
 {
 public:
   QBatch(library_sptr_t library, qseq_sptr_t qs);
-  void search_batch(uint32_t hdist_th, double min_covpos);
-  void print_summary(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
-  void place_wrt_closest(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
-  void place_wrt_tau(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
-  double corr_dist_blen(node_sptr_t nd_c, qmers_sptr_t qmers_placement);
-  void print_matches(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint64_t bix);
+  void search_batch(uint32_t hdist_th, double min_gamma);
   void search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
+  void add_to_report(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint32_t bix);
 
 private:
   uint32_t k;
@@ -76,52 +70,46 @@ private:
   library_sptr_t library;
   vec<std::string> name_batch;
   vec<std::string> seq_batch;
+  std::string report;
 };
 
 class Minfo
 {
+  friend class QMers;
   friend class QBatch;
 
 public:
-  Minfo(qmers_sptr_t qmers, float rho)
+  Minfo(qmers_sptr_t qmers, double rho)
     : qmers(qmers)
     , rho(rho)
   {
-    homoc_v.resize(qmers->len, 0);
-    subsc_v.resize(qmers->len, 0);
-    obsbp_v.resize(qmers->len, 0);
     hdisthist_v.resize(qmers->hdist_th + 1, 0);
     match_v.clear();
   }
-  void update_match(enc_t enc_lr, uint32_t pos, uint32_t zc, uint32_t curr_hdist)
+  void update_match(enc_t enc_lr, uint32_t pos, uint32_t curr_hdist)
   {
     if (match_v.empty() || ((match_v.back()).pos != pos)) {
-      match_v.emplace_back(enc_lr, pos, zc, curr_hdist);
       match_count++;
+      hdisthist_v[curr_hdist]++;
+      match_v.emplace_back(enc_lr, pos, curr_hdist);
     } else {
       if ((match_v.back()).hdist > curr_hdist) {
+        hdisthist_v[curr_hdist]++;
+        hdisthist_v[(match_v.back()).hdist]--;
         (match_v.back()).enc_lr = enc_lr;
-        (match_v.back()).zc = zc;
         (match_v.back()).hdist = curr_hdist;
       }
     }
   }
   void estimate_distance(optimize::HDistHistLLH& llhfunc);
-  void summarize_matches();
+  void compute_gamma();
 
 private:
-  float rho = 1;
-  double covmer = 0.0;
-  double covpos = 0.0;
+  double rho = 1;
+  double gamma = 0.0;
   uint32_t match_count = 0;
-  double d_was = std::numeric_limits<double>::max();
   double d_llh = std::numeric_limits<double>::max();
-  double avg_hdist = std::numeric_limits<double>::max();
-  uint32_t sup_hdist = std::numeric_limits<uint32_t>::max();
   std::vector<match_t> match_v;
-  std::vector<uint32_t> homoc_v;
-  std::vector<uint32_t> subsc_v;
-  std::vector<uint32_t> obsbp_v;
   std::vector<uint32_t> hdisthist_v;
   qmers_sptr_t qmers = nullptr;
 };

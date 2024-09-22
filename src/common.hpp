@@ -16,7 +16,6 @@
 #include <functional>
 #include <iostream>
 #include <locale>
-#include <map>
 #include <math.h>
 #include <memory>
 #include <numeric>
@@ -200,34 +199,32 @@ template<class K, class V>
 using parallel_flat_phmap = phmap::parallel_flat_hash_map<K, V, EXTRAARGS, std::mutex>;
 
 template<class K, class V>
+using parallel_node_phmap = phmap::parallel_node_hash_map<K, V, EXTRAARGS, std::mutex>;
+
+template<class K, class V>
 using flat_phmap = phmap::flat_hash_map<K, V>;
 
 template<class K, class V>
 using node_phmap = phmap::node_hash_map<K, V>;
 
-template<class V>
-using flat_phset = phmap::flat_hash_set<V>;
-
-static inline double kendalls_tau(vec<double>& d_branch_v, vec<double>& d_llh_v)
+static inline double kendalls_tau(vec<double>& v1, vec<double>& v2)
 {
   uint32_t len;
-  len = d_branch_v.size();
+  len = v1.size();
   assert(len > 1);
-  int i, j;
+  uint32_t i, j;
   int nC = 0, nD = 0;
-  int n0 = len * (len - 1) / 2;
-  int n1 = 0, n2 = 0;
+  uint32_t n1 = 0, n2 = 0;
+  uint32_t n0 = len * (len - 1) / 2;
   for (i = 0; i < (len - 1); i++) {
     for (j = i + 1; j < len; j++) {
-      if ((d_branch_v[i] > d_branch_v[j] && d_llh_v[i] > d_llh_v[j]) ||
-          (d_branch_v[i] < d_branch_v[j] && d_llh_v[i] < d_llh_v[j]))
+      if ((v1[i] > v1[j] && v2[i] > v2[j]) || (v1[i] < v1[j] && v2[i] < v2[j]))
         ++nC;
-      if ((d_branch_v[i] > d_branch_v[j] && d_llh_v[i] < d_llh_v[j]) ||
-          (d_branch_v[i] < d_branch_v[j] && d_llh_v[i] > d_llh_v[j]))
+      if ((v1[i] > v1[j] && v2[i] < v2[j]) || (v1[i] < v1[j] && v2[i] > v2[j]))
         ++nD;
-      if (d_branch_v[i] == d_branch_v[j])
+      if (v1[i] == v1[j])
         ++n1;
-      if (d_llh_v[i] == d_llh_v[j])
+      if (v2[i] == v2[j])
         ++n2;
     }
   }

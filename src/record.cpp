@@ -102,8 +102,7 @@ void Record::union_record(record_sptr_t source)
 {
   // TODO: check conflicts and resolve.
   // TODO: check if either of the records is empty.
-  sh_to_node.insert(source->sh_to_node.begin(),
-                    source->sh_to_node.end()); // TODO: Maybe remove.
+  sh_to_node.insert(source->sh_to_node.begin(), source->sh_to_node.end());
   sh_to_subset.insert(source->sh_to_subset.begin(), source->sh_to_subset.end());
   node_sptr_t root = Tree::compute_lca(tree->get_root(), source->get_tree()->get_root());
   tree = root->get_tree();
@@ -120,7 +119,7 @@ bool Record::check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_
     } else if ((subset->ch == subset1->sh || subset->ch == subset2->sh)) {
       return false;
     } else {
-      return true; // TODO: Check for missing cases?
+      return true;
     }
   } else {
     return false;
@@ -164,10 +163,10 @@ CRecord::CRecord(record_sptr_t record)
   nnodes = record->sh_to_node.size() + 1;
   se_to_pse.resize(nsubsets);
   se_to_node.resize(nnodes);
-  se_to_wdensity.resize(nnodes);
+  se_to_rho.resize(nnodes);
   while (nd_curr = tree->next_post_order()) {
     se_to_node[nd_curr->get_se()] = nd_curr;
-    se_to_wdensity[nd_curr->get_se()] = record->sh_to_wdensity[nd_curr->get_sh()];
+    se_to_rho[nd_curr->get_se()] = record->sh_to_rho[nd_curr->get_sh()];
   }
   tree->reset_traversal();
   for (auto& [sh, subset] : record->sh_to_subset) {
@@ -201,10 +200,10 @@ CRecord::CRecord(tree_sptr_t tree)
   nnodes = tree->get_nnodes() + 1;
   nsubsets = nnodes;
   se_to_node.resize(nnodes);
-  se_to_wdensity.resize(nnodes);
+  se_to_rho.resize(nnodes);
   while (nd_curr = tree->next_post_order()) {
     se_to_node[curr_senum] = nd_curr;
-    se_to_wdensity[curr_senum] = 0;
+    se_to_rho[curr_senum] = 0;
     curr_senum++;
   }
   tree->reset_traversal();
@@ -222,8 +221,8 @@ void CRecord::load(std::filesystem::path library_dir, std::string suffix)
     crecord_stream.read(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
     se_to_pse.resize(nsubsets);
     crecord_stream.read(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
-    se_to_wdensity.resize(nnodes);
-    crecord_stream.read(reinterpret_cast<char*>(se_to_wdensity.data()), sizeof(float) * nnodes);
+    se_to_rho.resize(nnodes);
+    crecord_stream.read(reinterpret_cast<char*>(se_to_rho.data()), sizeof(double) * nnodes);
   }
   if (!crecord_stream.good()) {
     std::cerr << "Reading subset enumerations has failed!" << std::endl;
@@ -238,7 +237,7 @@ void CRecord::save(std::filesystem::path library_dir, std::string suffix)
   crecord_stream.write(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
   crecord_stream.write(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
   crecord_stream.write(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
-  crecord_stream.write(reinterpret_cast<char*>(se_to_wdensity.data()), sizeof(float) * nnodes);
+  crecord_stream.write(reinterpret_cast<char*>(se_to_rho.data()), sizeof(double) * nnodes);
   if (!crecord_stream.good()) {
     std::cerr << "Writing subset enumerations has failed!" << std::endl;
     exit(EXIT_FAILURE);

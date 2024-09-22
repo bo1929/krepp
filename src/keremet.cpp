@@ -60,7 +60,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
     if (name_to_path.find(nd->get_name()) != name_to_path.end()) {
       rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, sh, lshf, name_to_path[nd->get_name()]);
       dynht->fill_table(rs);
-      dynht->get_record()->insert_density(nd->get_sh(), rs->get_wdensity());
+      dynht->get_record()->insert_rho(nd->get_sh(), rs->get_rho());
 #pragma omp critical
       {
         std::cerr << "\33[2K\r" << std::flush;
@@ -199,7 +199,7 @@ void Pkrmt::load_library()
   }
 }
 
-void Pkrmt::place_sequences()
+void Pkrmt::place_sequences() // TODO: Update this.
 {
   /* omp_set_num_threads(num_threads); */
   /* omp_set_nested(1); */
@@ -212,7 +212,7 @@ void Pkrmt::place_sequences()
         QBatch qb(library, qs);
         /* #pragma omp task untied */
         {
-          qb.search_batch(hdist_th, min_covpos);
+          qb.search_batch(hdist_th, min_gamma);
         }
       }
       /* #pragma omp taskwait */
@@ -234,13 +234,12 @@ Pkrmt::Pkrmt(CLI::App& sub_place)
       "-q,--query-file", query_path, "Path to FASTA/FASTQ query file to place on the tree.")
     ->required()
     ->check(CLI::ExistingFile);
-  sub_place.add_option("--hdist-th",
-                       hdist_th,
-                       "The maximum Hamming distance for a k-mer to be considered as a match [5].");
   sub_place.add_option(
-    "--min-covpos",
-    min_covpos,
-    "The minimum coverage of a read for a reference to be considered among the matching taxa [0.5].");
+    "--hdist-th", hdist_th, "The maximum Hamming distance for a k-mer to match [5].");
+  sub_place.add_option(
+    "--min-gamma",
+    min_gamma,
+    "The portion of k-mers/loci we expect to match for a reference to be included. [0.5]."); // TODO: Decide btw k-mers/loci.
   sub_place.add_option(
     "--leave-out-ref",
     leave_out_ref,
@@ -303,7 +302,7 @@ int main(int argc, char** argv)
     std::time_t tend_f = std::chrono::system_clock::to_time_t(tend_c);
     std::cerr << std::ctime(&tend_f);
   }
-  if (sub_place.parsed()) {
+  if (sub_place.parsed()) { // TODO: Update this.
     std::cerr << "Loading the library and the tree..." << std::endl;
     p.load_library();
 

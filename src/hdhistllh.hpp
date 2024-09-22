@@ -1,7 +1,6 @@
 #ifndef _HDHISTLLH_H
 #define _HDHISTLLH_H
 
-#include <cstdint>
 #include <lbfgsb.h>
 
 namespace optimize {
@@ -41,7 +40,7 @@ namespace optimize {
 
     double prob_collide(const uint32_t x)
     {
-      return 1.0 - (1.0 - pow(1.0 - static_cast<float>(x) / static_cast<float>(k), h));
+      return 1.0 - (1.0 - pow(1.0 - static_cast<double>(x) / static_cast<double>(k), h));
     }
 
     double prob_mutate(const double d, const uint32_t x)
@@ -79,11 +78,12 @@ namespace optimize {
 
     Vector computeGradient(const Vector& d) override
     {
+      Vector grad(d.size());
       uint32_t uc = nmers;
-      double grad = 0;
+      grad[0] = 0;
       for (uint32_t x = 0; x <= hdist_th; ++x) {
         uc -= *(mc_ptr + x);
-        grad -= (x / d[0] - (k - x) / (1.0 - d[0])) * (*(mc_ptr + x));
+        grad[0] -= (x / d[0] - (k - x) / (1.0 - d[0])) * (*(mc_ptr + x));
       }
       double mg_n = 0;
       for (uint32_t x = 0; x <= k; ++x) {
@@ -98,49 +98,12 @@ namespace optimize {
       }
       mg_n = rho * uc * mg_n;
       double mg_d = prob_miss(d[0]);
-      Vector grad_v(d.size());
-      grad_v[0] = grad - mg_n / mg_d;
-      /* #pragma omp critical */
-      /*       { */
-      /*         std::cout << "d : " << d[0] << std::endl; */
-      /*         std::cout << "hllhg : " << grad << std::endl; */
-      /*         std::cout << "grad : " << grad - mg_n / mg_d << std::endl; */
-      /*         std::cout << "mg_n : " << mg_n << std::endl; */
-      /*         std::cout << "mg_d : " << mg_d << std::endl; */
-      /*       } */
-      return grad_v;
+      grad[0] = grad[0] - mg_n / mg_d;
+      return grad;
     }
     void set_mc(uint32_t* curr_mc_ptr) { mc_ptr = curr_mc_ptr; }
     void set_ro(double curr_ro) { rho = curr_ro; }
   };
 }
-/* Vector grad(d.size()); */
-/* uint32_t uc = nmers; */
-/* grad[0] = 0; */
-/* for (uint32_t i = 0; i <= hdist_th; ++i) { */
-/*   uc -= *(mc_ptr + i); */
-/*   grad[0] -= (i / d[0] - (k - i) / (1 - d[0])) * (*(mc_ptr + i)); */
-/* } */
-/* // Better modeling of Hamming distance threshold: */
-/* double tmp = 0; */
-/* double f_bth = 0, g_bth = 0; */
-/* for (uint32_t i = 0; i <= hdist_th; ++i) { */
-/*   tmp = pow(d[0], i) * pow(1 - d[0], k - i) * binom_coef_k[i] * (1 - pow(1 - d[0], h)); */
-/*   f_bth += tmp; */
-/*   g_bth += (tmp * i) / d[0] + (tmp * i - tmp * k) / (1 - d[0]); */
-/* } */
-/* double f_ath = 0, g_ath = 0; */
-/* for (uint32_t i = hdist_th + 1; i <= k; ++i) { */
-/*   tmp = pow(d[0], i) * pow(1 - d[0], k - i) * binom_coef_k[i]; */
-/*   f_ath += tmp; */
-/*   g_ath += (tmp * i) / d[0] + (tmp * i - tmp * k) / (1 - d[0]); */
-/* } */
-/* double numer = uc * rho * (g_ath + g_bth); */
-/* double denom = (rho * (f_ath + f_bth) + 1 - rho); */
-/* grad[0] -= numer / denom; */
-/* // Simple likelihood for miss: */
-/* /1* double ps = pow(1 - d[0], h - 1); *1/ */
-/* /1* grad[0] -= (h * uc * rho * ps) / (1 - rho * ps * (1 - d[0])); *1/ */
-/* return grad; */
 
 #endif

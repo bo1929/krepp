@@ -55,7 +55,7 @@ private:
   vvec<mer_t> mer_vvec;
   tree_sptr_t tree = nullptr;
   record_sptr_t record = nullptr;
-  std::map<size_t, uint32_t> size_hist;
+  flat_phmap<size_t, uint32_t> size_hist;
 };
 
 class FlatHT

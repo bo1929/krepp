@@ -23,8 +23,8 @@ public:
   RSeq(uint8_t w, uint32_t r, bool frac, sh_t sh, lshf_sptr_t lshf, std::string input);
   ~RSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
-  float get_wdensity() { return wdensity; }
-  void compute_wdensity() { wdensity = static_cast<float>(wcix) / static_cast<float>(wnix); }
+  double get_rho() { return rho; }
+  void compute_rho() { rho = static_cast<double>(wcix) / static_cast<double>(wnix); }
   bool set_curr_seq()
   {
     name = kseq->name.s;
@@ -56,7 +56,7 @@ private:
   lshf_sptr_t lshf;
   uint64_t mask_bp = 0;
   uint64_t mask_lr = 0;
-  float wdensity = 0;
+  double rho = 0;
   uint64_t wcix = 0;
   uint64_t wnix = 0;
   std::filesystem::path input_path = "";

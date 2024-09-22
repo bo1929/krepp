@@ -66,7 +66,7 @@ public:
   void union_record(record_sptr_t source);
   void decode_sh(sh_t sh, vec<node_sptr_t> subset_v);
   bool check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2);
-  void insert_density(sh_t sh, float wdensity) { sh_to_wdensity[sh] = wdensity; }
+  void insert_rho(sh_t sh, double rho) { sh_to_rho[sh] = rho; }
   record_sptr_t getptr() { return shared_from_this(); }
   se_t map_compact(sh_t sh) { return sh_to_se[sh]; }
   tree_sptr_t get_tree() { return tree; }
@@ -76,7 +76,7 @@ private:
   parallel_flat_phmap<sh_t, se_t> sh_to_se = {};
   parallel_flat_phmap<sh_t, node_sptr_t> sh_to_node = {};
   parallel_flat_phmap<sh_t, subset_sptr_t> sh_to_subset = {};
-  parallel_flat_phmap<sh_t, float> sh_to_wdensity = {};
+  parallel_flat_phmap<sh_t, double> sh_to_rho = {};
 };
 
 class CRecord : public std::enable_shared_from_this<CRecord>
@@ -93,7 +93,7 @@ public:
   node_sptr_t get_node(se_t se) const { return se_to_node[se]; }
   se_t get_nnodes() const { return se_to_node.size(); }
   pse_t get_pse(se_t se) const { return se_to_pse[se]; }
-  float get_wdensity(se_t se) const { return se_to_wdensity[se]; }
+  double get_rho(se_t se) const { return se_to_rho[se]; }
 
 private:
   se_t nnodes = 0;
@@ -101,7 +101,7 @@ private:
   tree_sptr_t tree = nullptr;
   std::vector<pse_t> se_to_pse = {};
   std::vector<node_sptr_t> se_to_node = {};
-  std::vector<float> se_to_wdensity = {};
+  std::vector<double> se_to_rho = {};
 };
 
 #endif

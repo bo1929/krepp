@@ -7,18 +7,19 @@
 class Tree : public std::enable_shared_from_this<Tree>
 {
   friend class Node;
-  // TODO: Make parsing more robust, especially for trees with nodes < 3.
+
 public:
   Tree() {}
   void print_info();
   node_sptr_t next_post_order();
+  void compute_bdepth();
   bool check_compatible(tree_sptr_t tree);
   void split_nwk(vec<std::string>& n_vec);
   void parse(std::filesystem::path nwk_path);
+  static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
+  static double compute_distance(node_sptr_t a, node_sptr_t b);
   void save(std::filesystem::path library_dir, std::string suffix);
   void load(std::filesystem::path library_dir, std::string suffix);
-  static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y); // TODO: Fix ldepth.
-  static double compute_distance(node_sptr_t a, node_sptr_t b);
   void set_subtree(node_sptr_t source) { subtree_root = source; }
   tree_sptr_t getptr() { return shared_from_this(); }
   node_sptr_t get_root() { return root; }
@@ -30,13 +31,13 @@ public:
   }
 
 private:
+  std::string nwk_str;
   tuint_t atter = 0;
   tuint_t nnodes = 0;
-  std::string nwk_str;
+  double total_blen = 0;
   node_sptr_t root = nullptr;
   node_sptr_t curr = nullptr;
   node_sptr_t subtree_root = nullptr;
-  float total_len_branch = 0;
 };
 
 class Node : public std::enable_shared_from_this<Node>
@@ -57,18 +58,9 @@ public:
   tuint_t get_nchildren() { return nchildren; }
   node_sptr_t get_parent() { return parent; }
   tree_sptr_t get_tree() { return tree; }
-  double get_bdepth()
-  {
-    return static_cast<double>(bdepth);
-  } // TODO: Fix variable name. Fix float to double.
-  double get_blen()
-  {
-    return static_cast<double>(branch_len);
-  } // TODO: Fix variable name. Fix float to double.
-  double get_ldepth()
-  {
-    return static_cast<double>(ldepth);
-  } // TODO: Fix variable name. Fix float to double.
+  double get_bdepth() { return bdepth; }
+  double get_blen() { return blen; }
+  double get_ldepth() { return ldepth; }
   std::string get_name() { return name; }
   tuint_t get_card() { return card; }
   sh_t get_sh() { return sh; }
@@ -86,8 +78,8 @@ private:
   std::string name = "";
   node_sptr_t parent = nullptr;
   tree_sptr_t tree = nullptr;
-  float branch_len = 0;
-  float bdepth = 0; // TODO: Fix.
+  double blen = 0;
+  double bdepth = 0;
   uint32_t ldepth = 0;
   bool is_leaf = true;
   tuint_t nchildren = 0;

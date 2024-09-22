@@ -51,11 +51,11 @@ public:
 
 private:
   std::filesystem::path output_dir = "./";
-  std::filesystem::path library_dir;
-  std::filesystem::path query_path;
-  library_sptr_t library = nullptr;
+  double min_gamma = 0.5; // TODO: Perhaps remove this?
   uint32_t hdist_th = 5;
-  double min_covpos = 0.5;
+  library_sptr_t library = nullptr;
+  std::filesystem::path query_path;
+  std::filesystem::path library_dir;
 };
 
 #endif
