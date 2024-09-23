@@ -15,12 +15,14 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <locale>
 #include <math.h>
 #include <memory>
 #include <numeric>
 #include <ostream>
 #include <parallel_hashmap/phmap.h>
+#include <parallel_hashmap/btree.h>
 #include <queue>
 #include <random>
 #include <regex>
@@ -205,12 +207,13 @@ template<class K, class V>
 using flat_phmap = phmap::flat_hash_map<K, V>;
 
 template<class K, class V>
+using btree_phmap = phmap::btree_map<K, V>;
+
+template<class K, class V>
 using node_phmap = phmap::node_hash_map<K, V>;
 
-static inline double kendalls_tau(vec<double>& v1, vec<double>& v2)
+static inline double kendalls_tau(double* v1, double* v2, tuint_t len)
 {
-  uint32_t len;
-  len = v1.size();
   assert(len > 1);
   uint32_t i, j;
   int nC = 0, nD = 0;

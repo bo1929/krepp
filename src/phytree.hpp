@@ -21,6 +21,8 @@ public:
   void save(std::filesystem::path library_dir, std::string suffix);
   void load(std::filesystem::path library_dir, std::string suffix);
   void set_subtree(node_sptr_t source) { subtree_root = source; }
+  node_sptr_t get_node(se_t se) const { return se_to_node[se]; }
+  bool check_node(se_t se) const { return se <= nnodes; }
   tree_sptr_t getptr() { return shared_from_this(); }
   node_sptr_t get_root() { return root; }
   tuint_t get_nnodes() { return nnodes; }
@@ -38,6 +40,7 @@ private:
   node_sptr_t root = nullptr;
   node_sptr_t curr = nullptr;
   node_sptr_t subtree_root = nullptr;
+  std::vector<node_sptr_t> se_to_node = {nullptr};
 };
 
 class Node : public std::enable_shared_from_this<Node>

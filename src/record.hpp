@@ -64,7 +64,7 @@ public:
   void make_compact();
   sh_t add_subset(sh_t sh1, sh_t sh2);
   void union_record(record_sptr_t source);
-  void decode_sh(sh_t sh, vec<node_sptr_t> subset_v);
+  void decode_sh(sh_t sh, vec<node_sptr_t>& subset_v);
   bool check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2);
   void insert_rho(sh_t sh, double rho) { sh_to_rho[sh] = rho; }
   record_sptr_t getptr() { return shared_from_this(); }
@@ -85,13 +85,10 @@ public:
   CRecord(tree_sptr_t tree);
   CRecord(record_sptr_t record);
   void print_info();
-  void decode_se(se_t se, vec<node_sptr_t> subset_v);
+  void decode_se(se_t se, vec<node_sptr_t>& subset_v);
   void load(std::filesystem::path library_dir, std::string suffix);
   void save(std::filesystem::path library_dir, std::string suffix);
   crecord_sptr_t getptr() { return shared_from_this(); }
-  bool check_node(se_t se) const { return se < nnodes; }
-  node_sptr_t get_node(se_t se) const { return se_to_node[se]; }
-  se_t get_nnodes() const { return se_to_node.size(); }
   pse_t get_pse(se_t se) const { return se_to_pse[se]; }
   double get_rho(se_t se) const { return se_to_rho[se]; }
 
@@ -100,7 +97,6 @@ private:
   se_t nsubsets = 0;
   tree_sptr_t tree = nullptr;
   std::vector<pse_t> se_to_pse = {};
-  std::vector<node_sptr_t> se_to_node = {};
   std::vector<double> se_to_rho = {};
 };
 

@@ -5,7 +5,7 @@
 #include "lshf.hpp"
 #include "table.hpp"
 
-#define BATCH_SIZE 262144
+#define BATCH_SIZE 6600
 /* #define CANONICAL */
 
 extern "C"

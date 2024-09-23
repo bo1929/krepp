@@ -56,9 +56,10 @@ class QBatch
 {
 public:
   QBatch(library_sptr_t library, qseq_sptr_t qs);
-  void search_batch(uint32_t hdist_th, double min_gamma);
+  void place_batch(uint32_t hdist_th, double min_gamma);
   void search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
-  void add_to_report(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint32_t bix);
+  node_sptr_t place_wrt_closest(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
+  node_sptr_t place_wrt_tau(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
 
 private:
   uint32_t k;
@@ -71,7 +72,6 @@ private:
   library_sptr_t library;
   vec<std::string> name_batch;
   vec<std::string> seq_batch;
-  std::string report;
 };
 
 class Minfo

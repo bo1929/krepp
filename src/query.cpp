@@ -14,9 +14,8 @@ QMers::QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th, double min
   h = lshf->get_h();
 }
 
-void QBatch::search_batch(uint32_t hdist_th, double min_gamma)
+void QBatch::place_batch(uint32_t hdist_th, double min_gamma)
 {
-#pragma omp parallel for num_threads(num_threads)
   for (uint64_t bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
@@ -29,12 +28,9 @@ void QBatch::search_batch(uint32_t hdist_th, double min_gamma)
     qmers_or->summarize_minfo();
     qmers_rc->summarize_minfo();
 
-#pragma omp critical
-    {
-      add_to_report(qmers_or, qmers_rc, bix);
-    }
+    node_sptr_t nd_placement = place_wrt_tau(qmers_or, qmers_rc);
+    /* nd_placement = place_wrt_closest(qmers_or, qmers_rc); */
   }
-  std::cout << report;
 }
 
 void Minfo::compute_gamma()
@@ -95,36 +91,6 @@ QBatch::QBatch(library_sptr_t library, qseq_sptr_t qs)
   mask_bp = u64m >> ((32 - k) * 2);
 }
 
-void QBatch::add_to_report(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc, uint32_t bix)
-{
-  for (auto const& [nd, mi] : qmers_or->node_to_minfo) {
-    if (mi->gamma > qmers_or->min_gamma &&
-        !(qmers_rc->node_to_minfo.contains(nd) && mi->d_llh > qmers_rc->node_to_minfo[nd]->d_llh)) {
-      report += name_batch[bix] + "\t" + "or" + "\t" + std::to_string(mi->match_count) + "\t" +
-                std::to_string(qmers_or->nmers) + "\t" + std::to_string(mi->rho) + "\t" +
-                nd->get_name() + "\t" + std::to_string(mi->d_llh) + "\t" +
-                std::to_string(mi->gamma);
-      for (uint32_t i = 0; i < mi->hdisthist_v.size(); ++i) {
-        report += "\t" + std::to_string(mi->hdisthist_v[i]);
-      }
-      report += "\n";
-    }
-  }
-  for (auto const& [nd, mi] : qmers_rc->node_to_minfo) {
-    if (mi->gamma > qmers_rc->min_gamma &&
-        !(qmers_or->node_to_minfo.contains(nd) && mi->d_llh > qmers_or->node_to_minfo[nd]->d_llh)) {
-      report += name_batch[bix] + "\t" + "rc" + "\t" + std::to_string(mi->match_count) + "\t" +
-                std::to_string(qmers_or->nmers) + "\t" + std::to_string(mi->rho) + "\t" +
-                nd->get_name() + "\t" + std::to_string(mi->d_llh) + "\t" +
-                std::to_string(mi->gamma);
-      for (uint32_t i = 0; i < mi->hdisthist_v.size(); ++i) {
-        report += "\t" + std::to_string(mi->hdisthist_v[i]);
-      }
-      report += "\n";
-    }
-  }
-}
-
 void QBatch::search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
 {
   uint32_t i, l;
@@ -178,7 +144,7 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
   node_sptr_t nd;
   uint32_t ix;
   uint32_t curr_hdist;
-  std::queue<se_t> subset_q;
+  std::queue<se_t> se_q;
   std::pair<se_t, se_t> pse;
   std::vector<cmer_t>::const_iterator iter1 = library->get_first(rix);
   std::vector<cmer_t>::const_iterator iter2 = library->get_next(rix);
@@ -188,17 +154,17 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
     if (curr_hdist > hdist_th) {
       continue;
     }
-    subset_q.push(iter1->second);
-    while (!subset_q.empty()) {
-      se = subset_q.front();
-      subset_q.pop();
-      if (!crecord->check_node(se)) {
+    se_q.push(iter1->second);
+    while (!se_q.empty()) {
+      se = se_q.front();
+      se_q.pop();
+      if (!tree->check_node(se)) {
         pse = crecord->get_pse(se);
-        subset_q.push(pse.first);
-        subset_q.push(pse.second);
+        se_q.push(pse.first);
+        se_q.push(pse.second);
         continue;
       }
-      nd = crecord->get_node(se);
+      nd = tree->get_node(se);
       if (nd->check_leaf() && (nd->get_name() != leave_out_ref)) { // TODO: Remove testing.
         if (!node_to_minfo.contains(nd)) {
           node_to_minfo[nd] = std::make_unique<Minfo>(getptr(), crecord->get_rho(se));
@@ -206,12 +172,113 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
         node_to_minfo[nd]->update_match(iter1->first, pos, curr_hdist);
       } else { // TODO: This might not be needed.
         for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
-          subset_q.push((*std::next(nd->get_children(), i))->get_se());
+          se_q.push((*std::next(nd->get_children(), i))->get_se());
         }
       }
     }
   }
   nmers++;
+}
+
+node_sptr_t QBatch::place_wrt_closest(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
+{
+  node_sptr_t nd_placement = nullptr;
+  double dmin_llh = std::numeric_limits<double>::max();
+  for (auto const& [nd, mi] : qmers_or->node_to_minfo) {
+    if (mi->gamma > qmers_or->min_gamma && mi->d_llh < dmin_llh) {
+      nd_placement = nd;
+      dmin_llh = mi->d_llh;
+    }
+  }
+  for (auto const& [nd, mi] : qmers_rc->node_to_minfo) {
+    if (mi->gamma > qmers_or->min_gamma && mi->d_llh < dmin_llh) {
+      nd_placement = nd;
+      dmin_llh = mi->d_llh;
+    }
+  }
+  return nd_placement;
+}
+
+node_sptr_t QBatch::place_wrt_tau(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
+{
+  btree_phmap<se_t, double> se_to_dmin;
+  for (auto const& [nd, mi] : qmers_or->node_to_minfo) {
+    if (mi->gamma < qmers_or->min_gamma) {
+      continue;
+    }
+    se_to_dmin[nd->get_se()] = mi->d_llh;
+  }
+  for (auto const& [nd, mi] : qmers_rc->node_to_minfo) {
+    if (mi->gamma < qmers_or->min_gamma) {
+      continue;
+    }
+    if (!(se_to_dmin.contains(nd->get_se()) && se_to_dmin[nd->get_se()] < mi->d_llh)) {
+      se_to_dmin[nd->get_se()] = mi->d_llh;
+    }
+  }
+
+  if (se_to_dmin.size() < 2) {
+    return tree->get_node((se_to_dmin.begin())->first);
+  }
+
+  node_sptr_t subtree_root = Tree::compute_lca(tree->get_node((se_to_dmin.begin())->first),
+                                               tree->get_node((se_to_dmin.end())->first));
+  se_t se_max = subtree_root->get_se();
+  se_t se_min = (se_to_dmin.begin())->first;
+
+  double tau;
+  double blen_curr, blen_ddiff, blen_sdiff;
+  vec<bool> subtree_v(se_max + 1, false);
+  node_sptr_t nd_curr, nd_prev;
+
+  vec<double> dmin_v;
+  vec<double> blen_v;
+  vec<se_t> se_v;
+  dmin_v.reserve(se_to_dmin.size());
+  blen_v.reserve(se_to_dmin.size());
+  se_v.reserve(se_to_dmin.size());
+
+  for (tuint_t se = se_min; se < se_max; ++se) {
+    nd_curr = tree->get_node(se);
+    if (se_to_dmin.contains(se)) {
+      subtree_v[se] = true;
+      subtree_v[nd_curr->get_parent()->get_se()] = true;
+    }
+    if (!subtree_v[se]) {
+      continue;
+    }
+    if (se == se_min) {
+      for (const auto& kv : se_to_dmin) {
+        dmin_v.push_back(kv.second);
+        blen_curr = Tree::compute_distance(tree->get_node(kv.first), nd_curr->get_parent());
+        blen_curr = kv.first == se_min ? blen_curr - nd_curr->get_blen() / 2.0
+                                       : blen_curr + nd_curr->get_blen() / 2.0;
+        blen_v.push_back(blen_curr);
+        se_v.push_back(se);
+      }
+    } else {
+      if (nd_curr == nd_prev->get_parent()) {
+        blen_ddiff = nd_curr->get_blen() / 2.0 + nd_prev->get_blen() / 2.0;
+        blen_sdiff = -blen_ddiff;
+      } else {
+        blen_ddiff = nd_prev->get_blen() / 2.0 - nd_curr->get_blen() / 2.0;
+        blen_sdiff = -nd_prev->get_blen() / 2.0 - nd_curr->get_blen() / 2.0;
+      }
+      for (uint32_t i = 0; i < se_v.size(); ++i) {
+        if (se_v[i] == nd_prev->get_se()) {
+          blen_v[i] -= blen_sdiff;
+        } else {
+          blen_v[i] -= blen_ddiff;
+        }
+      }
+      nd_prev = nd_curr;
+    }
+    tau = kendalls_tau(dmin_v.data(), blen_v.data(), se_v.size());
+  }
+
+  node_sptr_t nd_placement = nullptr;
+
+  return nd_placement;
 }
 
 void optimize::simulate_hdhistllh()
@@ -266,16 +333,6 @@ void optimize::simulate_hdhistllh()
       optimize::State state =
         solver.minimize(llhfunc, optimize::d_init, optimize::d_lb, optimize::d_ub);
       d_llh = (state.x().transpose())(0);
-
-#pragma omp critical
-      {
-        std::cout << k << "\t" << h << "\t" << rho << "\t" << len << "\t" << bix << "\t"
-                  << hdist_curr << "\t" << d_llh;
-        for (int i = 0; i < hdist_th; ++i) {
-          std::cout << "\t" << hdisthist_v[i];
-        }
-        std::cout << std::endl;
-      }
 
       std::fill(subs_v.begin(), subs_v.end(), false);
       std::fill(hdisthist_v.begin(), hdisthist_v.end(), 0);

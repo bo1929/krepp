@@ -201,21 +201,21 @@ void Pkrmt::load_library()
 
 void Pkrmt::place_sequences() // TODO: Update this.
 {
-  /* omp_set_num_threads(num_threads); */
-  /* omp_set_nested(1); */
+  omp_set_num_threads(num_threads);
+  omp_set_nested(1);
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
-  /* #pragma omp parallel shared(qs) */
+#pragma omp parallel shared(qs)
   {
-    /* #pragma omp single */
+#pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         QBatch qb(library, qs);
-        /* #pragma omp task untied */
+#pragma omp task untied
         {
-          qb.search_batch(hdist_th, min_gamma);
+          qb.place_batch(hdist_th, min_gamma);
         }
       }
-      /* #pragma omp taskwait */
+#pragma omp taskwait
     }
   }
 }
@@ -313,7 +313,7 @@ int main(int argc, char** argv)
     p.place_sequences();
   }
   if (sub_simulate.parsed()) {
-    optimize::simulate_hdhistllh();
+    optimize::simulate_hdhistllh(); // TODO: Update this, take parameters as arguments.
   }
 
   return 0;

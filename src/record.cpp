@@ -162,10 +162,8 @@ CRecord::CRecord(record_sptr_t record)
   nsubsets = record->sh_to_se.size() + 1;
   nnodes = record->sh_to_node.size() + 1;
   se_to_pse.resize(nsubsets);
-  se_to_node.resize(nnodes);
   se_to_rho.resize(nnodes);
   while (nd_curr = tree->next_post_order()) {
-    se_to_node[nd_curr->get_se()] = nd_curr;
     se_to_rho[nd_curr->get_se()] = record->sh_to_rho[nd_curr->get_sh()];
   }
   tree->reset_traversal();
@@ -174,15 +172,14 @@ CRecord::CRecord(record_sptr_t record)
       record->sh_to_se[subset->ch], record->sh_to_se[sh - subset->ch - subset->nonce]);
   }
   se_to_pse[0] = std::make_pair(0, 0);
-  se_to_node[0] = nullptr;
 }
 
 void CRecord::print_info()
 {
   std::cout << "Total number of subsets excluding nodes: " << nsubsets << std::endl;
-  std::cout << "Number of nodes: " << se_to_node.size() << std::endl;
+  std::cout << "Number of nodes: " << tree->get_nnodes() << std::endl;
   for (uint32_t se = 1; se < nnodes; ++se) {
-    node_sptr_t nd = se_to_node[se];
+    node_sptr_t nd = tree->get_node(se);
     std::cout << se << ": " << nd->get_name() << "(" << nd->get_card() << ")" << std::endl;
   }
   for (uint32_t se = 1; se < nsubsets; ++se) {
@@ -199,10 +196,8 @@ CRecord::CRecord(tree_sptr_t tree)
   tree->reset_traversal();
   nnodes = tree->get_nnodes() + 1;
   nsubsets = nnodes;
-  se_to_node.resize(nnodes);
   se_to_rho.resize(nnodes);
   while (nd_curr = tree->next_post_order()) {
-    se_to_node[curr_senum] = nd_curr;
     se_to_rho[curr_senum] = 0;
     curr_senum++;
   }
@@ -245,7 +240,7 @@ void CRecord::save(std::filesystem::path library_dir, std::string suffix)
   crecord_stream.close();
 }
 
-void Record::decode_sh(sh_t sh, vec<node_sptr_t> subset_v)
+void Record::decode_sh(sh_t sh, vec<node_sptr_t>& subset_v)
 {
   std::queue<sh_t> qsubset;
   qsubset.push(sh);
@@ -263,7 +258,7 @@ void Record::decode_sh(sh_t sh, vec<node_sptr_t> subset_v)
   }
 }
 
-void CRecord::decode_se(se_t se, vec<node_sptr_t> subset_v)
+void CRecord::decode_se(se_t se, vec<node_sptr_t>& subset_v)
 {
   std::queue<se_t> qsubset;
   qsubset.push(se);
@@ -271,8 +266,8 @@ void CRecord::decode_se(se_t se, vec<node_sptr_t> subset_v)
   while (!qsubset.empty()) {
     se = qsubset.front();
     qsubset.pop();
-    if (se <= se_to_node.size()) {
-      subset_v.push_back(se_to_node[se]);
+    if (tree->get_node(se)) {
+      subset_v.push_back(tree->get_node(se));
     } else {
       pse = se_to_pse[se];
       qsubset.push(pse.first);

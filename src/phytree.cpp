@@ -94,6 +94,7 @@ void Node::parse(vec<std::string>& nd_v)
     }
     tree->nnodes++;
     se = tree->nnodes;
+    tree->se_to_node.push_back(getptr());
     return;
   }
   if (nd_v[tree->atter] == "(") {
@@ -114,6 +115,7 @@ void Node::parse(vec<std::string>& nd_v)
     is_leaf = false;
     tree->nnodes++;
     se = tree->nnodes;
+    tree->se_to_node.push_back(getptr());
   }
   if (nd_v[tree->atter] == ")") {
     tree->atter++;
