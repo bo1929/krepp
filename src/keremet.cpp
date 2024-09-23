@@ -278,6 +278,9 @@ int main(int argc, char** argv)
     *app.add_subcommand("place", "Place given sequences with respect to reference libraries.");
   Pkrmt p(sub_place);
 
+  auto& sub_simulate =
+    *app.add_subcommand("simulate", "Simulate mutations to perfrom maximum likelihood estimation.");
+
   CLI11_PARSE(app, argc, argv);
 
   if (sub_build.parsed()) {
@@ -308,6 +311,9 @@ int main(int argc, char** argv)
 
     std::cerr << "Querying given sequences..." << std::endl;
     p.place_sequences();
+  }
+  if (sub_simulate.parsed()) {
+    optimize::simulate_hdhistllh();
   }
 
   return 0;

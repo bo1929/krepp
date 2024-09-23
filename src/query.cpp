@@ -1,5 +1,4 @@
 #include "query.hpp"
-#include "common.hpp"
 #include "hdhistllh.hpp"
 
 QMers::QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th, double min_gamma)
@@ -213,4 +212,73 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
     }
   }
   nmers++;
+}
+
+void optimize::simulate_hdhistllh()
+{
+  const uint32_t num_replicates = 1000;
+  const uint32_t hdist_th = 4;
+  const double min_gamma = 0.0;
+  const double dist_max = 0.25;
+  const uint32_t len = 150;
+  const double rho = 1.0;
+  const uint32_t k = 29;
+  const uint32_t h = 13;
+  uint32_t hdist_max = (len * dist_max);
+
+#pragma omp parallel for num_threads(num_threads)
+  for (uint32_t hdist_curr = 0; hdist_curr < hdist_max; ++hdist_curr) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::bernoulli_distribution dindexed(rho);
+
+    uint32_t hdist_seq;
+    double d_llh;
+
+    vec<bool> subs_v(len, false);
+    vec<uint32_t> hdisthist_v(hdist_th + 1, 0);
+    vec<uint32_t> pos_v(len);
+    std::iota(std::begin(pos_v), std::end(pos_v), 0);
+
+    optimize::HDistHistLLH llhfunc(h, k, hdist_th, (len - k + 1));
+    for (uint64_t bix = 0; bix < num_replicates; ++bix) {
+      std::random_shuffle(pos_v.begin(), pos_v.end());
+      for (uint32_t pix = 0; pix < hdist_curr; ++pix) {
+        subs_v[pos_v[pix]] = true;
+      }
+
+      for (uint32_t six = 0; six < (len - k + 1); ++six) {
+        hdist_seq = 0;
+        for (uint32_t mix = 0; mix < k; ++mix) {
+          if (subs_v[six + mix]) {
+            hdist_seq++;
+          }
+        }
+        std::bernoulli_distribution dcoll(llhfunc.prob_collide(hdist_seq));
+        if ((hdist_seq <= hdist_th) && dcoll(gen) && dindexed(gen)) {
+          hdisthist_v[hdist_seq]++;
+        }
+      }
+
+      llhfunc.set_mc(hdisthist_v.data());
+      llhfunc.set_ro(rho);
+      optimize::Lbfgsb solver;
+      optimize::State state =
+        solver.minimize(llhfunc, optimize::d_init, optimize::d_lb, optimize::d_ub);
+      d_llh = (state.x().transpose())(0);
+
+#pragma omp critical
+      {
+        std::cout << k << "\t" << h << "\t" << rho << "\t" << len << "\t" << bix << "\t"
+                  << hdist_curr << "\t" << d_llh;
+        for (int i = 0; i < hdist_th; ++i) {
+          std::cout << "\t" << hdisthist_v[i];
+        }
+        std::cout << std::endl;
+      }
+
+      std::fill(subs_v.begin(), subs_v.end(), false);
+      std::fill(hdisthist_v.begin(), hdisthist_v.end(), 0);
+    }
+  }
 }

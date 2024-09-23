@@ -9,6 +9,7 @@
 
 namespace optimize {
   class HDistHistLLH;
+  void simulate_hdhistllh();
 }
 
 class Minfo;
