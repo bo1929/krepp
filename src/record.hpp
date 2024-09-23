@@ -86,8 +86,7 @@ public:
   CRecord(record_sptr_t record);
   ~CRecord(){
     se_to_pse.clear();
-    se_to_node.clear();
-    se_to_wdensity.clear();
+    se_to_rho.clear();
     tree.reset();
   }
   void print_info();
