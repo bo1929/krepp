@@ -67,6 +67,12 @@ public:
   FlatHT(tree_sptr_t tree, crecord_sptr_t crecord)
     : tree(tree)
     , crecord(crecord){};
+  ~FlatHT(){
+    inc_v.clear();
+    cmer_v.clear();
+    crecord.reset();
+    tree.reset();
+  }
   void load(std::filesystem::path library_dir, std::string suffix);
   void save(std::filesystem::path library_dir, std::string suffix);
   void set_crecord(crecord_sptr_t source) { crecord = source; }
