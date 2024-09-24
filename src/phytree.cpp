@@ -249,8 +249,8 @@ void Tree::compute_bdepth()
   while (!nd_q.empty()) {
     nd_curr = nd_q.front();
     nd_q.pop();
-    for (tuint_t i = 0; i < root->get_nchildren(); ++i) {
-      nd_q.push((*std::next(root->get_children(), i)));
+    for (tuint_t i = 0; i < nd_curr->get_nchildren(); ++i) {
+      nd_q.push((*std::next(nd_curr->get_children(), i)));
       (nd_q.front())->bdepth = nd_curr->bdepth + (nd_q.front())->blen;
     }
   }

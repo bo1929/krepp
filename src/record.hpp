@@ -84,7 +84,8 @@ class CRecord : public std::enable_shared_from_this<CRecord>
 public:
   CRecord(tree_sptr_t tree);
   CRecord(record_sptr_t record);
-  ~CRecord(){
+  ~CRecord()
+  {
     se_to_pse.clear();
     se_to_rho.clear();
     tree.reset();

@@ -67,7 +67,8 @@ public:
   FlatHT(tree_sptr_t tree, crecord_sptr_t crecord)
     : tree(tree)
     , crecord(crecord){};
-  ~FlatHT(){
+  ~FlatHT()
+  {
     inc_v.clear();
     cmer_v.clear();
     crecord.reset();
