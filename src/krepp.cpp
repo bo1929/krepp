@@ -1,15 +1,15 @@
-#include "keremet.hpp"
+#include "krepp.hpp"
 
-void Bkrmt::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m); }
+void Bkrepp::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m); }
 
-void Bkrmt::parse_newick_tree()
+void Bkrepp::parse_newick_tree()
 {
   tree = std::make_shared<Tree>();
   tree->parse(nwk_path);
   tree->reset_traversal();
 }
 
-void Bkrmt::read_input_file()
+void Bkrepp::read_input_file()
 {
   std::ifstream input_file(input_path);
   if (!input_file.good()) {
@@ -29,7 +29,7 @@ void Bkrmt::read_input_file()
   input_file.close();
 }
 
-void Bkrmt::build_library()
+void Bkrepp::build_library()
 {
   record_sptr_t record = std::make_shared<Record>(tree);
   root_dynht = std::make_shared<DynHT>(nrows, tree, record);
@@ -44,7 +44,7 @@ void Bkrmt::build_library()
   }
 }
 
-void Bkrmt::save_library()
+void Bkrepp::save_library()
 {
   assertm(root_dynht->get_nkmers() > 0, "No k-mers to to save!");
   flatht_sptr_t root_flatht = std::make_shared<FlatHT>(root_dynht);
@@ -53,7 +53,7 @@ void Bkrmt::save_library()
   root_flatht->get_crecord()->save(library_dir, suffix);
 }
 
-void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
+void Bkrepp::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
 {
   if (nd->check_leaf()) {
     sh_t sh = nd->get_sh();
@@ -103,7 +103,7 @@ void Bkrmt::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
   }
 }
 
-void Bkrmt::save_metadata()
+void Bkrepp::save_metadata()
 {
   std::filesystem::path metadata_path = library_dir / ("metadata" + suffix);
   std::ofstream metadata_stream(metadata_path, std::ofstream::binary);
@@ -123,7 +123,7 @@ void Bkrmt::save_metadata()
   metadata_stream.close();
 }
 
-Bkrmt::Bkrmt(CLI::App& sub_build)
+Bkrepp::Bkrepp(CLI::App& sub_build)
 {
   sub_build
     .add_option(
@@ -169,7 +169,7 @@ Bkrmt::Bkrmt(CLI::App& sub_build)
   });
 }
 
-void Pkrmt::load_library()
+void Qkrepp::load_library()
 {
   node_phmap<std::string, std::set<std::string>> suffix_to_ltype;
   for (const auto& entry : std::filesystem::directory_iterator(library_dir)) {
@@ -199,20 +199,37 @@ void Pkrmt::load_library()
   }
 }
 
-void Pkrmt::place_sequences() // TODO: Update this.
+void Qkrepp::simulate_hdhistllh() // TODO: Update this to take parameters as arguments.
+{
+  const uint32_t num_replicates = 1000;
+  const uint32_t hdist_th = 4;
+  const double min_gamma = 0.0;
+  const double dist_max = 0.25;
+  const uint32_t len = 150;
+  const double rho = 1.0;
+  const uint32_t k = 29;
+  const uint32_t h = 13;
+  uint32_t hdist_max = (len * dist_max);
+#pragma omp parallel for num_threads(num_threads)
+  for (uint32_t hdist_curr = 0; hdist_curr < hdist_max; ++hdist_curr) {
+    optimize::simulate_hdhistllh(k, h, rho, len, hdist_curr, hdist_th, min_gamma, num_replicates);
+  }
+}
+
+void Qkrepp::estimate_distances() // TODO: Benchmark different types of parallelism.
 {
   omp_set_num_threads(num_threads);
-  omp_set_nested(1);
+  /* omp_set_nested(1); */
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
 #pragma omp parallel shared(qs)
   {
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
-        QBatch qb(library, qs);
+        QBatch qb(library, qs, hdist_th, min_gamma);
 #pragma omp task untied
         {
-          qb.place_batch(hdist_th, min_gamma);
+          qb.estimate_distances();
         }
       }
 #pragma omp taskwait
@@ -220,31 +237,50 @@ void Pkrmt::place_sequences() // TODO: Update this.
   }
 }
 
-Pkrmt::Pkrmt(CLI::App& sub_place)
+void Qkrepp::place_sequences() // TODO: Benchmark different types of parallelism.
 {
-  sub_place
+  omp_set_num_threads(num_threads);
+  /* omp_set_nested(1); */
+  qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
+#pragma omp parallel shared(qs)
+  {
+#pragma omp single
+    {
+      while (qs->read_next_batch() || !qs->is_batch_finished()) {
+        QBatch qb(library, qs, hdist_th, min_gamma);
+#pragma omp task untied
+        {
+          qb.place_sequences();
+        }
+      }
+#pragma omp taskwait
+    }
+  }
+}
+
+Qkrepp::Qkrepp(CLI::App& sub_query)
+{
+  sub_query
     .add_option(
       "-l,--library-dir", library_dir, "Path to the directory containing reference library.")
     ->required()
     ->check(CLI::ExistingDirectory);
-  sub_place.add_option(
-    "-o,--output-dir", output_dir, "Path to the directory to output place results [./].");
-  sub_place
-    .add_option(
-      "-q,--query-file", query_path, "Path to FASTA/FASTQ query file to place on the tree.")
+  sub_query.add_option(
+    "-o,--output-dir", output_dir, "Path to the directory to output query results [./].");
+  sub_query.add_option("-q,--query-file", query_path, "Path to FASTA/FASTQ query file to query.")
     ->required()
     ->check(CLI::ExistingFile);
-  sub_place.add_option(
+  sub_query.add_option(
     "--hdist-th", hdist_th, "The maximum Hamming distance for a k-mer to match [5].");
-  sub_place.add_option(
+  sub_query.add_option(
     "--min-gamma",
     min_gamma,
     "The portion of k-mers/loci we expect to match for a reference to be included. [0.5]."); // TODO: Decide btw k-mers/loci.
-  sub_place.add_option(
+  sub_query.add_option(
     "--leave-out-ref",
     leave_out_ref,
-    "The reference taxon to be excluded during the placement, useful for benchmarking and testing.");
-  sub_place.callback([&]() {
+    "The reference taxon to be excluded during query, useful for benchmarking and testing.");
+  sub_query.callback([&]() {
     std::filesystem::create_directory(output_dir);
     library = std::make_shared<Library>(library_dir);
   });
@@ -252,6 +288,7 @@ Pkrmt::Pkrmt(CLI::App& sub_place)
 
 int main(int argc, char** argv)
 {
+  std::ios::sync_with_stdio(false);
   CLI::App app{"Keremet: "
                "a tool for k-mer-based search in large genome collections & "
                "metagenomic analysis!"};
@@ -272,11 +309,15 @@ int main(int argc, char** argv)
 
   auto& sub_build =
     *app.add_subcommand("build", "Builds a library using k-mers of reference genomes.");
-  Bkrmt b(sub_build);
+  Bkrepp b(sub_build);
 
-  auto& sub_place =
-    *app.add_subcommand("place", "Place given sequences with respect to reference libraries.");
-  Pkrmt p(sub_place);
+  auto& sub_place = *app.add_subcommand(
+    "place", "Place given sequences with on the backbone tree using reference k-mers.");
+  Qkrepp qplace(sub_place);
+
+  auto& sub_dist = *app.add_subcommand(
+    "dist", "Estimate distance between query sequences and matching references.");
+  Qkrepp qdist(sub_dist);
 
   auto& sub_simulate =
     *app.add_subcommand("simulate", "Simulate mutations to perfrom maximum likelihood estimation.");
@@ -305,15 +346,20 @@ int main(int argc, char** argv)
     std::time_t tend_f = std::chrono::system_clock::to_time_t(tend_c);
     std::cerr << std::ctime(&tend_f);
   }
-  if (sub_place.parsed()) { // TODO: Update this.
+  if (sub_place.parsed()) {
     std::cerr << "Loading the library and the tree..." << std::endl;
-    p.load_library();
-
-    std::cerr << "Querying given sequences..." << std::endl;
-    p.place_sequences();
+    qplace.load_library();
+    std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
+    qplace.place_sequences();
+  }
+  if (sub_dist.parsed()) {
+    std::cerr << "Loading the library and the tree..." << std::endl;
+    qdist.load_library();
+    std::cerr << "Estimating distances between given sequences and references..." << std::endl;
+    qdist.estimate_distances();
   }
   if (sub_simulate.parsed()) {
-    optimize::simulate_hdhistllh(); // TODO: Update this, take parameters as arguments.
+    Qkrepp::simulate_hdhistllh();
   }
 
   return 0;

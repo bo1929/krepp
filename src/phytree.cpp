@@ -46,28 +46,24 @@ void Tree::parse(std::filesystem::path nwk_path)
 void Tree::split_nwk(vec<std::string>& nd_v)
 {
   int i = 0;
-  int at = 0;
-  char buf[nwk_str.length()];
-  std::memset(buf, 0, nwk_str.length());
+  std::string buf = "";
+  buf.reserve(nd_v.size());
   for (; i < nwk_str.length(); i++) {
     if (nwk_str[i] == '\t' || nwk_str[i] == ' ' || nwk_str[i] == ';')
       continue;
     if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',') {
-      if (strlen(buf) > 0) {
+      if (buf.length() > 0) {
         nd_v.push_back(buf);
-        std::memset(buf, 0, nwk_str.length());
-        at = 0;
+        buf = "";
       }
       nd_v.push_back(std::string() + nwk_str[i]);
       continue;
     } else {
-      buf[at++] = nwk_str[i];
+      buf += nwk_str[i];
     }
   }
-  if (strlen(buf) > 0) {
+  if (buf.length() > 0) {
     nd_v.push_back(buf);
-    std::memset(buf, 0, nwk_str.length());
-    at = 0;
   }
 }
 

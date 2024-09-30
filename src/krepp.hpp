@@ -1,5 +1,5 @@
-#ifndef _KEREMET_H
-#define _KEREMET_H
+#ifndef _KREPP_H
+#define _KREPP_H
 
 #include "common.hpp"
 #include "library.hpp"
@@ -11,10 +11,10 @@
 #include "table.hpp"
 #include <CLI.hpp>
 
-class Bkrmt
+class Bkrepp
 {
 public:
-  Bkrmt(CLI::App& sub_build);
+  Bkrepp(CLI::App& sub_build);
   void set_lshf();
   void save_metadata();
   void read_input_file();
@@ -42,12 +42,14 @@ private:
   parallel_flat_phmap<std::string, std::string> name_to_path;
 };
 
-class Pkrmt
+class Qkrepp
 {
 public:
-  Pkrmt(CLI::App& sub_query);
+  Qkrepp(CLI::App& sub_query);
   void load_library();
   void place_sequences();
+  void estimate_distances();
+  static void simulate_hdhistllh();
 
 private:
   std::filesystem::path output_dir = "./";

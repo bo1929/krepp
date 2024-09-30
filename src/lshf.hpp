@@ -2,7 +2,6 @@
 #define _LSHF_H
 
 #include "common.hpp"
-#include <cstdint>
 
 class LSHF
 {

@@ -2,20 +2,20 @@
 #--------------------------------------------
 COMPILER = g++
 LDLIBS = -lstdc++fs -lm -lz -lstdc++ -lcurl
-INC = -Iexternal/CLI11/include/CLI -Iexternal/eigen-3.4.0 \
-			-Iexternal/l-bfgs-b/include -Iexternal/parallel-hashmap
+INC = -Iexternal/CLI11/include/CLI \
+			-Iexternal/parallel-hashmap -Iexternal/boost/libs/math/include
 CXXFLAGS = -std=c++17 -O3 -g -fopenmp
 WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 
 # project files
 #--------------------------------------------
-PROGRAM = keremet
+PROGRAM = krepp
 OBJECTS = build/common.o \
 					build/MurmurHash3.o \
 					build/lshf.o \
 					build/library.o build/query.o build/rqseq.o \
 					build/record.o build/phytree.o build/table.o \
-					build/keremet.o
+					build/krepp.o
 
 # rules
 #--------------------------------------------

@@ -122,7 +122,7 @@ QSeq::~QSeq()
 void QSeq::clear_curr_batch()
 {
   seq_batch.clear();
-  name_batch.clear();
+  identifer_batch.clear();
 }
 
 QSeq::QSeq(std::filesystem::path input_path)
@@ -140,14 +140,14 @@ QSeq::QSeq(std::filesystem::path input_path)
 bool QSeq::read_next_batch()
 {
   seq_batch.clear();
-  name_batch.clear();
+  identifer_batch.clear();
   seq_batch.reserve(BATCH_SIZE);
-  name_batch.reserve(BATCH_SIZE);
+  identifer_batch.reserve(BATCH_SIZE);
   bool cont_reading = false;
   uint64_t ix = 0;
   while ((cont_reading = kseq_read(kseq) >= 0) && ix < BATCH_SIZE) {
     seq_batch.emplace_back(kseq->seq.s);
-    name_batch.emplace_back(kseq->name.s);
+    identifer_batch.emplace_back(kseq->name.s);
     ix++;
   }
   batch_size = ix;
@@ -156,6 +156,6 @@ bool QSeq::read_next_batch()
 
 bool QSeq::is_batch_finished()
 {
-  assert(seq_batch.size() == name_batch.size());
-  return seq_batch.empty() && name_batch.empty();
+  assert(seq_batch.size() == identifer_batch.size());
+  return seq_batch.empty() && identifer_batch.empty();
 }

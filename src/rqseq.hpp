@@ -5,7 +5,7 @@
 #include "lshf.hpp"
 #include "table.hpp"
 
-#define BATCH_SIZE 6600
+#define BATCH_SIZE 4096 // TODO: Try to optimize this or make it a function of input size.
 /* #define CANONICAL */
 
 extern "C"
@@ -80,7 +80,7 @@ private:
   kseq_t* kseq;
   uint64_t batch_size;
   vec<std::string> seq_batch;
-  vec<std::string> name_batch;
+  vec<std::string> identifer_batch;
   std::filesystem::path input_path;
 };
 
