@@ -28,6 +28,7 @@ void QBatch::estimate_distances()
     summarize_minfo(qmers_or, qmers_rc);
     report_distances(batch_report, qmers_or, qmers_rc);
   }
+#pragma omp critical
   std::cout << batch_report.rdbuf();
 }
 
@@ -47,6 +48,7 @@ void QBatch::place_sequences()
     /* node_sptr_t nd_placement = place_wrt_tau(qmers_or, qmers_rc); */
     /* node_sptr_t nd_placement = place_wrt_closest(qmers_or, qmers_rc); */
   }
+#pragma omp critical
   std::cout << batch_report.rdbuf();
 }
 

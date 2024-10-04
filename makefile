@@ -4,7 +4,7 @@ COMPILER = g++
 LDLIBS = -lstdc++fs -lm -lz -lstdc++ -lcurl
 INC = -Iexternal/CLI11/include/CLI \
 			-Iexternal/parallel-hashmap -Iexternal/boost/libs/math/include
-CXXFLAGS = -std=c++17 -O3 -g -fopenmp
+CXXFLAGS = -std=c++17 -O3 -g -fopenmp -funroll-loops
 WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 
 # project files
