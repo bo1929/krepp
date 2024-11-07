@@ -29,7 +29,7 @@ Once  you have the index built, query reads against it to get distance estimates
 ```bash
 krepp dist -l $LIBRARY_DIR -q $QUERY_PATH
 ```
-where `-q` is the path of a FASTA/Q file containing query reads, and `krepp` simply outputs everything to stdout and write log messages to stderr. The output is in a tab-separated format in which the first column stands for the read ID, second column is the ID of the reference matching, and the third column is the distance estimate of krepp.
+where `-q` is the path of a FASTA/Q file containing query reads, and `krepp` simply outputs everything to stdout and writes log messages to stderr. The output is in a tab-separated format in which the first column stands for the read ID, second column is the ID of the reference matching, and the third column is the distance estimate of krepp.
 
 ### Phylogenetic placement of reads on the backbone tree
 In addition to distance estimation, one could place reads on the backbone tree given as an input while building the index
