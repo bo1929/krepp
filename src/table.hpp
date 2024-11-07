@@ -55,7 +55,7 @@ private:
   vvec<mer_t> mer_vvec;
   tree_sptr_t tree = nullptr;
   record_sptr_t record = nullptr;
-  flat_phmap<size_t, uint32_t> size_hist;
+  flat_phmap<uint64_t, uint32_t> size_hist;
 };
 
 class FlatHT
@@ -87,6 +87,7 @@ public:
   {
     return std::next(cmer_v.begin(), inc_v[rix]);
   }
+  void display_info(uint32_t r);
 
 private:
   uint32_t nrows = 0;

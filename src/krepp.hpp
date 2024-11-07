@@ -26,7 +26,7 @@ public:
 private:
   uint8_t k = 29;
   uint8_t w = k + 3;
-  uint8_t h = 13;
+  uint8_t h = 14;
   uint32_t m = 2;
   uint32_t r = 1;
   bool frac = false;
@@ -42,22 +42,34 @@ private:
   parallel_flat_phmap<std::string, std::string> name_to_path;
 };
 
-class Qkrepp
+class WLkrepp
+{
+public:
+  void load_library();
+
+protected:
+  library_sptr_t library = nullptr;
+  std::filesystem::path library_dir;
+};
+
+class Qkrepp : public WLkrepp
 {
 public:
   Qkrepp(CLI::App& sub_query);
-  void load_library();
   void place_sequences();
   void estimate_distances();
-  static void simulate_hdhistllh();
 
 private:
-  std::filesystem::path output_dir = "./";
-  double min_gamma = 0.5; // TODO: Perhaps remove this?
-  uint32_t hdist_th = 5;
-  library_sptr_t library = nullptr;
+  /* std::filesystem::path output_dir = "./"; */
+  uint32_t hdist_th = 4;
   std::filesystem::path query_path;
-  std::filesystem::path library_dir;
+};
+
+class Ikrepp : public WLkrepp
+{
+public:
+  Ikrepp(CLI::App& sub_query);
+  void display_info();
 };
 
 #endif

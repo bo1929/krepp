@@ -12,12 +12,13 @@ public:
   Tree() {}
   void print_info();
   node_sptr_t next_post_order();
+  node_sptr_t next_post_order(node_sptr_t nd_curr);
   void compute_bdepth();
   bool check_compatible(tree_sptr_t tree);
   void split_nwk(vec<std::string>& n_vec);
   void parse(std::filesystem::path nwk_path);
-  static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
   static double compute_distance(node_sptr_t a, node_sptr_t b);
+  static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
   void save(std::filesystem::path library_dir, std::string suffix);
   void load(std::filesystem::path library_dir, std::string suffix);
   void set_subtree(node_sptr_t source) { subtree_root = source; }

@@ -240,3 +240,13 @@ void DynHT::fill_table(rseq_sptr_t rs)
   sort_columns();
   make_unique();
 }
+
+void FlatHT::display_info(uint32_t r)
+{
+  vec<uint64_t> se_to_count;
+  se_to_count.resize(crecord->get_nsubsets());
+  for (uint64_t ix = 0; ix < nkmers; ++ix) {
+    se_to_count[cmer_v[ix].second]++;
+  }
+  crecord->display_info(r, se_to_count);
+}

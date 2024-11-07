@@ -275,3 +275,28 @@ void CRecord::decode_se(se_t se, vec<node_sptr_t>& subset_v)
     }
   }
 }
+
+void CRecord::display_info(uint32_t r, vec<uint64_t>& se_to_count)
+{
+  std::cout << r << "\t#NODES\t" << nnodes << std::endl;
+  std::cout << r << "\t#COLORS\t" << nsubsets << std::endl;
+  vec<uint64_t> se_to_outdegree(se_to_pse.size());
+  for (int ix = 1; ix < se_to_pse.size(); ++ix) {
+    se_to_outdegree[se_to_pse[ix].first]++;
+    se_to_outdegree[se_to_pse[ix].second]++;
+  }
+  flat_phmap<uint64_t, uint32_t> outdegree_hist;
+  for (uint64_t ix = 1; ix < se_to_outdegree.size(); ++ix) {
+    outdegree_hist[se_to_outdegree[ix]]++;
+  }
+  flat_phmap<uint64_t, uint32_t> count_hist;
+  for (uint64_t ix = 1; ix < se_to_pse.size(); ++ix) {
+    count_hist[se_to_count[ix]]++;
+  }
+  for (auto const& [key, val] : count_hist) {
+    std::cout << r << "\t#COLOR_COUNT" << key << "\t" << val << std::endl;
+  }
+  for (auto const& [key, val] : outdegree_hist) {
+    std::cout << r << "\t#COLOR_OUTDEGREE\t" << key << "\t" << val << std::endl;
+  }
+}

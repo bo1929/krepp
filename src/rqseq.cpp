@@ -145,7 +145,7 @@ bool QSeq::read_next_batch()
   identifer_batch.reserve(BATCH_SIZE);
   bool cont_reading = false;
   uint64_t ix = 0;
-  while ((cont_reading = kseq_read(kseq) >= 0) && ix < BATCH_SIZE) {
+  while ((ix < BATCH_SIZE) && (cont_reading = kseq_read(kseq) >= 0)) {
     seq_batch.emplace_back(kseq->seq.s);
     identifer_batch.emplace_back(kseq->name.s);
     ix++;

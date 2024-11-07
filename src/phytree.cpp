@@ -39,6 +39,7 @@ void Tree::parse(std::filesystem::path nwk_path)
   split_nwk(nd_v);
   root = std::make_shared<Node>(getptr());
   root->parse(nd_v);
+  se_to_node.push_back(root);
   subtree_root = root;
   compute_bdepth();
 }
@@ -139,38 +140,44 @@ void Node::print_info()
   std::cout << name << "\t" << sh << "\t" << blen << "\t" << pname << std::endl;
 }
 
-node_sptr_t Tree::next_post_order()
+node_sptr_t Tree::next_post_order(node_sptr_t nd_curr)
 {
-  if (curr == subtree_root)
+  if (nd_curr == subtree_root)
     return nullptr;
-  if (!curr) {
-    curr = subtree_root;
-    while (!curr->is_leaf)
-      curr = curr->children.front();
-    return curr;
+  if (!nd_curr) {
+    nd_curr = subtree_root;
+    while (!nd_curr->is_leaf)
+      nd_curr = nd_curr->children.front();
+    return nd_curr;
   } else {
-    if (curr->is_leaf) {
-      if (curr == curr->parent->children.back()) {
-        curr = curr->parent;
-        return curr;
+    if (nd_curr->is_leaf) {
+      if (nd_curr == nd_curr->parent->children.back()) {
+        nd_curr = nd_curr->parent;
+        return nd_curr;
       } else {
-        curr = curr->parent->children[curr->ix_child + 1];
-        while (!curr->is_leaf)
-          curr = curr->children.front();
-        return curr;
+        nd_curr = nd_curr->parent->children[nd_curr->ix_child + 1];
+        while (!nd_curr->is_leaf)
+          nd_curr = nd_curr->children.front();
+        return nd_curr;
       }
     } else {
-      if (curr == curr->parent->children.back()) {
-        curr = curr->parent;
-        return curr;
+      if (nd_curr == nd_curr->parent->children.back()) {
+        nd_curr = nd_curr->parent;
+        return nd_curr;
       } else {
-        curr = curr->parent->children[curr->ix_child + 1];
-        while (!curr->is_leaf)
-          curr = curr->children.front();
-        return curr;
+        nd_curr = nd_curr->parent->children[nd_curr->ix_child + 1];
+        while (!nd_curr->is_leaf)
+          nd_curr = nd_curr->children.front();
+        return nd_curr;
       }
     }
   }
+}
+
+node_sptr_t Tree::next_post_order()
+{
+  curr = next_post_order(curr);
+  return curr;
 }
 
 void Tree::print_info()

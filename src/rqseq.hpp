@@ -5,7 +5,7 @@
 #include "lshf.hpp"
 #include "table.hpp"
 
-#define BATCH_SIZE 4096 // TODO: Try to optimize this or make it a function of input size.
+#define BATCH_SIZE 512 // TODO: Try to optimize this or make it a function of input size.
 /* #define CANONICAL */
 
 extern "C"

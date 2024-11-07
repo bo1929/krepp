@@ -1,12 +1,12 @@
 #ifndef _RECORD_H
 #define _RECORD_H
 
-#define MMHSEED1 1
-#define MMHSEED0 0
-
 #include "MurmurHash3.hpp"
 #include "common.hpp"
 #include "phytree.hpp"
+
+#define MMHSEED1 1
+#define MMHSEED0 0
 
 class Subset : public std::enable_shared_from_this<Subset>
 {
@@ -70,6 +70,7 @@ public:
   record_sptr_t getptr() { return shared_from_this(); }
   se_t map_compact(sh_t sh) { return sh_to_se[sh]; }
   tree_sptr_t get_tree() { return tree; }
+  uint64_t get_size() { return sh_to_subset.size(); }
 
 private:
   tree_sptr_t tree = nullptr;
@@ -97,6 +98,8 @@ public:
   crecord_sptr_t getptr() { return shared_from_this(); }
   pse_t get_pse(se_t se) const { return se_to_pse[se]; }
   double get_rho(se_t se) const { return se_to_rho[se]; }
+  se_t get_nsubsets() { return nsubsets; }
+  void display_info(uint32_t r, vec<uint64_t>& se_to_count);
 
 private:
   se_t nnodes = 0;

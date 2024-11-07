@@ -1,23 +1,16 @@
 #ifndef _HDHISTLLH_H
 #define _HDHISTLLH_H
 
-/* #include <lbfgsb.h> */
-
 namespace optimize {
-  // For l-bfgs-b:
-  /* const Vector d_init{{0.01}};             // Initial guess */
-  /* const Vector d_lb{{0.0000000000000001}}; // Lower bounds on d_llh */
-  /* const Vector d_ub{{0.5}};                // Upper bounds on d_llh */
-
-  class HDistHistLLH // : public Function
+  class HDistHistLLH
   {
   private:
     uint32_t hdist_th;
-    uint32_t nmers;
     uint32_t k;
     uint32_t h;
     double rho = 1;
-    uint32_t* mc_ptr = nullptr;
+    double uc;
+    double* mc_ptr = nullptr;
     std::vector<uint64_t> binom_coef_k;
     std::vector<double> prob_elude_v;
 
@@ -79,20 +72,17 @@ namespace optimize {
 
     /* Scalar computeValue(const Vector& d) override */
     /* { */
-    /*   uint32_t uc = nmers; */
     /*   double sum = 0; */
     /*   for (uint32_t x = 0; x <= hdist_th; ++x) { */
     /*     // sum -= (log(rho) + log(prob_collide(x)) + log(prob_mutate(d, x))) * (*(mc_ptr + x)); */
     /*     // sum -= log(prob_hit(d, x)) * (*(mc_ptr + x)); */
     /*     sum -= ((k - x) * log(1.0 - d[0]) + x * log(d[0])) * (*(mc_ptr + x)); */
-    /*     uc -= *(mc_ptr + x); */
     /*   } */
     /*   return sum - log(prob_miss(d[0])) * uc; */
     /* } */
 
     double operator()(double const& d)
     {
-      uint32_t uc = nmers;
       double sum = 0.0, lv_m = 0.0;
       double powdc = pow((1.0 - d), k);
       double logdn = log(1.0 - d);
@@ -101,7 +91,6 @@ namespace optimize {
       double dratio = d / (1.0 - d);
       for (uint32_t x = 0; x <= k; ++x) {
         if (x <= hdist_th) {
-          uc -= *(mc_ptr + x);
           sum -= (logdn + x * logdp) * (*(mc_ptr + x));
           lv_m += prob_elude_v[x] * (powdc * binom_coef_k[x]);
         } else {
@@ -116,7 +105,6 @@ namespace optimize {
     /* { */
     /*   Vector grad(d.size()); */
     /*   grad[0] = 0; */
-    /*   uint32_t uc = nmers; */
     /*   double mg_n = 0, mg_d = 0; */
     /*   double prob_dxc, prob_dxm, dhitx; */
     /*   for (uint32_t x = 0; x <= k; ++x) { */
@@ -124,7 +112,6 @@ namespace optimize {
     /*     prob_dxm = prob_mutate(d[0], x); */
     /*     prob_dxc = prob_dxm * dhitx; */
     /*     if (x <= hdist_th) { */
-    /*       uc -= *(mc_ptr + x); */
     /*       grad[0] -= dhitx * (*(mc_ptr + x)); */
     /*       mg_n += prob_elude_v[x] * prob_dxc; */
     /*       mg_d += prob_elude_v[x] * prob_dxm; */
@@ -142,7 +129,6 @@ namespace optimize {
     /* double operator()(double const& d) */
     /* { */
     /*   double grad = 0; */
-    /*   uint32_t uc = nmers; */
     /*   double mg_n = 0, mg_d = 0; */
     /*   double prob_dxc, prob_dxm, dhitx; */
     /*   for (uint32_t x = 0; x <= k; ++x) { */
@@ -150,7 +136,6 @@ namespace optimize {
     /*     prob_dxm = prob_mutate(d, x); */
     /*     prob_dxc = prob_dxm * dhitx; */
     /*     if (x <= hdist_th) { */
-    /*       uc -= *(mc_ptr + x); */
     /*       grad -= dhitx * (*(mc_ptr + x)); */
     /*       mg_n += prob_elude_v[x] * prob_dxc; */
     /*       mg_d += prob_elude_v[x] * prob_dxm; */
@@ -165,11 +150,12 @@ namespace optimize {
     /*   return grad; */
     /* } */
 
-    void set_mc(uint32_t* curr_mc_ptr) { mc_ptr = curr_mc_ptr; }
-
-    void set_nmers(uint32_t curr_nmers) { nmers = curr_nmers; }
-
-    void set_ro(double curr_ro) { rho = curr_ro; }
+    void set_parameters(double* curr_mc_ptr, double curr_uc, double curr_rho)
+    {
+      mc_ptr = curr_mc_ptr;
+      uc = curr_uc;
+      rho = curr_rho;
+    }
   };
 }
 

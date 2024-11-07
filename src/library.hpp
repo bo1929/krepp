@@ -7,7 +7,7 @@
 #include "record.hpp"
 #include "table.hpp"
 
-class Library
+class Library // TODO: Rename everything library to index.
 {
 public:
   Library(std::filesystem::path library_dir)
@@ -20,6 +20,12 @@ public:
   flatht_sptr_t get_flatht_sptr(uint32_t rix) { return r_to_flatht[rix % m]; };
   lshf_sptr_t get_lshf() { return lshf; }
   tree_sptr_t get_tree() { return tree; }
+  void display_info()
+  {
+    for (auto const& [key, val] : r_to_flatht) {
+      val->display_info(key);
+    }
+  }
 
 private:
   uint8_t k;
