@@ -24,18 +24,17 @@ where
 Run `krepp build --help` to see more options.
 If you don't have a tree and mostly interested in estimating distances, an arbitrary (or random) tree might just work as a workaround (with the side effect of making the color index potentially a little larger).
 
-
 ### Estimating distances of reads to reference genomes
 Once  you have the index built, query reads against it to get distance estimates is quite simple:
 ```bash
-krepp dist -l $LIBRARY_DIR -o $OUTPUT_DIR -q $QUERY_PATH
+krepp dist -l $LIBRARY_DIR -q $QUERY_PATH
 ```
-where `-q` is the path of a FASTA/Q file containing query reads, and `-o` is simply the output directory (current working directory by default). The output is a tab-separated file in which the first column stands for the read ID, second column is the ID of the reference matching, and the third column is the distance estimate of krepp.
+where `-q` is the path of a FASTA/Q file containing query reads, and `krepp` simply outputs everything to stdout and write log messages to stderr. The output is in a tab-separated format in which the first column stands for the read ID, second column is the ID of the reference matching, and the third column is the distance estimate of krepp.
 
 ### Phylogenetic placement of reads on the backbone tree
 In addition to distance estimation, one could place reads on the backbone tree given as an input while building the index
 ```bash
-krepp place -l $LIBRARY_DIR -o $OUTPUT_DIR -q $QUERY_PATH
+krepp place -l $LIBRARY_DIR -q $QUERY_PATH
 ```
-where output is again a tab-separated file.
-We will make the standard placement format `jplace` available very soon with the initial release.
+where output is again in a tab-separated format and each row corresponds to a read.
+We will make the standard placement format `jplace` available very soon with the next release.
