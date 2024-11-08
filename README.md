@@ -1,7 +1,7 @@
 # krepp
 A k-mer-based maximum likelihood method for estimating distances of reads to genomes and phylogenetic placement.
 
-## Quickstart
+## Quick start
 ### Installing and compiling krepp from source
 Pre-compiled binaries are not available yet, but hopefully will be soon.
 
@@ -10,7 +10,7 @@ To compile from source, simply clone the repository with its submodules and comp
 git clone --recurse-submodules -j8 https://github.com/bo1929/krepp.git
 cd krepp && make
 ```
-and run `./krepp --help`. Then perhaps, copy it to a directory you have in your `$PATH` (e.g., `cp ./krepp ~/.local/bin`).
+and run `./krepp --help`. Then, perhaps, copy it to a directory you have in your `$PATH` (e.g., `cp ./krepp ~/.local/bin`).
 
 ### Building a krepp index from reference genomes
 Given a set of reference genomes and a backbone tree, krepp can build an LSH index of colored k-mers by simply running
@@ -29,7 +29,7 @@ If you don't have a tree and if you are mainly interested in estimating distance
 Instead of building an index from scratch, you could use one of the public ones.
 Currently, there are only three such indexes available for microbial and archaeal genomes.
 Note that smaller indexes were built using a reference subset of the larger one.
-Therefore, these indexes overlap and you could just pick the one that you can afford memory-wise.
+Therefore, these indexes overlap, and you could just pick the one that you can afford memory-wise.
 
 * Web of Life - v2: [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv2-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv2.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv2.tsv.gz)
 * Web of Life - v1: [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
@@ -49,7 +49,7 @@ Once you have the index built, query reads against it to get distance estimates 
 krepp --num-threads $NUM_THREADS dist -l $INDEX_DIR -q $QUERY_PATH
 ```
 where `-q` is the path of a FASTA/Q file containing query reads, and `krepp` simply outputs everything to stdout and writes log messages to stderr.
-The output is in a tab-separated format in which the first column stands for the read ID, second column is the ID of the reference matching, and the third column is the distance estimate of krepp.
+The output is in a tab-separated format in which the first column stands for the read ID, the second column is the ID of the reference matching, and the third column is the distance estimate of krepp.
 
 ### Phylogenetic placement of reads on the backbone tree
 In addition to distance estimation, one could place reads on the backbone tree given as an input while building the index
@@ -68,7 +68,7 @@ cd test/
 tar -xvf references_toy.tar.gz && xz -d references_toy/*
 ../krepp --num-threads 8 build -h 11 -k 27 -w 35 -l index_toy -i input_map.tsv -t tree_toy.nwk
 ```
-This command took less than 10 seconds and used 1.5GB memory for 6,975,500 indexed *k*-mers on machine with Intel Xeon Silver 4110 CPUs.
+This command took less than 10 seconds and used 1.5GB memory for 6,975,500 indexed *k*-mers on a machine with Intel Xeon Silver 4110 CPUs.
 The resulting index will be stored in `index_toy`.
 Alternatively, you could download one of the larger public libraries to make it more realistic and use it also for your novel query sequences.
 
