@@ -32,7 +32,7 @@ Note that smaller indexes were built using a reference subset of the larger one.
 Therefore, these indexes overlap, and you could just pick the one that you can afford memory-wise.
 
 * Web of Life - v2 (15,493 archaeal and bacterial genomes): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv2-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv2.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv2.tsv.gz)
-* Web of Life - v1 (10,576 archaeal and bacterial genomes): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
+* Web of Life - v1 (10,576 archaeal and bacterial genomes): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
 
 Only the index is required to query novel sequences, but genome IDs are not informative.
 You can use provided metadata to further analyze the distance estimates for taxonomic classification or abundance profiling.
