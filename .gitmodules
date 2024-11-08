@@ -1,21 +1,9 @@
-[submodule "external/eigen"]
-	path = external/eigen
-	url = https://gitlab.com/libeigen/eigen.git
 [submodule "external/parallel-hashmap"]
 	path = external/parallel-hashmap
 	url = https://github.com/greg7mdp/parallel-hashmap.git
 [submodule "external/CLI11"]
 	path = external/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
-[submodule "CLI11"]
-	path = CLI11
-	url = https://github.com/CLIUtils/CLI11.git
-[submodule "external/--force"]
-	path = external/--force
-	url = https://github.com/CLIUtils/CLI11.git
 [submodule "external/boost"]
 	path = external/boost
 	url = https://github.com/boostorg/boost
-[submodule "external/vectorclass"]
-	path = external/vectorclass
-	url = https://github.com/vectorclass/version2.git
