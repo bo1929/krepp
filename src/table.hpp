@@ -74,8 +74,8 @@ public:
     crecord.reset();
     tree.reset();
   }
-  void load(std::filesystem::path library_dir, std::string suffix);
-  void save(std::filesystem::path library_dir, std::string suffix);
+  void load(std::filesystem::path index_dir, std::string suffix);
+  void save(std::filesystem::path index_dir, std::string suffix);
   void set_crecord(crecord_sptr_t source) { crecord = source; }
   void set_tree(tree_sptr_t source) { tree = source; }
   tree_sptr_t get_tree() { return tree; }

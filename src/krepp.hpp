@@ -2,7 +2,7 @@
 #define _KREPP_H
 
 #include "common.hpp"
-#include "library.hpp"
+#include "index.hpp"
 #include "lshf.hpp"
 #include "phytree.hpp"
 #include "query.hpp"
@@ -19,8 +19,8 @@ public:
   void save_metadata();
   void read_input_file();
   void parse_newick_tree();
-  void save_library();
-  void build_library();
+  void save_index();
+  void build_index();
   void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht);
 
 private:
@@ -38,28 +38,29 @@ private:
   std::string suffix;
   std::filesystem::path nwk_path;
   std::filesystem::path input_path;
-  std::filesystem::path library_dir;
+  std::filesystem::path index_dir;
   parallel_flat_phmap<std::string, std::string> name_to_path;
 };
 
 class WLkrepp
 {
 public:
-  void load_library();
+  void load_index();
 
 protected:
-  library_sptr_t library = nullptr;
-  std::filesystem::path library_dir;
+  index_sptr_t index = nullptr;
+  std::filesystem::path index_dir;
 };
 
 class Qkrepp : public WLkrepp
 {
 public:
   Qkrepp(CLI::App& sub_query);
+  void estimate_distances();
   void place_sequences();
+  void header_dreport(strstream& dreport_stream);
   void begin_jplace(strstream& jplace_stream);
   void end_jplace(strstream& jplace_stream);
-  void estimate_distances();
 
 private:
   /* std::filesystem::path output_dir = "./"; */

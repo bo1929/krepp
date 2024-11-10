@@ -236,9 +236,9 @@ double Tree::compute_distance(node_sptr_t a, node_sptr_t b)
   return distance;
 }
 
-void Tree::save(std::filesystem::path library_dir, std::string suffix)
+void Tree::save(std::filesystem::path index_dir, std::string suffix)
 {
-  std::ofstream tree_stream(library_dir / ("tree" + suffix));
+  std::ofstream tree_stream(index_dir / ("tree" + suffix));
   std::ostream_iterator<char> output_iterator(tree_stream);
   std::copy(nwk_str.begin(), nwk_str.end(), output_iterator);
   if (!tree_stream.good()) {
@@ -248,9 +248,9 @@ void Tree::save(std::filesystem::path library_dir, std::string suffix)
   tree_stream.close();
 }
 
-void Tree::load(std::filesystem::path library_dir, std::string suffix)
+void Tree::load(std::filesystem::path index_dir, std::string suffix)
 {
-  std::ifstream tree_stream(library_dir / ("tree" + suffix));
+  std::ifstream tree_stream(index_dir / ("tree" + suffix));
   nwk_str =
     std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
   tree_stream.close();

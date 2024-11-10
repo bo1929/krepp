@@ -33,7 +33,7 @@
 #include <zlib.h>
 #include <stdio.h>
 
-#define VERSION "v0.0.1"
+#define VERSION "v0.0.2"
 
 extern uint32_t num_threads;
 extern std::string invocation;
@@ -69,7 +69,7 @@ class Record;
 class CRecord;
 class DynHT;
 class FlatHT;
-class Library;
+class Index;
 
 typedef std::shared_ptr<RSeq> rseq_sptr_t;
 typedef std::shared_ptr<QSeq> qseq_sptr_t;
@@ -83,7 +83,7 @@ typedef std::shared_ptr<Record> record_sptr_t;
 typedef std::shared_ptr<CRecord> crecord_sptr_t;
 typedef std::shared_ptr<DynHT> dynht_sptr_t;
 typedef std::shared_ptr<FlatHT> flatht_sptr_t;
-typedef std::shared_ptr<Library> library_sptr_t;
+typedef std::shared_ptr<Index> index_sptr_t;
 typedef std::pair<enc_t, se_t> cmer_t;
 typedef std::pair<se_t, se_t> pse_t;
 

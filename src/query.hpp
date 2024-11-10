@@ -2,7 +2,7 @@
 #define _QUERY_H
 
 #include "common.hpp"
-#include "library.hpp"
+#include "index.hpp"
 #include "lshf.hpp"
 #include "rqseq.hpp"
 #include "table.hpp"
@@ -22,7 +22,7 @@ class QMers : public std::enable_shared_from_this<QMers>
   friend class Minfo;
 
 public:
-  QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th);
+  QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th);
   qmers_sptr_t getptr() { return shared_from_this(); }
   void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
 
@@ -35,7 +35,7 @@ private:
   uint32_t enmers;
   tree_sptr_t tree = nullptr;
   lshf_sptr_t lshf = nullptr;
-  library_sptr_t library = nullptr;
+  index_sptr_t index = nullptr;
   uint32_t hdist_filt = std::numeric_limits<uint32_t>::max();
   parallel_flat_phmap<node_sptr_t, minfo_sptr_t> leaf_to_minfo = {};
 };
@@ -43,7 +43,7 @@ private:
 class QBatch
 {
 public:
-  QBatch(library_sptr_t library, qseq_sptr_t qs, uint32_t hdist_th = 4);
+  QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th = 4);
   void search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
   void summarize_minfo(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
   void estimate_distances();
@@ -65,7 +65,7 @@ private:
   uint32_t enmers;
   tree_sptr_t tree;
   lshf_sptr_t lshf;
-  library_sptr_t library;
+  index_sptr_t index;
   node_sptr_t nd_pp = nullptr;
   minfo_sptr_t mi_pp = nullptr;
   vec<std::string> seq_batch;

@@ -1,5 +1,5 @@
-#ifndef _LIBRARY_H
-#define _LIBRARY_H
+#ifndef _INDEX_H
+#define _INDEX_H
 
 #include "common.hpp"
 #include "lshf.hpp"
@@ -7,12 +7,12 @@
 #include "record.hpp"
 #include "table.hpp"
 
-class Library
+class Index
 {
 public:
-  Library(std::filesystem::path library_dir)
-    : library_dir(library_dir){};
-  void add_partial_library(std::string suffix);
+  Index(std::filesystem::path index_dir)
+    : index_dir(index_dir){};
+  void add_partial_index(std::string suffix);
   crecord_sptr_t get_crecord(uint32_t rix);
   std::vector<cmer_t>::const_iterator get_first(uint32_t rix);
   std::vector<cmer_t>::const_iterator get_next(uint32_t rix);
@@ -34,7 +34,7 @@ private:
   uint32_t nrows;
   tree_sptr_t tree = nullptr;
   lshf_sptr_t lshf = nullptr;
-  std::filesystem::path library_dir;
+  std::filesystem::path index_dir;
   parallel_flat_phmap<uint32_t, flatht_sptr_t> r_to_flatht;
 };
 

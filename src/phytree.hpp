@@ -19,8 +19,8 @@ public:
   void parse(std::filesystem::path nwk_path);
   static double compute_distance(node_sptr_t a, node_sptr_t b);
   static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
-  void save(std::filesystem::path library_dir, std::string suffix);
-  void load(std::filesystem::path library_dir, std::string suffix);
+  void save(std::filesystem::path index_dir, std::string suffix);
+  void load(std::filesystem::path index_dir, std::string suffix);
   void stream_newick_str(std::stringstream& nwk_strstream, node_sptr_t nd);
   void set_subtree(node_sptr_t source) { subtree_root = source; }
   node_sptr_t get_node(se_t se) const { return se_to_node[se]; }

@@ -55,8 +55,9 @@ In addition to distance estimation, one could place reads on the backbone tree g
 ```bash
 krepp --num-threads $NUM_THREADS place -l $INDEX_DIR -q $QUERY_PATH
 ```
-where output is again in a tab-separated format and each row corresponds to a read.
-We will make the standard placement format `jplace` available very soon with the next release.
+where the output is in `jplace` format (version 3) (see the description [here](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0031009)).
+We allow `p` field to be empty for sequences without any *k*-mer match.
+Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with empty placement fields (such as [`gappa`](github.com/lczech/gappa)), in this case you can simply filter those lines (e.g., by parsing `jplace` as a `json` file in Python or via bash scripting `grep -v "\[ \]" $QUERY_NAME.jplace | sed -z "s/},\n\t]/}\n\t]/g" > $QUERY_NAME-filtered.jplace`).
 
 ### A toy example for testing
 
@@ -78,6 +79,8 @@ Once you have your index (e.g., the one we built above: `index_toy`), you can es
 ```
 The first five lines of `distances_toy.tsv` are going to look like:
 ```
+#software: krepp	#version: v0.0.2	#invocation :../krepp --num-threads 8 dist -l index_toy -q query_toy.fq
+SEQ_ID	REFERENCE_NAME	DIST
 ||61435-4122	G000341695	0.0898062
 ||61435-4949	G000830905	0.147048
 ||61435-4949	G000341695	0.0740587
@@ -87,6 +90,34 @@ The first five lines of `distances_toy.tsv` are going to look like:
 
 Quite similarly, you can place reads by running:
 ```bash
-../krepp --num-threads 8 place -l index_toy -q query_toy.fq | tee placements_toy.tsv
+../krepp --num-threads 8 place -l index_toy -q query_toy.fq | tee placements_toy.jplace
 ```
-The first column of the output is for the read ID, the second column corresponds to the placement on the backbone tree, and other columns are for statistical importance and distance information.
+
+The resulting placement file is a `json` file in a special format called `jplace`:
+```bash
+head -n15 placements_toy.jplace
+```
+```
+{
+	"version" : 3,
+	"fields" : ["edge_num", "like_weight_ratio", "likelihood", "pendant_length", "distal_length"],
+	"metadata" : {
+		"software" : "krepp",
+		"version" : "v0.0.1",
+		"repository" : "https://github.com/bo1929/krepp",
+		"invocation" : "../krepp --num-threads 8 place -l index_toy -q query_toy.fq"
+	},
+	"placements" :
+		[
+			{"p" : [[39, 0.000000, 20.671067, 0.000010, 0.001088]], "n" : ["||61435-4122"]},
+			{"p" : [[40, 2.308570, 45.363721, 0.000010, 0.008363]], "n" : ["||61435-4949"]},
+			{"p" : [[41, 1.938949, 37.197833, 0.000010, 0.149723]], "n" : ["||61435-317"]},
+			{"p" : [[40, 0.043721, 38.058347, 0.000010, 0.008363]], "n" : ["||61435-2985"]},
+
+```
+
+You can proceed with your down-stream analysis using other tools, such as [`gappa`](github.com/lczech/gappa):
+```bash
+grep -v "\[ \]" placements_toy.jplace | sed -z "s/},\n\t]/}\n\t]/g" > placements_toy-filtered.jplace # filtering sequences without any match and hence an empty placement field
+gappa examine heat-tree --jplace-path placements_toy-filtered.jplace --write-svg-tree # generating a colored tree based on placement densities across the backbone tree
+```

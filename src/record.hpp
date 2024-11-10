@@ -93,8 +93,8 @@ public:
   }
   void print_info();
   void decode_se(se_t se, vec<node_sptr_t>& subset_v);
-  void load(std::filesystem::path library_dir, std::string suffix);
-  void save(std::filesystem::path library_dir, std::string suffix);
+  void load(std::filesystem::path index_dir, std::string suffix);
+  void save(std::filesystem::path index_dir, std::string suffix);
   crecord_sptr_t getptr() { return shared_from_this(); }
   pse_t get_pse(se_t se) const { return se_to_pse[se]; }
   double get_rho(se_t se) const { return se_to_rho[se]; }

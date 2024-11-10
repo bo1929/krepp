@@ -1,14 +1,15 @@
 #include "query.hpp"
 #include <boost/math/tools/minima.hpp>
+#include <string>
 
 #define CHISQ_THRESHOLD 2.706
 
-QBatch::QBatch(library_sptr_t library, qseq_sptr_t qs, uint32_t hdist_th)
-  : library(library)
+QBatch::QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th)
+  : index(index)
   , hdist_th(hdist_th)
 {
-  lshf = library->get_lshf();
-  tree = library->get_tree();
+  lshf = index->get_lshf();
+  tree = index->get_tree();
   k = lshf->get_k();
   h = lshf->get_h();
   m = lshf->get_m();
@@ -49,25 +50,25 @@ void QBatch::search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, q
 #ifdef CANONICAL
     if (rcenc64_bp < orenc64_bp) {
       orrix = lshf->compute_hash(orenc64_bp);
-      if (library->check_partial(orrix)) {
+      if (index->check_partial(orrix)) {
         qmers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
         onmers_or++;
       }
     } else {
       rcrix = lshf->compute_hash(rcenc64_bp);
-      if (library->check_partial(rcrix)) {
+      if (index->check_partial(rcrix)) {
         qmers_or->add_matching_mer(i - k, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
         onmers_rc++;
       }
     }
 #else
     orrix = lshf->compute_hash(orenc64_bp);
-    if (library->check_partial(orrix)) {
+    if (index->check_partial(orrix)) {
       qmers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
       onmers_or++;
     }
     rcrix = lshf->compute_hash(rcenc64_bp);
-    if (library->check_partial(rcrix)) {
+    if (index->check_partial(rcrix)) {
       qmers_rc->add_matching_mer(len - i, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
       onmers_rc++;
     }
@@ -120,8 +121,8 @@ void QBatch::estimate_distances()
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
 
-    qmers_sptr_t qmers_or = std::make_shared<QMers>(library, len, hdist_th);
-    qmers_sptr_t qmers_rc = std::make_shared<QMers>(library, len, hdist_th);
+    qmers_sptr_t qmers_or = std::make_shared<QMers>(index, len, hdist_th);
+    qmers_sptr_t qmers_rc = std::make_shared<QMers>(index, len, hdist_th);
 
     search_mers(seq, len, qmers_or, qmers_rc);
     summarize_minfo(qmers_or, qmers_rc);
@@ -146,8 +147,8 @@ void QBatch::place_sequences()
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
 
-    qmers_sptr_t qmers_or = std::make_shared<QMers>(library, len, hdist_th);
-    qmers_sptr_t qmers_rc = std::make_shared<QMers>(library, len, hdist_th);
+    qmers_sptr_t qmers_or = std::make_shared<QMers>(index, len, hdist_th);
+    qmers_sptr_t qmers_rc = std::make_shared<QMers>(index, len, hdist_th);
 
     search_mers(seq, len, qmers_or, qmers_rc);
     summarize_minfo(qmers_or, qmers_rc);
@@ -223,20 +224,21 @@ void QBatch::report_placement(strstream& batch_stream)
   batch_stream << "\t\t\t{\"p\" : [[" + std::to_string(nd_pp->get_se() - 1) + ", " +
                     std::to_string(mi_pp->chisq) + ", " +
                     /* std::to_string(mi_pp->d_llh) + ", " + */
-                    std::to_string(mi_pp->v_llh) + ", " + std::to_string(1e-5) + ", " +
+                    std::to_string(mi_pp->v_llh) + ", " + std::to_string(mi_pp->d_llh) + ", " +
+                    std::to_string(1e-5) + ", " +
                     /* std::to_string(mi_pp->rmatch_count) + ", " + */
                     std::to_string(nd_pp->get_blen() / 2.0) + "]], \"n\" : [\"" +
                     identifer_batch[bix] + "\"]},\n";
 }
 
-QMers::QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th)
-  : library(library)
+QMers::QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
+  : index(index)
   , len(len)
   , hdist_th(hdist_th)
   , onmers(0)
 {
-  lshf = library->get_lshf();
-  tree = library->get_tree();
+  lshf = index->get_lshf();
+  tree = index->get_tree();
   k = lshf->get_k();
   h = lshf->get_h();
   enmers = len - k + 1;
@@ -250,9 +252,9 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
   uint32_t hdist_curr;
   std::queue<se_t> se_q;
   std::pair<se_t, se_t> pse;
-  std::vector<cmer_t>::const_iterator iter1 = library->get_first(rix);
-  std::vector<cmer_t>::const_iterator iter2 = library->get_next(rix);
-  crecord_sptr_t crecord = library->get_crecord(rix);
+  std::vector<cmer_t>::const_iterator iter1 = index->get_first(rix);
+  std::vector<cmer_t>::const_iterator iter2 = index->get_next(rix);
+  crecord_sptr_t crecord = index->get_crecord(rix);
   for (; iter1 < iter2; ++iter1) {
     hdist_curr = popcount_lr32(iter1->first ^ enc_lr);
     if (hdist_curr > hdist_th) {

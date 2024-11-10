@@ -30,7 +30,7 @@ void Bkrepp::read_input_file()
   input_file.close();
 }
 
-void Bkrepp::build_library()
+void Bkrepp::build_index()
 {
   record_sptr_t record = std::make_shared<Record>(tree);
   root_dynht = std::make_shared<DynHT>(nrows, tree, record);
@@ -45,13 +45,13 @@ void Bkrepp::build_library()
   }
 }
 
-void Bkrepp::save_library()
+void Bkrepp::save_index()
 {
   assertm(root_dynht->get_nkmers() > 0, "No k-mers to to save!");
   flatht_sptr_t root_flatht = std::make_shared<FlatHT>(root_dynht);
-  root_flatht->save(library_dir, suffix);
-  root_flatht->get_tree()->save(library_dir, suffix);
-  root_flatht->get_crecord()->save(library_dir, suffix);
+  root_flatht->save(index_dir, suffix);
+  root_flatht->get_tree()->save(index_dir, suffix);
+  root_flatht->get_crecord()->save(index_dir, suffix);
 }
 
 void Bkrepp::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
@@ -106,7 +106,7 @@ void Bkrepp::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
 
 void Bkrepp::save_metadata()
 {
-  std::filesystem::path metadata_path = library_dir / ("metadata" + suffix);
+  std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
   std::ofstream metadata_stream(metadata_path, std::ofstream::binary);
   metadata_stream.write(reinterpret_cast<char*>(&k), sizeof(uint8_t));
   metadata_stream.write(reinterpret_cast<char*>(&w), sizeof(uint8_t));
@@ -118,7 +118,7 @@ void Bkrepp::save_metadata()
   metadata_stream.write(reinterpret_cast<char*>(lshf->ppos_data()), (h) * sizeof(uint8_t));
   metadata_stream.write(reinterpret_cast<char*>(lshf->npos_data()), (k - h) * sizeof(uint8_t));
   if (!metadata_stream.good()) {
-    std::cerr << "Writing the metadata for the library has failed!" << std::endl;
+    std::cerr << "Writing the metadata for the index has failed!" << std::endl;
     exit(EXIT_FAILURE);
   }
   metadata_stream.close();
@@ -128,7 +128,7 @@ Bkrepp::Bkrepp(CLI::App& sub_build)
 {
   sub_build
     .add_option(
-      "-l,--library-dir", library_dir, "Path to the directory in which the index will be stored.")
+      "-l,--index-dir", index_dir, "Path to the directory in which the index will be stored.")
     ->required();
   sub_build
     .add_option("-i,--input-file",
@@ -161,7 +161,7 @@ Bkrepp::Bkrepp(CLI::App& sub_build)
     if (!(sub_build.count("-w") + sub_build.count("--win-len"))) {
       w = k + 3;
     }
-    std::filesystem::create_directory(library_dir);
+    std::filesystem::create_directory(index_dir);
     suffix = "-";
     /* suffix += "k" + std::to_string(k) + "w" + std::to_string(w) + "h" + std::to_string(h); */
     suffix += "m" + std::to_string(m) + "r" + std::to_string(r);
@@ -169,10 +169,10 @@ Bkrepp::Bkrepp(CLI::App& sub_build)
   });
 }
 
-void WLkrepp::load_library()
+void WLkrepp::load_index()
 {
   node_phmap<std::string, std::set<std::string>> suffix_to_ltype;
-  for (const auto& entry : std::filesystem::directory_iterator(library_dir)) {
+  for (const auto& entry : std::filesystem::directory_iterator(index_dir)) {
     std::string filename, ltype, mrcfg, fracv;
     size_t pos1, pos2;
     filename = entry.path().filename();
@@ -191,16 +191,25 @@ void WLkrepp::load_library()
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
     if (suffix_to_ltype[suffixes[lix]] == lall) {
-      library->add_partial_library(suffixes[lix]);
+      index->add_partial_index(suffixes[lix]);
     } else {
-      std::cerr << "There is a partial library with a missing file!" << std::endl;
+      std::cerr << "There is a partial index with a missing file!" << std::endl;
       exit(EXIT_FAILURE);
     }
   }
 }
 
+void Qkrepp::header_dreport(strstream& dreport_stream)
+{
+  dreport_stream << "#software: krepp\t#version: " VERSION "\t#invocation :" + invocation;
+  dreport_stream << "\nSEQ_ID\tREFERENCE_NAME\tDIST\n";
+}
+
 void Qkrepp::estimate_distances()
 {
+  strstream dreport_stream;
+  header_dreport(dreport_stream);
+  std::cout << dreport_stream.rdbuf();
   omp_set_num_threads(num_threads);
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
 #pragma omp parallel shared(qs)
@@ -208,7 +217,7 @@ void Qkrepp::estimate_distances()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
-        QBatch qb(library, qs, hdist_th);
+        QBatch qb(index, qs, hdist_th);
 #pragma omp task untied
         {
           qb.estimate_distances();
@@ -224,7 +233,7 @@ void Qkrepp::end_jplace(strstream& jplace_stream)
   jplace_stream << "\t\t\t{\"p\" : [ ], \"n\" : [\"NaN\"]}\n";
   jplace_stream << "\t],\n";
   jplace_stream << "\t\"tree\" : \"";
-  library->get_tree()->stream_newick_str(jplace_stream, library->get_tree()->get_root());
+  index->get_tree()->stream_newick_str(jplace_stream, index->get_tree()->get_root());
   jplace_stream << "\"\n}";
 }
 
@@ -232,7 +241,7 @@ void Qkrepp::begin_jplace(strstream& jplace_stream)
 {
   jplace_stream
     << "{\n\t\"version\" : 3,\n\t"
-       "\"fields\" : [\"edge_num\", \"like_weight_ratio\", \"likelihood\", \"pendant_length\", \"distal_length\"],\n"
+       "\"fields\" : [\"edge_num\", \"like_weight_ratio\", \"likelihood\", \"pavg_distance\", \"pendant_length\", \"distal_length\"],\n"
        "\t\"metadata\" : {\n"
        "\t\t\"software\" : \"krepp\",\n"
        "\t\t\"version\" : \"" VERSION "\",\n"
@@ -254,7 +263,7 @@ void Qkrepp::place_sequences()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
-        QBatch qb(library, qs, hdist_th);
+        QBatch qb(index, qs, hdist_th);
 #pragma omp task untied
         {
           qb.place_sequences();
@@ -271,20 +280,19 @@ void Qkrepp::place_sequences()
 Ikrepp::Ikrepp(CLI::App& sub_info)
 {
   sub_info
-    .add_option(
-      "-l,--library-dir", library_dir, "Path to the directory containing reference library.")
+    .add_option("-l,--index-dir", index_dir, "Path to the directory containing reference index.")
     ->required()
     ->check(CLI::ExistingDirectory);
-  sub_info.callback([&]() { library = std::make_shared<Library>(library_dir); });
+  sub_info.callback([&]() { index = std::make_shared<Index>(index_dir); });
 }
 
-void Ikrepp::display_info() { library->display_info(); }
+void Ikrepp::display_info() { index->display_info(); }
 
 Qkrepp::Qkrepp(CLI::App& sub_query)
 {
   sub_query
     .add_option(
-      "-l,--library-dir", library_dir, "Path to the directory containing the reference index.")
+      "-l,--index-dir", index_dir, "Path to the directory containing the reference index.")
     ->required()
     ->check(CLI::ExistingDirectory);
   /* sub_query.add_option( */
@@ -300,7 +308,7 @@ Qkrepp::Qkrepp(CLI::App& sub_query)
     "The reference taxon to be excluded during query, useful for benchmarking and testing.");
   sub_query.callback([&]() {
     /* std::filesystem::create_directory(output_dir); */
-    library = std::make_shared<Library>(library_dir);
+    index = std::make_shared<Index>(index_dir);
   });
 }
 
@@ -336,7 +344,7 @@ int main(int argc, char** argv)
   Qkrepp qdist(sub_dist);
 
   auto& sub_info =
-    *app.add_subcommand("info", "Display statistics and information for a given library.");
+    *app.add_subcommand("info", "Display statistics and information for a given index.");
   Ikrepp i(sub_info);
 
   CLI11_PARSE(app, argc, argv);
@@ -350,38 +358,38 @@ int main(int argc, char** argv)
   std::cerr << std::ctime(&tstart_f) << "\n";
 
   if (sub_build.parsed()) {
-    std::cerr << "Reading the tree and initializing the library..." << std::endl;
+    std::cerr << "Reading the tree and initializing the index..." << std::endl;
     b.set_lshf();
     b.read_input_file();
     b.parse_newick_tree();
 
-    std::cerr << "Building the library..." << std::endl;
-    b.build_library();
+    std::cerr << "Building the index..." << std::endl;
+    b.build_index();
     std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
     std::cerr << "\nFinished building, elapsed: " << es_b.count() << " seconds" << std::endl;
 
-    b.save_library();
+    b.save_index();
     b.save_metadata();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
     std::cerr << "\nDone converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
   }
 
   if (sub_place.parsed()) {
-    std::cerr << "Loading the library and the tree..." << std::endl;
-    qplace.load_library();
+    std::cerr << "Loading the index and the tree..." << std::endl;
+    qplace.load_index();
     std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
     qplace.place_sequences();
   }
 
   if (sub_dist.parsed()) {
-    std::cerr << "Loading the library and the tree..." << std::endl;
-    qdist.load_library();
+    std::cerr << "Loading the index and the tree..." << std::endl;
+    qdist.load_index();
     std::cerr << "Estimating distances between given sequences and references..." << std::endl;
     qdist.estimate_distances();
   }
 
   if (sub_info.parsed()) {
-    i.load_library();
+    i.load_index();
     i.display_info();
   }
 

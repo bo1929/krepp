@@ -204,9 +204,9 @@ CRecord::CRecord(tree_sptr_t tree)
   tree->reset_traversal();
 }
 
-void CRecord::load(std::filesystem::path library_dir, std::string suffix)
+void CRecord::load(std::filesystem::path index_dir, std::string suffix)
 {
-  std::filesystem::path crecord_path = library_dir / ("crecord" + suffix);
+  std::filesystem::path crecord_path = index_dir / ("crecord" + suffix);
   std::ifstream crecord_stream(crecord_path, std::ifstream::binary);
   if (!crecord_stream.is_open()) {
     std::cerr << "Failed to open " << crecord_path << std::endl;
@@ -226,9 +226,9 @@ void CRecord::load(std::filesystem::path library_dir, std::string suffix)
   crecord_stream.close();
 }
 
-void CRecord::save(std::filesystem::path library_dir, std::string suffix)
+void CRecord::save(std::filesystem::path index_dir, std::string suffix)
 {
-  std::ofstream crecord_stream(library_dir / ("crecord" + suffix), std::ofstream::binary);
+  std::ofstream crecord_stream(index_dir / ("crecord" + suffix), std::ofstream::binary);
   crecord_stream.write(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
   crecord_stream.write(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
   crecord_stream.write(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);

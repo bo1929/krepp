@@ -22,9 +22,9 @@ FlatHT::FlatHT(dynht_sptr_t source)
   }
 }
 
-void FlatHT::load(std::filesystem::path library_dir, std::string suffix)
+void FlatHT::load(std::filesystem::path index_dir, std::string suffix)
 {
-  std::filesystem::path mer_path = library_dir / ("cmer" + suffix);
+  std::filesystem::path mer_path = index_dir / ("cmer" + suffix);
   std::ifstream mer_stream(mer_path, std::ifstream::binary);
   if (!mer_stream.is_open()) {
     std::cerr << "Failed to open " << mer_path << std::endl;
@@ -41,7 +41,7 @@ void FlatHT::load(std::filesystem::path library_dir, std::string suffix)
   }
   mer_stream.close();
 
-  std::filesystem::path inc_path = library_dir / ("inc" + suffix);
+  std::filesystem::path inc_path = index_dir / ("inc" + suffix);
   std::ifstream inc_stream(inc_path, std::ifstream::binary);
   if (!inc_stream.is_open()) {
     std::cerr << "Failed to open " << inc_path << std::endl;
@@ -59,9 +59,9 @@ void FlatHT::load(std::filesystem::path library_dir, std::string suffix)
   inc_stream.close();
 }
 
-void FlatHT::save(std::filesystem::path library_dir, std::string suffix)
+void FlatHT::save(std::filesystem::path index_dir, std::string suffix)
 {
-  std::ofstream mer_stream(library_dir / ("cmer" + suffix), std::ofstream::binary);
+  std::ofstream mer_stream(index_dir / ("cmer" + suffix), std::ofstream::binary);
   mer_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
   mer_stream.write(reinterpret_cast<const char*>(cmer_v.data()), sizeof(cmer_t) * nkmers);
   if (!mer_stream.good()) {
@@ -70,7 +70,7 @@ void FlatHT::save(std::filesystem::path library_dir, std::string suffix)
   }
   mer_stream.close();
 
-  std::ofstream inc_stream(library_dir / ("inc" + suffix), std::ofstream::binary);
+  std::ofstream inc_stream(index_dir / ("inc" + suffix), std::ofstream::binary);
   inc_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
   inc_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * nrows);
   if (!inc_stream.good()) {
