@@ -3,9 +3,9 @@ A k-mer-based maximum likelihood method for estimating distances of reads to gen
 
 ## Quick start
 ### Installing and compiling krepp from source
-Pre-compiled binaries are not available yet, but hopefully will be soon.
+Pre-compiled binaries are not available yet but hopefully will be soon.
 
-To compile from source, simply clone the repository with its submodules and compile with
+To compile from the source, simply clone the repository with its submodules and compile with
 ```
 git clone --recurse-submodules -j8 https://github.com/bo1929/krepp.git
 cd krepp && make
@@ -24,7 +24,7 @@ where
 * `-t` is the backbone tree in Newick format matching the genome IDs (i.e., leaf labels) given.
 
 Run `krepp build --help` to see more options.
-If you don't have a tree and if you are mainly interested in estimating distances, an arbitrary (or random) tree might just work as a workaround (with the side effect of making the color index potentially a little larger).
+If you don't have a tree and are mainly interested in estimating distances, an arbitrary (or random) tree might just work as a workaround (with the side effect of potentially making the color index a little larger).
 
 Instead of building an index from scratch, you could use one of the public ones.
 Currently, there are only three such indexes available for microbial and archaeal genomes.
@@ -35,10 +35,10 @@ Therefore, these indexes overlap, and you could just pick the one that you can a
 * Web of Life - v1 (10,576 archaeal and bacterial genomes): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
 
 Only the index is required to query novel sequences, but genome IDs are not informative.
-You can use provided metadata to further analyze the distance estimates for taxonomic classification or abundance profiling.
+You can use the provided metadata to analyze the distance estimates further for taxonomic classification or abundance profiling.
 Similarly, the backbone tree could be used for UniFrac computation.
 
-Lastly, we note that memory use increases almost linearly with `$NUM_THREADS` for `build` subcommand, and hence, you may want to decrease it if you run out of memory.
+Lastly, we note that memory use increases almost linearly with `$NUM_THREADS` for the `build` subcommand, and hence, you may want to decrease it if you run out of memory.
 The peak memory usage can always be reduced to the memory level available by splitting the LSH index into batches and building each batch separately by using `-m`, `-r` and `--no-frac` options (see relevant documentation and `krank --help`).
 This is not the case for `dist` and `place` commands, feel free to use all cores available during the query-time.
 
@@ -56,8 +56,8 @@ In addition to distance estimation, one could place reads on the backbone tree g
 krepp --num-threads $NUM_THREADS place -l $INDEX_DIR -q $QUERY_PATH
 ```
 where the output is in `jplace` format (version 3) (see the description [here](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0031009)).
-We allow `p` field to be empty for sequences without any *k*-mer match.
-Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with empty placement fields (such as [`gappa`](github.com/lczech/gappa)), in this case you can simply filter those lines (e.g., by parsing `jplace` as a `json` file in Python or via bash scripting `grep -v "\[ \]" $QUERY_NAME.jplace | sed -z "s/},\n\t]/}\n\t]/g" > $QUERY_NAME-filtered.jplace`).
+We allow the `p` field to be empty for sequences without any *k*-mer match.
+Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with empty placement fields (such as [`gappa`](github.com/lczech/gappa)), in this case you can simply filter those lines (e.g., by parsing `jplace` as a JSON file in Python or via bash scripting `grep -v "\[ \]" $QUERY_NAME.jplace | sed -z "s/},\n\t]/}\n\t]/g" > $QUERY_NAME-filtered.jplace`).
 
 ### A toy example for testing
 
@@ -93,7 +93,7 @@ Quite similarly, you can place reads by running:
 ../krepp --num-threads 8 place -l index_toy -q query_toy.fq | tee placements_toy.jplace
 ```
 
-The resulting placement file is a `json` file in a special format called `jplace`:
+The resulting placement file is a JSON file in a special format called `jplace`:
 ```bash
 head -n15 placements_toy.jplace
 ```
