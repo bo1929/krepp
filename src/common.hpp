@@ -33,7 +33,10 @@
 #include <zlib.h>
 #include <stdio.h>
 
+#define VERSION "v0.0.1"
+
 extern uint32_t num_threads;
+extern std::string invocation;
 extern std::string leave_out_ref;
 extern thread_local std::random_device rd;
 extern thread_local std::mt19937 gen;
@@ -46,6 +49,8 @@ typedef uint32_t se_t;
 typedef uint64_t inc_t;
 typedef uint32_t enc_t;
 typedef uint32_t tuint_t;
+
+typedef std::stringstream strstream;
 
 template<typename T>
 using vvec = std::vector<std::vector<T>>;

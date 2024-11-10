@@ -1,4 +1,5 @@
 #include "phytree.hpp"
+#include "common.hpp"
 
 bool Tree::check_compatible(tree_sptr_t tree)
 {
@@ -42,6 +43,24 @@ void Tree::parse(std::filesystem::path nwk_path)
   se_to_node.push_back(root);
   subtree_root = root;
   compute_bdepth();
+}
+
+void Tree::stream_newick_str(strstream& nwk_strstream, node_sptr_t nd)
+{
+  if (!nd->check_leaf()) {
+    nwk_strstream << "(";
+    for (uint32_t nix = 0; nix < nd->get_nchildren(); ++nix) {
+      stream_newick_str(nwk_strstream, *std::next(nd->get_children(), nix));
+      if (nix < (nd->get_nchildren() - 1)) {
+        nwk_strstream << ",";
+      }
+    }
+    nwk_strstream << ")";
+  }
+  nwk_strstream << nd->get_name() << ":" << nd->get_blen() << "{" << nd->get_se() - 1 << "}";
+  if (nd == get_root()) {
+    nwk_strstream << ";";
+  }
 }
 
 void Tree::split_nwk(vec<std::string>& nd_v)

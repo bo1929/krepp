@@ -115,7 +115,7 @@ void QBatch::summarize_minfo(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
 
 void QBatch::estimate_distances()
 {
-  strstream batch_report;
+  strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
@@ -125,23 +125,23 @@ void QBatch::estimate_distances()
 
     search_mers(seq, len, qmers_or, qmers_rc);
     summarize_minfo(qmers_or, qmers_rc);
-    report_distances(batch_report);
+    report_distances(batch_stream);
   }
 #pragma omp critical
-  std::cout << batch_report.rdbuf();
+  std::cout << batch_stream.rdbuf();
 }
 
-void QBatch::report_distances(strstream& batch_report)
+void QBatch::report_distances(strstream& batch_stream)
 {
   for (auto& [nd, mi] : node_to_minfo) {
     // TODO: Add distance threshold for reporting or likelihood ratio test.
-    batch_report << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
+    batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
   }
 }
 
 void QBatch::place_sequences()
 {
-  strstream batch_report;
+  strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
@@ -151,80 +151,82 @@ void QBatch::place_sequences()
 
     search_mers(seq, len, qmers_or, qmers_rc);
     summarize_minfo(qmers_or, qmers_rc);
-    report_placement(batch_report);
+    report_placement(batch_stream);
   }
 #pragma omp critical
-  std::cout << batch_report.rdbuf();
+  std::cout << batch_stream.rdbuf();
 }
 
-void QBatch::report_placement(strstream& batch_report)
+void QBatch::report_placement(strstream& batch_stream)
 {
   if (node_to_minfo.size() == 0) {
-    batch_report << identifer_batch[bix] << "\tNaN\tNaN\tNaN\tNaN\n";
+    batch_stream << "\t\t\t{\"p\" : [ ], \"n \": [\"" + identifer_batch[bix] + "\"]},\n";
     return;
-  }
-  if (node_to_minfo.size() == 1) { // OR place on the closest leaf.
-    mi_pp->chisq = 0;
-    batch_report << identifer_batch[bix] << "\t" << nd_pp->get_name() << "\t" << mi_pp->d_llh
-                 << "\t" << mi_pp->v_llh << "\t" << mi_pp->chisq << "\n";
-    return;
-  }
+  } else if (node_to_minfo.size() > 1) { // OR place on the closest leaf.
+    node_sptr_t nd_curr = nullptr;
+    minfo_sptr_t mi_curr = nullptr;
 
-  node_sptr_t nd_curr = nullptr;
-  minfo_sptr_t mi_curr = nullptr;
-  /*
-  // Place on the LCA of all leaves that pass llh-ratio test:
-  mi_curr = std::make_shared<Minfo>(hdist_th);
-  for (auto const& [nd, mi] : node_to_minfo) {
-    mi->chisq = mi->likelihood_ratio(mi_pp->d_llh, llhfunc);
-    if (mi->chisq < CHISQ_THRESHOLD) {
-      nd_curr = Tree::compute_lca(nd_curr, nd);
-     mi_curr.add(mi);
+    /*
+    // Place on the LCA of all leaves that pass llh-ratio test:
+    mi_curr = std::make_shared<Minfo>(hdist_th);
+    for (auto const& [nd, mi] : node_to_minfo) {
+      mi->chisq = mi->likelihood_ratio(mi_pp->d_llh, llhfunc);
+      if (mi->chisq < CHISQ_THRESHOLD) {
+        nd_curr = Tree::compute_lca(nd_curr, nd);
+        mi_curr.add(mi);
+      }
     }
-  }
-  mi_curr->chisq =  mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
-  nd_pp = nd_curr;
-  mi_pp = mi_curr;
-  */
-  vec<node_sptr_t> nd_v;
-  while (nd_curr = tree->next_post_order(nd_curr)) {
-    if (nd_curr->check_leaf()) {
-      if (!node_to_minfo.contains(nd_curr)) {
-        node_to_minfo[nd_curr] = std::make_shared<Minfo>(enmers, hdist_th);
+    mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
+    nd_pp = nd_curr;
+    mi_pp = mi_curr;
+    */
+    vec<node_sptr_t> nd_v;
+    while (nd_curr = tree->next_post_order(nd_curr)) {
+      if (nd_curr->check_leaf()) {
+        if (!node_to_minfo.contains(nd_curr)) {
+          node_to_minfo[nd_curr] = std::make_shared<Minfo>(enmers, hdist_th);
+        } else {
+          mi_curr = node_to_minfo[nd_curr];
+          mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
+          if (mi_curr->chisq < CHISQ_THRESHOLD) {
+            nd_v.push_back(nd_curr);
+          }
+        }
       } else {
-        mi_curr = node_to_minfo[nd_curr];
-        mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
-        if (mi_curr->chisq < CHISQ_THRESHOLD) {
-          nd_v.push_back(nd_curr);
+        mi_curr = std::make_shared<Minfo>(hdist_th);
+        for (uint32_t nix = 0; nix < nd_curr->get_nchildren(); ++nix) {
+          mi_curr->add(node_to_minfo[*std::next(nd_curr->get_children(), nix)]);
         }
-      }
-    } else {
-      mi_curr = std::make_shared<Minfo>(hdist_th);
-      for (uint32_t nix = 0; nix < nd_curr->get_nchildren(); ++nix) {
-        mi_curr->add(node_to_minfo[*std::next(nd_curr->get_children(), nix)]);
-      }
-      if (mi_curr->rmatch_count) {
-        mi_curr->optimize_likelihood(llhfunc);
-        mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
-        if (mi_curr->chisq < CHISQ_THRESHOLD) {
+        if (mi_curr->rmatch_count) {
           mi_curr->optimize_likelihood(llhfunc);
-          nd_v.push_back(nd_curr);
+          mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
+          if (mi_curr->chisq < CHISQ_THRESHOLD) {
+            mi_curr->optimize_likelihood(llhfunc);
+            nd_v.push_back(nd_curr);
+          }
         }
+        node_to_minfo[nd_curr] = mi_curr;
       }
-      node_to_minfo[nd_curr] = mi_curr;
     }
-  }
 
-  std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
-    if (lhs->get_card() == rhs->get_card())
-      return node_to_minfo[lhs]->d_llh > node_to_minfo[rhs]->d_llh;
-    else
-      return lhs->get_card() < rhs->get_card();
-  });
-  nd_pp = *(nd_v.rbegin());
-  mi_pp = node_to_minfo[nd_pp];
-  batch_report << identifer_batch[bix] << "\t" << nd_pp->get_name() << "\t" << mi_pp->d_llh << "\t"
-               << mi_pp->rmatch_count << "\t" << mi_pp->chisq << "\n";
+    std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
+      if (lhs->get_card() == rhs->get_card())
+        return node_to_minfo[lhs]->d_llh > node_to_minfo[rhs]->d_llh;
+      else
+        return lhs->get_card() < rhs->get_card();
+    });
+    nd_pp = *(nd_v.rbegin());
+    mi_pp = node_to_minfo[nd_pp];
+  } else {
+    mi_pp->chisq = 0;
+  }
+  batch_stream << "\t\t\t{\"p\" : [[" + std::to_string(nd_pp->get_se() - 1) + ", " +
+                    std::to_string(mi_pp->chisq) + ", " +
+                    /* std::to_string(mi_pp->d_llh) + ", " + */
+                    std::to_string(mi_pp->v_llh) + ", " + std::to_string(1e-5) + ", " +
+                    /* std::to_string(mi_pp->rmatch_count) + ", " + */
+                    std::to_string(nd_pp->get_blen() / 2.0) + "]], \"n\" : [\"" +
+                    identifer_batch[bix] + "\"]},\n";
 }
 
 QMers::QMers(library_sptr_t library, uint64_t len, uint32_t hdist_th)

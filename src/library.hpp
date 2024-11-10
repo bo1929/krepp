@@ -7,7 +7,7 @@
 #include "record.hpp"
 #include "table.hpp"
 
-class Library // TODO: Rename everything library to index.
+class Library
 {
 public:
   Library(std::filesystem::path library_dir)

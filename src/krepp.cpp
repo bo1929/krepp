@@ -1,4 +1,5 @@
 #include "krepp.hpp"
+#include "common.hpp"
 
 void Bkrepp::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m); }
 
@@ -198,7 +199,7 @@ void WLkrepp::load_library()
   }
 }
 
-void Qkrepp::estimate_distances() // TODO: Benchmark different types of parallelism.
+void Qkrepp::estimate_distances()
 {
   omp_set_num_threads(num_threads);
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
@@ -218,8 +219,34 @@ void Qkrepp::estimate_distances() // TODO: Benchmark different types of parallel
   }
 }
 
-void Qkrepp::place_sequences() // TODO: Benchmark different types of parallelism.
+void Qkrepp::end_jplace(strstream& jplace_stream)
 {
+  jplace_stream << "\t\t\t{\"p\" : [ ], \"n\" : [\"NaN\"]}\n";
+  jplace_stream << "\t],\n";
+  jplace_stream << "\t\"tree\" : \"";
+  library->get_tree()->stream_newick_str(jplace_stream, library->get_tree()->get_root());
+  jplace_stream << "\"\n}";
+}
+
+void Qkrepp::begin_jplace(strstream& jplace_stream)
+{
+  jplace_stream
+    << "{\n\t\"version\" : 3,\n\t"
+       "\"fields\" : [\"edge_num\", \"like_weight_ratio\", \"likelihood\", \"pendant_length\", \"distal_length\"],\n"
+       "\t\"metadata\" : {\n"
+       "\t\t\"software\" : \"krepp\",\n"
+       "\t\t\"version\" : \"" VERSION "\",\n"
+       "\t\t\"repository\" : \"https://github.com/bo1929/krepp\",\n"
+       "\t\t\"invocation\" : \"";
+  jplace_stream << invocation;
+  jplace_stream << "\"\n\t},\n\t\"placements\" :\n\t\t[\n";
+}
+
+void Qkrepp::place_sequences()
+{
+  strstream jplace_stream;
+  begin_jplace(jplace_stream);
+  std::cout << jplace_stream.rdbuf();
   omp_set_num_threads(num_threads);
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
 #pragma omp parallel shared(qs)
@@ -236,6 +263,9 @@ void Qkrepp::place_sequences() // TODO: Benchmark different types of parallelism
 #pragma omp taskwait
     }
   }
+  jplace_stream.str("");
+  end_jplace(jplace_stream);
+  std::cout << jplace_stream.rdbuf();
 }
 
 Ikrepp::Ikrepp(CLI::App& sub_info)
@@ -310,6 +340,14 @@ int main(int argc, char** argv)
   Ikrepp i(sub_info);
 
   CLI11_PARSE(app, argc, argv);
+  for (int i = 0; i < argc; ++i) {
+    invocation += std::string(argv[i]) + " ";
+  }
+  invocation.pop_back();
+
+  auto tstart = std::chrono::system_clock::now();
+  std::time_t tstart_f = std::chrono::system_clock::to_time_t(tstart);
+  std::cerr << std::ctime(&tstart_f) << "\n";
 
   if (sub_build.parsed()) {
     std::cerr << "Reading the tree and initializing the library..." << std::endl;
@@ -317,44 +355,39 @@ int main(int argc, char** argv)
     b.read_input_file();
     b.parse_newick_tree();
 
-    auto tstart = std::chrono::system_clock::now();
     std::cerr << "Building the library..." << std::endl;
     b.build_library();
-    auto tend_b = std::chrono::system_clock::now();
-    std::chrono::duration<float> es_b = tend_b - tstart;
+    std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
     std::cerr << "\nFinished building, elapsed: " << es_b.count() << " seconds" << std::endl;
 
     b.save_library();
     b.save_metadata();
-    auto tend_c = std::chrono::system_clock::now();
-    std::chrono::duration<float> es_s = tend_c - tend_b;
-    std::cerr << "Done converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
-
-    std::time_t tend_f = std::chrono::system_clock::to_time_t(tend_c);
-    std::cerr << std::ctime(&tend_f);
+    std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
+    std::cerr << "\nDone converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
   }
+
   if (sub_place.parsed()) {
     std::cerr << "Loading the library and the tree..." << std::endl;
     qplace.load_library();
     std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
     qplace.place_sequences();
-    auto tend_c = std::chrono::system_clock::now();
-    std::time_t tend_f = std::chrono::system_clock::to_time_t(tend_c);
-    std::cerr << std::ctime(&tend_f);
   }
+
   if (sub_dist.parsed()) {
     std::cerr << "Loading the library and the tree..." << std::endl;
     qdist.load_library();
     std::cerr << "Estimating distances between given sequences and references..." << std::endl;
     qdist.estimate_distances();
-    auto tend_c = std::chrono::system_clock::now();
-    std::time_t tend_f = std::chrono::system_clock::to_time_t(tend_c);
-    std::cerr << std::ctime(&tend_f);
   }
+
   if (sub_info.parsed()) {
     i.load_library();
     i.display_info();
   }
+
+  auto tend = std::chrono::system_clock::now();
+  std::time_t tend_f = std::chrono::system_clock::to_time_t(tend);
+  std::cerr << "\n" << std::ctime(&tend_f);
 
   return 0;
 }

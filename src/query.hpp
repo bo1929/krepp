@@ -15,7 +15,6 @@ namespace optimize {
 class Minfo;
 typedef std::shared_ptr<Minfo> minfo_sptr_t;
 typedef std::unique_ptr<Minfo> minfo_uptr_t;
-typedef std::stringstream strstream;
 
 class QMers : public std::enable_shared_from_this<QMers>
 {
@@ -49,8 +48,8 @@ public:
   void summarize_minfo(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
   void estimate_distances();
   void place_sequences();
-  void report_distances(strstream& batch_report);
-  void report_placement(strstream& batch_report);
+  void report_distances(strstream& batch_stream);
+  void report_placement(strstream& batch_stream);
 
 private:
   uint32_t k;

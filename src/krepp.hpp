@@ -57,6 +57,8 @@ class Qkrepp : public WLkrepp
 public:
   Qkrepp(CLI::App& sub_query);
   void place_sequences();
+  void begin_jplace(strstream& jplace_stream);
+  void end_jplace(strstream& jplace_stream);
   void estimate_distances();
 
 private:
