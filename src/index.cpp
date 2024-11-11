@@ -91,3 +91,11 @@ crecord_sptr_t Index::get_crecord(uint32_t rix)
   return rix < nrows ? (r_to_flatht[rix % m])->get_crecord()
                      : (r_to_flatht[rix % m])->get_crecord();
 }
+
+void Index::make_rho_partial()
+{
+  double ratio_m = static_cast<double>(r_to_flatht.size()) / static_cast<double>(m);
+  for (auto [r, flatht] : r_to_flatht) {
+    flatht->get_crecord()->apply_rho_coef(ratio_m);
+  }
+}

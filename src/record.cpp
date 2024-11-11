@@ -196,11 +196,7 @@ CRecord::CRecord(tree_sptr_t tree)
   tree->reset_traversal();
   nnodes = tree->get_nnodes() + 1;
   nsubsets = nnodes;
-  se_to_rho.resize(nnodes);
-  while (nd_curr = tree->next_post_order()) {
-    se_to_rho[curr_senum] = 0;
-    curr_senum++;
-  }
+  se_to_rho.resize(nnodes, 0);
   tree->reset_traversal();
 }
 
@@ -298,5 +294,12 @@ void CRecord::display_info(uint32_t r, vec<uint64_t>& se_to_count)
   }
   for (auto const& [key, val] : outdegree_hist) {
     std::cout << r << "\t#COLOR_OUTDEGREE\t" << key << "\t" << val << std::endl;
+  }
+}
+
+void CRecord::apply_rho_coef(double coef)
+{
+  for (se_t se = 0; se < se_to_rho.size(); ++se) {
+    se_to_rho[se] *= coef;
   }
 }

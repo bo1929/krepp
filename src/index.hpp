@@ -13,6 +13,7 @@ public:
   Index(std::filesystem::path index_dir)
     : index_dir(index_dir){};
   void add_partial_index(std::string suffix);
+  void make_rho_partial();
   crecord_sptr_t get_crecord(uint32_t rix);
   std::vector<cmer_t>::const_iterator get_first(uint32_t rix);
   std::vector<cmer_t>::const_iterator get_next(uint32_t rix);

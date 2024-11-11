@@ -118,6 +118,8 @@ head -n15 placements_toy.jplace
 
 You can proceed with your down-stream analysis using other tools, such as [`gappa`](github.com/lczech/gappa):
 ```bash
-grep -v "\[ \]" placements_toy.jplace | sed -z "s/},\n\t]/}\n\t]/g" > placements_toy-filtered.jplace # filtering sequences without any match and hence an empty placement field
-gappa examine heat-tree --jplace-path placements_toy-filtered.jplace --write-svg-tree # generating a colored tree based on placement densities across the backbone tree
+# filtering sequences without any match and hence an empty placement field
+grep -v "\[ \]" placements_toy.jplace | sed -z "s/},\n\t]/}\n\t]/g" > placements_toy-filtered.jplace
+# generating a colored tree based on placement densities across the backbone tree
+gappa examine heat-tree --jplace-path placements_toy-filtered.jplace --write-svg-tree
 ```

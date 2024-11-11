@@ -92,6 +92,7 @@ public:
     tree.reset();
   }
   void print_info();
+  void apply_rho_coef(double coef);
   void decode_se(se_t se, vec<node_sptr_t>& subset_v);
   void load(std::filesystem::path index_dir, std::string suffix);
   void save(std::filesystem::path index_dir, std::string suffix);
