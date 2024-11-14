@@ -13,7 +13,7 @@ PROGRAM = krepp
 OBJECTS = build/common.o \
 					build/MurmurHash3.o \
 					build/lshf.o \
-					build/library.o build/query.o build/rqseq.o \
+					build/index.o build/query.o build/rqseq.o \
 					build/record.o build/phytree.o build/table.o \
 					build/krepp.o
 
