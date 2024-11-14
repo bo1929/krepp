@@ -202,7 +202,6 @@ void QBatch::report_placement(strstream& batch_stream)
           mi_curr->optimize_likelihood(llhfunc);
           mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
           if (mi_curr->chisq < CHISQ_THRESHOLD) {
-            mi_curr->optimize_likelihood(llhfunc);
             nd_v.push_back(nd_curr);
           }
         }
