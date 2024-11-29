@@ -7,6 +7,7 @@ Pre-compiled binaries are not available yet but hopefully will be soon.
 
 To compile from the source, simply clone the repository with its submodules and compile with
 ```
+sudo apt install curl
 git clone --recurse-submodules -j8 https://github.com/bo1929/krepp.git
 cd krepp && make
 ```
