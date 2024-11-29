@@ -38,7 +38,7 @@ public:
     return written;
   }
   void extract_mers(vvec<mer_t>& table);
-  std::string download_url(std::string url);
+  /* std::string download_url(std::string url); */
 
 private:
   uint8_t k;
