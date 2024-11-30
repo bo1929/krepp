@@ -1,7 +1,7 @@
 # compiler options
 #--------------------------------------------
 COMPILER = g++
-LDLIBS = -lstdc++fs -lm -lz -lstdc++ -lcurl
+LDLIBS = -lstdc++fs -lm -lz -lstdc++
 INC = -Iexternal/CLI11/include/CLI \
 			-Iexternal/parallel-hashmap -Iexternal/boost/libs/math/include
 CXXFLAGS = -std=c++17 -O3 -g -fopenmp
