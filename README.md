@@ -6,12 +6,19 @@ A k-mer-based maximum likelihood method for estimating distances of reads to gen
 Pre-compiled binaries are not available yet but hopefully will be soon.
 
 To compile from the source, simply clone the repository with its submodules and compile with
-```
+```bash
 sudo apt install curl
 git clone --recurse-submodules -j8 https://github.com/bo1929/krepp.git
 cd krepp && make
 ```
 and run `./krepp --help`. Then, perhaps, copy it to a directory you have in your `$PATH` (e.g., `cp ./krepp ~/.local/bin`).
+
+If you don't have `libcurl` on your system and if you are not able to install it, you can use releases named with suffix `*-no_libcurl` and the branch `libcurl-free`.
+```bash
+git clone -b libcurl-free --recurse-submodules -j8 https://github.com/bo1929/krepp.git
+cd krepp && make
+```
+Using this version, you cannot download reference genomes directly from FTP servers, you have to have all references locally stored to construct an index.
 
 ### Building a krepp index from reference genomes
 Given a set of reference genomes and a backbone tree, krepp can build an LSH index of colored k-mers by simply running
