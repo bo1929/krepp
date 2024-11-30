@@ -29,7 +29,7 @@ where
 * `$NUM_THREADS` is simply the number of threads,
 * `-l` is the directory where the index will be stored (preferably a unique name),
 * `-i` is a tab-separated file where the first column is IDs of references, i.e., leaves of the tree, and the second column is for paths to reference genomes (e.g., FASTA),
-* `-t` is the backbone tree in Newick format matching the genome IDs (i.e., leaf labels) given.
+* `-t` is the backbone tree in Newick format matching the genome IDs (i.e., leaf labels) given (must be rooted and with labeled internal nodes).
 
 Run `krepp build --help` to see more options.
 If you don't have a tree and are mainly interested in estimating distances, an arbitrary (or random) tree might just work as a workaround (with the side effect of potentially making the color index a little larger).
