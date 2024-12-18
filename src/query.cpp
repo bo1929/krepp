@@ -1,6 +1,5 @@
 #include "query.hpp"
 #include <boost/math/tools/minima.hpp>
-#include <string>
 
 #define CHISQ_THRESHOLD 2.706
 
@@ -161,7 +160,7 @@ void QBatch::place_sequences()
 void QBatch::report_placement(strstream& batch_stream)
 {
   if (node_to_minfo.size() == 0) {
-    batch_stream << "\t\t\t{\"p\" : [ ], \"n \": [\"" + identifer_batch[bix] + "\"]},\n";
+    batch_stream << "\t\t\t{\"p\" : [ ], \"n\": [\"" + identifer_batch[bix] + "\"]},\n";
     return;
   } else if (node_to_minfo.size() > 1) { // OR place on the closest leaf.
     node_sptr_t nd_curr = nullptr;
@@ -220,14 +219,11 @@ void QBatch::report_placement(strstream& batch_stream)
   } else {
     mi_pp->chisq = 0;
   }
-  batch_stream << "\t\t\t{\"p\" : [[" + std::to_string(nd_pp->get_se() - 1) + ", " +
-                    std::to_string(mi_pp->chisq) + ", " +
-                    /* std::to_string(mi_pp->d_llh) + ", " + */
-                    std::to_string(mi_pp->v_llh) + ", " + std::to_string(mi_pp->d_llh) + ", " +
-                    std::to_string(1e-5) + ", " +
-                    /* std::to_string(mi_pp->rmatch_count) + ", " + */
-                    std::to_string(nd_pp->get_blen() / 2.0) + "]], \"n\" : [\"" +
-                    identifer_batch[bix] + "\"]},\n";
+  batch_stream << "\t\t\t{\"p\" : [[" << nd_pp->get_se() << ", " << mi_pp->chisq
+               << ", " // mi_pp->d_llh << ","
+               << mi_pp->v_llh << ", " << mi_pp->d_llh << ", " << 1e-5
+               << ", " // mi_pp->rmatch_count << ","
+               << nd_pp->get_blen() / 2.0 << "]], \"n\" : [\"" << identifer_batch[bix] << "\"]},\n";
 }
 
 QMers::QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
