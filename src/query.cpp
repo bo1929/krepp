@@ -219,7 +219,7 @@ void QBatch::report_placement(strstream& batch_stream)
   } else {
     mi_pp->chisq = 0;
   }
-  batch_stream << "\t\t\t{\"p\" : [[" << nd_pp->get_se() << ", " << mi_pp->chisq
+  batch_stream << "\t\t\t{\"p\" : [[" << nd_pp->get_se() - 1 << ", " << mi_pp->chisq
                << ", " // mi_pp->d_llh << ","
                << mi_pp->v_llh << ", " << mi_pp->d_llh << ", " << 1e-5
                << ", " // mi_pp->rmatch_count << ","
