@@ -135,7 +135,10 @@ void QBatch::report_distances(strstream& batch_stream)
 {
   for (auto& [nd, mi] : node_to_minfo) {
     // TODO: Add distance threshold for reporting or likelihood ratio test.
-    batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
+    mi->chisq = mi->likelihood_ratio(mi_pp->d_llh, llhfunc);
+    if (mi->chisq < CHISQ_THRESHOLD) {
+      batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
+    }
   }
 }
 
