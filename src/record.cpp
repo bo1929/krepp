@@ -274,27 +274,59 @@ void CRecord::decode_se(se_t se, vec<node_sptr_t>& subset_v)
 
 void CRecord::display_info(uint32_t r, vec<uint64_t>& se_to_count)
 {
-  std::cout << r << "\t#NODES\t" << nnodes << std::endl;
-  std::cout << r << "\t#COLORS\t" << nsubsets << std::endl;
+  std::cout << r << "\tNUM_NODES\t" << nnodes << "\n";
+  std::cout << r << "\tNUM_COLORS\t" << nsubsets << "\n";
   vec<uint64_t> se_to_outdegree(se_to_pse.size());
   for (int ix = 1; ix < se_to_pse.size(); ++ix) {
     se_to_outdegree[se_to_pse[ix].first]++;
     se_to_outdegree[se_to_pse[ix].second]++;
   }
   flat_phmap<uint64_t, uint32_t> outdegree_hist;
-  for (uint64_t ix = 1; ix < se_to_outdegree.size(); ++ix) {
-    outdegree_hist[se_to_outdegree[ix]]++;
-  }
   flat_phmap<uint64_t, uint32_t> count_hist;
   for (uint64_t ix = 1; ix < se_to_pse.size(); ++ix) {
     count_hist[se_to_count[ix]]++;
+    outdegree_hist[se_to_outdegree[ix]]++;
   }
   for (auto const& [key, val] : count_hist) {
-    std::cout << r << "\t#COLOR_COUNT" << key << "\t" << val << std::endl;
+    std::cout << r << "\tMER_COUNT\t" << key << "\t" << val << "\n";
   }
   for (auto const& [key, val] : outdegree_hist) {
-    std::cout << r << "\t#COLOR_OUTDEGREE\t" << key << "\t" << val << std::endl;
+    std::cout << r << "\tOUTDEGREE_COUNT\t" << key << "\t" << val << "\n";
   }
+  node_sptr_t nd;
+  for (uint64_t ix = 1; ix < nnodes; ++ix) {
+    nd = tree->get_node(ix);
+    if (nd->check_leaf()) {
+      continue;
+    }
+    std::cout << r << "\tNODE_INFO\t" << nd->get_name() << "\t" << nd->get_card() << "\t"
+              << se_to_outdegree[ix] << "\t" << se_to_count[ix] << "\n";
+  }
+  // std::queue<se_t> se_q;
+  // uint64_t se;
+  // uint32_t depth;
+  // std::pair<se_t, se_t> pse;
+  // for (uint64_t ix = 1; ix < se_to_pse.size(); ++ix) {
+  //   depth = 0;
+  //   if (!tree->check_node(ix)) {
+  //     se_q.push(ix);
+  //     while (!se_q.empty()) {
+  //       depth++;
+  //       uint32_t n = se_q.size();
+  //       for (uint32_t i = 0; i < n; i++) {
+  //         se = se_q.front();
+  //         se_q.pop();
+  //         if (!tree->check_node(se)) {
+  //           pse = se_to_pse[se];
+  //           se_q.push(pse.first);
+  //           se_q.push(pse.second);
+  //         }
+  //       }
+  //     }
+  //     depth--;
+  //   }
+  //   std::cout << r << "\tCOLOR_INFO\t" << ix << "\t" << depth << "\t" << se_to_count[ix] << "\n";
+  // }
 }
 
 void CRecord::apply_rho_coef(double coef)

@@ -1,11 +1,15 @@
 #include "query.hpp"
 #include <boost/math/tools/minima.hpp>
 
+/* #define CHISQ_THRESHOLD 3.841 */
 #define CHISQ_THRESHOLD 2.706
+/* #define CHISQ_THRESHOLD 1.642 */
 
-QBatch::QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th)
+QBatch::QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t tau, bool no_filter)
   : index(index)
   , hdist_th(hdist_th)
+  , tau(tau)
+  , no_filter(no_filter)
 {
   lshf = index->get_lshf();
   tree = index->get_tree();
@@ -75,10 +79,10 @@ void QBatch::search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, q
   }
 }
 
-void QBatch::summarize_minfo(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
+void QBatch::summarize_matches(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
 {
-  nd_pp = tree->get_root();
-  mi_pp = std::make_shared<Minfo>(hdist_th);
+  nd_closest = tree->get_root();
+  mi_closest = std::make_shared<Minfo>(hdist_th);
   node_to_minfo.clear();
   qmers_or->hdist_filt = 2 * qmers_or->hdist_filt + 1;
   qmers_rc->hdist_filt = 2 * qmers_rc->hdist_filt + 1;
@@ -88,9 +92,9 @@ void QBatch::summarize_minfo(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
       continue;
     }
     mi->optimize_likelihood(llhfunc);
-    if (mi->d_llh < mi_pp->d_llh) {
-      nd_pp = nd;
-      mi_pp = mi;
+    if (mi->d_llh < mi_closest->d_llh) {
+      nd_closest = nd;
+      mi_closest = mi;
     }
     node_to_minfo[nd] = mi;
   }
@@ -100,9 +104,9 @@ void QBatch::summarize_minfo(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
       continue;
     }
     mi->optimize_likelihood(llhfunc);
-    if (mi->d_llh < mi_pp->d_llh) {
-      nd_pp = nd;
-      mi_pp = mi;
+    if (mi->d_llh < mi_closest->d_llh) {
+      nd_closest = nd;
+      mi_closest = mi;
     }
     node_to_minfo[nd] = mi;
     // If both in reverse-complement and the original sequence, decide:
@@ -113,7 +117,7 @@ void QBatch::summarize_minfo(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
   }
 }
 
-void QBatch::estimate_distances()
+void QBatch::estimate_distances(std::ostream& output_stream)
 {
   strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
@@ -124,25 +128,33 @@ void QBatch::estimate_distances()
     qmers_sptr_t qmers_rc = std::make_shared<QMers>(index, len, hdist_th);
 
     search_mers(seq, len, qmers_or, qmers_rc);
-    summarize_minfo(qmers_or, qmers_rc);
+    summarize_matches(qmers_or, qmers_rc);
     report_distances(batch_stream);
   }
 #pragma omp critical
-  std::cout << batch_stream.rdbuf();
+  output_stream << batch_stream.rdbuf();
 }
 
 void QBatch::report_distances(strstream& batch_stream)
 {
-  for (auto& [nd, mi] : node_to_minfo) {
-    // TODO: Add distance threshold for reporting or likelihood ratio test.
-    mi->chisq = mi->likelihood_ratio(mi_pp->d_llh, llhfunc);
-    if (mi->chisq < CHISQ_THRESHOLD) {
+  if (no_filter) {
+    for (auto& [nd, mi] : node_to_minfo) {
       batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
     }
+  } else {
+    for (auto& [nd, mi] : node_to_minfo) {
+      mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
+      if (mi->chisq < CHISQ_THRESHOLD) {
+        batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
+      }
+    }
+  }
+  if (node_to_minfo.empty()) {
+    batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
   }
 }
 
-void QBatch::place_sequences()
+void QBatch::place_sequences(std::ostream& output_stream)
 {
   strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
@@ -153,19 +165,19 @@ void QBatch::place_sequences()
     qmers_sptr_t qmers_rc = std::make_shared<QMers>(index, len, hdist_th);
 
     search_mers(seq, len, qmers_or, qmers_rc);
-    summarize_minfo(qmers_or, qmers_rc);
+    summarize_matches(qmers_or, qmers_rc);
     report_placement(batch_stream);
   }
 #pragma omp critical
-  std::cout << batch_stream.rdbuf();
+  output_stream << batch_stream.rdbuf();
 }
 
 void QBatch::report_placement(strstream& batch_stream)
 {
-  if (node_to_minfo.size() == 0) {
-    batch_stream << "\t\t\t{\"p\" : [ ], \"n\": [\"" + identifer_batch[bix] + "\"]},\n";
-    return;
-  } else if (node_to_minfo.size() > 1) { // OR place on the closest leaf.
+  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], ";
+  node_sptr_t nd_pp = nullptr;
+  minfo_sptr_t mi_pp = nullptr;
+  if (node_to_minfo.size() > 1) {
     node_sptr_t nd_curr = nullptr;
     minfo_sptr_t mi_curr = nullptr;
 
@@ -173,42 +185,48 @@ void QBatch::report_placement(strstream& batch_stream)
     // Place on the LCA of all leaves that pass llh-ratio test:
     mi_curr = std::make_shared<Minfo>(hdist_th);
     for (auto const& [nd, mi] : node_to_minfo) {
-      mi->chisq = mi->likelihood_ratio(mi_pp->d_llh, llhfunc);
-      if (mi->chisq < CHISQ_THRESHOLD) {
+      mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
+      if (mi->chisq < CHISQ_THRESHOLD && (no_filter || mi->get_leq_tau(tau) > 1.0)) {
         nd_curr = Tree::compute_lca(nd_curr, nd);
-        mi_curr.add(mi);
+        mi_curr->join(mi);
       }
     }
-    mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
+    mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
     nd_pp = nd_curr;
     mi_pp = mi_curr;
     */
+
     vec<node_sptr_t> nd_v;
     while (nd_curr = tree->next_post_order(nd_curr)) {
       if (nd_curr->check_leaf()) {
         if (!node_to_minfo.contains(nd_curr)) {
-          node_to_minfo[nd_curr] = std::make_shared<Minfo>(enmers, hdist_th);
+          node_to_minfo[nd_curr] = std::make_shared<Minfo>(hdist_th, enmers, 0.0);
         } else {
           mi_curr = node_to_minfo[nd_curr];
-          mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
-          if (mi_curr->chisq < CHISQ_THRESHOLD) {
+          mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
+          if (mi_curr->chisq < CHISQ_THRESHOLD && (no_filter || mi_curr->get_leq_tau(tau) > 1.0)) {
             nd_v.push_back(nd_curr);
           }
         }
       } else {
         mi_curr = std::make_shared<Minfo>(hdist_th);
         for (uint32_t nix = 0; nix < nd_curr->get_nchildren(); ++nix) {
-          mi_curr->add(node_to_minfo[*std::next(nd_curr->get_children(), nix)]);
+          mi_curr->join(node_to_minfo[*std::next(nd_curr->get_children(), nix)]);
         }
-        if (mi_curr->rmatch_count) {
+        if (mi_curr->rmatch_count > 1.0 && (no_filter || mi_curr->get_leq_tau(tau) > 1.0)) {
           mi_curr->optimize_likelihood(llhfunc);
-          mi_curr->chisq = mi_curr->likelihood_ratio(mi_pp->d_llh, llhfunc);
+          mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
           if (mi_curr->chisq < CHISQ_THRESHOLD) {
             nd_v.push_back(nd_curr);
           }
         }
         node_to_minfo[nd_curr] = mi_curr;
       }
+    }
+
+    if (nd_v.empty()) {
+      batch_stream << "\"p\" : [ ]},\n";
+      return;
     }
 
     std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
@@ -219,14 +237,40 @@ void QBatch::report_placement(strstream& batch_stream)
     });
     nd_pp = *(nd_v.rbegin());
     mi_pp = node_to_minfo[nd_pp];
+
+    // Don't place on top if all matches,
+    // choose either of the children based on the total branch length.
+    // TODO: Do something more elegant for such cases...
+    if ((mi_pp->rcard == mi_pp->rmatch_count) && !nd_pp->check_leaf()) {
+      nd_curr = *std::next(nd_pp->get_children(), 0);
+      mi_curr = node_to_minfo[nd_curr];
+      for (uint32_t nix = 1; nix < nd_pp->get_nchildren(); ++nix) {
+        if (nd_curr->total_blen < (*std::next(nd_pp->get_children(), nix))->total_blen) {
+          nd_curr = *std::next(nd_pp->get_children(), nix);
+          mi_curr = node_to_minfo[nd_curr];
+        }
+      }
+      nd_pp = nd_curr;
+      mi_pp = mi_curr;
+      if (mi_pp->chisq != mi_pp->chisq) {
+        mi_pp->optimize_likelihood(llhfunc);
+        mi_pp->chisq = mi_closest->likelihood_ratio(mi_pp->d_llh, llhfunc);
+      }
+    }
   } else {
-    mi_pp->chisq = 0;
+    if (node_to_minfo.size() > 0 && (no_filter || mi_closest->get_leq_tau(tau) > 1.0)) {
+      nd_pp = nd_closest;
+      mi_pp = mi_closest;
+      mi_pp->chisq = 0;
+    }
   }
-  batch_stream << "\t\t\t{\"p\" : [[" << nd_pp->get_se() - 1 << ", " << mi_pp->chisq
-               << ", " // mi_pp->d_llh << ","
-               << mi_pp->v_llh << ", " << mi_pp->d_llh << ", " << 1e-5
-               << ", " // mi_pp->rmatch_count << ","
-               << nd_pp->get_blen() / 2.0 << "]], \"n\" : [\"" << identifer_batch[bix] << "\"]},\n";
+  if (nd_pp) {
+    batch_stream << "\"p\" : [[" << (nd_pp->get_se() - 1) << ", 0, " << nd_pp->get_blen() / 2.0
+                 << ", " << -mi_pp->v_llh << ", " << mi_pp->chisq << ", " << mi_pp->d_llh
+                 << "]]},\n";
+  } else {
+    batch_stream << "\"p\" : [ ]},\n";
+  }
 }
 
 QMers::QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
@@ -239,11 +283,15 @@ QMers::QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
   tree = index->get_tree();
   k = lshf->get_k();
   h = lshf->get_h();
-  enmers = len - k + 1;
+  if (len) {
+    enmers = len - k + 1;
+  } else {
+    enmers = 0;
+  }
 }
 
 void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
-{ // TODO: Potential acceleration using SIMD?
+{
   se_t se;
   node_sptr_t nd;
   uint32_t ix;
@@ -274,7 +322,7 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
       nd = tree->get_node(se);
       if (nd->check_leaf()) {
         if (!leaf_to_minfo.contains(nd)) {
-          leaf_to_minfo[nd] = std::make_shared<Minfo>(enmers, hdist_th, crecord->get_rho(se));
+          leaf_to_minfo[nd] = std::make_shared<Minfo>(hdist_th, enmers, crecord->get_rho(se));
         }
         leaf_to_minfo[nd]->update_match(iter1->first, pos, hdist_curr);
       } else {
@@ -324,15 +372,8 @@ double Minfo::likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc)
 void Minfo::optimize_likelihood(optimize::HDistHistLLH& llhfunc)
 {
   llhfunc.set_parameters(hdisthist_v.data(), mismatch_count, rho);
-
   // Locating Function Minima using Brent's algorithm, depends on boost::math.
   std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.5, 16);
   d_llh = sol_r.first;
   v_llh = sol_r.second;
-
-  // Optimizing with L-BFGS-B, requires Eigen and l-bfgs-b libraries.
-  /* optimize::Lbfgsb solver; */
-  /* optimize::State state = */
-  /*   solver.minimize(llhfunc, optimize::d_init, optimize::d_lb, optimize::d_ub); */
-  /* d_llh = (state.x().transpose())(0); */
 }

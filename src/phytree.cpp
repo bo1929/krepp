@@ -122,6 +122,8 @@ void Node::parse(vec<std::string>& nd_v)
       (children.back())->parse(nd_v);
       card += (children.back())->card;
       sh += (children.back())->sh;
+      total_blen += (children.back())->blen;
+      total_blen += (children.back())->total_blen;
       nchildren++;
       if (nd_v[tree->atter] == ",")
         continue;

@@ -63,8 +63,12 @@ public:
   void end_jplace(strstream& jplace_stream);
 
 private:
-  /* std::filesystem::path output_dir = "./"; */
+  std::filesystem::path output_path;
+  std::ofstream output_file;
+  std::ostream* output_stream = &std::cout;
   uint32_t hdist_th = 4;
+  uint32_t tau = 3;
+  bool no_filter = false;
   std::filesystem::path query_path;
 };
 

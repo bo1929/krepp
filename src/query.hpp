@@ -19,7 +19,6 @@ typedef std::unique_ptr<Minfo> minfo_uptr_t;
 class QMers : public std::enable_shared_from_this<QMers>
 {
   friend class QBatch;
-  friend class Minfo;
 
 public:
   QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th);
@@ -43,11 +42,11 @@ private:
 class QBatch
 {
 public:
-  QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th = 4);
+  QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t tau, bool no_filter);
   void search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
-  void summarize_minfo(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
-  void estimate_distances();
-  void place_sequences();
+  void summarize_matches(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
+  void estimate_distances(std::ostream& output_stream);
+  void place_sequences(std::ostream& output_stream);
   void report_distances(strstream& batch_stream);
   void report_placement(strstream& batch_stream);
 
@@ -55,21 +54,23 @@ private:
   uint32_t k;
   uint32_t h;
   uint32_t m;
-  uint64_t mask_bp;
-  uint64_t mask_lr;
   uint32_t hdist_th;
-  uint64_t bix;
-  uint64_t batch_size;
-  uint32_t onmers_or;
-  uint32_t onmers_rc;
-  uint32_t enmers;
+  uint32_t tau;
+  bool no_filter;
   tree_sptr_t tree;
   lshf_sptr_t lshf;
   index_sptr_t index;
-  node_sptr_t nd_pp = nullptr;
-  minfo_sptr_t mi_pp = nullptr;
+  uint64_t mask_bp;
+  uint64_t mask_lr;
+  uint32_t enmers;
+  uint32_t onmers_or;
+  uint32_t onmers_rc;
+  uint64_t batch_size;
+  uint64_t bix;
   vec<std::string> seq_batch;
   vec<std::string> identifer_batch;
+  node_sptr_t nd_closest = nullptr;
+  minfo_sptr_t mi_closest = nullptr;
   optimize::HDistHistLLH llhfunc;
 
 protected:
@@ -78,68 +79,45 @@ protected:
 
 class Minfo
 {
-  friend class QMers;
   friend class QBatch;
 
-  struct match_t
-  {
-    enc_t enc_lr;
-    uint32_t pos;
-    uint32_t hdist;
-    match_t(enc_t enc_lr, uint32_t pos, uint32_t hdist)
-      : enc_lr(enc_lr)
-      , pos(pos)
-      , hdist(hdist)
-    {}
-  };
+  // struct match_t
+  // {
+  //   enc_t enc_lr;
+  //   uint32_t pos;
+  //   uint32_t hdist;
+  //   match_t(enc_t enc_lr, uint32_t pos, uint32_t hdist)
+  //     : enc_lr(enc_lr)
+  //     , pos(pos)
+  //     , hdist(hdist)
+  //   {}
+  // };
 
 public:
-  Minfo(uint32_t nmers, uint32_t hdist_th, double rho)
+  Minfo(uint32_t hdist_th, uint32_t nmers, double rho = 0.0)
     : nmers(nmers)
-    , hdist_th(hdist_th)
     , rho(rho)
   {
-    rmatch_count = 1;
+    rcard++;
+    rmatch_count = rho > 0 ? 1 : 0;
     mismatch_count = nmers;
     hdisthist_v.resize(hdist_th + 1, 0);
   }
-  Minfo(uint32_t nmers, uint32_t hdist_th)
-    : nmers(nmers)
-    , hdist_th(hdist_th)
+  Minfo(uint32_t hdist_th) { hdisthist_v.resize(hdist_th + 1, 0); }
+  void join(minfo_sptr_t minfo)
   {
-    mismatch_count = nmers;
-    hdisthist_v.resize(hdist_th + 1, 0);
-  }
-  Minfo(uint32_t hdist_th)
-    : nmers(0)
-    , hdist_th(hdist_th)
-  {
-    mismatch_count = nmers;
-    hdisthist_v.resize(hdist_th + 1, 0);
-  }
-  void add(minfo_sptr_t minfo)
-  {
-    if (nmers) {
-      gamma = (gamma + minfo->gamma) / 2.0;
-      d_llh = (d_llh + minfo->d_llh) / 2.0;
-      match_count = (match_count + minfo->match_count) / 2.0;
-      mismatch_count = (mismatch_count + minfo->mismatch_count) / 2.0;
-      for (uint32_t x = 0; x <= hdist_th; ++x) {
-        hdisthist_v[x] = (hdisthist_v[x] + minfo->hdisthist_v[x]) / 2.0;
-      }
-    } else {
-      gamma = minfo->gamma;
-      d_llh = minfo->d_llh;
-      match_count = minfo->match_count;
-      mismatch_count = minfo->mismatch_count;
-      for (uint32_t x = 0; x <= hdist_th; ++x) {
-        hdisthist_v[x] = minfo->hdisthist_v[x];
-      }
+    double denom = nmers ? 0.5 : 1.0;
+    /* gamma = (gamma + minfo->gamma) * denom; */
+    match_count = (match_count + minfo->match_count) * denom;
+    mismatch_count = (mismatch_count + minfo->mismatch_count) * denom;
+    for (uint32_t x = 0; x < hdisthist_v.size(); ++x) {
+      hdisthist_v[x] = (hdisthist_v[x] + minfo->hdisthist_v[x]) * denom;
     }
-    rmatch_count += minfo->rmatch_count;
-    rho = std::max(rho, minfo->rho);
     hdist_min = std::min(hdist_min, minfo->hdist_min);
     nmers = std::max(nmers, minfo->nmers);
+    rho = std::max(rho, minfo->rho);
+    rcard += minfo->rcard;
+    rmatch_count += minfo->rmatch_count;
   }
   void update_match(enc_t enc_lr, uint32_t pos, uint32_t hdist_curr)
   {
@@ -148,15 +126,15 @@ public:
       match_count++;
       mismatch_count--;
       hdisthist_v[hdist_curr]++;
-      /* match_v.emplace_back(enc_lr, pos, hdist_curr); */
       last_pos = pos;
       last_hdist = hdist_curr;
+      /* match_v.emplace_back(enc_lr, pos, hdist_curr); */
     } else {
       if (last_hdist > hdist_curr) {
         hdisthist_v[hdist_curr]++;
-        /* hdisthist_v[(match_v.back()).hdist]--; */
         hdisthist_v[last_hdist]--;
         last_hdist = hdist_curr;
+        /* hdisthist_v[(match_v.back()).hdist]--; */
         /* (match_v.back()).enc_lr = enc_lr; */
         /* (match_v.back()).hdist = hdist_curr; */
       }
@@ -165,25 +143,33 @@ public:
       hdist_min = hdist_curr;
     }
   }
+  double get_leq_tau(uint32_t tau)
+  {
+    double total_leq_tau = 0.0;
+    for (uint32_t x = 0; x <= tau; ++x) {
+      total_leq_tau += hdisthist_v[x];
+    }
+    return total_leq_tau;
+  }
   /* void compute_gamma(); */
   void optimize_likelihood(optimize::HDistHistLLH& llhfunc);
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
 private:
-  uint32_t hdist_th;
-  double nmers;
-  double mismatch_count;
+  double nmers = 0;
+  double mismatch_count = 0;
   double match_count = 0;
-  double gamma = 0.0;
   double rho = 0.0;
+  /* double gamma = 0.0; */
+  uint32_t rcard = 0;
+  uint32_t rmatch_count = 0;
   uint32_t last_pos = 0;
   uint32_t last_hdist = 0xFFFFFFFF;
-  uint32_t rmatch_count = 0;
-  uint32_t hdist_min = std::numeric_limits<uint32_t>::max();
-  double chisq = std::numeric_limits<double>::max();
-  double d_llh = std::numeric_limits<double>::max();
-  double v_llh = std::numeric_limits<double>::min();
+  uint32_t hdist_min = 0xFFFFFFFF;
   std::vector<double> hdisthist_v;
+  double chisq = std::numeric_limits<double>::quiet_NaN();
+  double d_llh = std::numeric_limits<double>::max();
+  double v_llh = std::numeric_limits<double>::quiet_NaN();
   /* std::vector<match_t> match_v; */
 };
 

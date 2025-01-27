@@ -77,6 +77,7 @@ public:
     std::for_each(children.begin(), children.end(), [&sh](node_sptr_t nd) { sh += nd->sh; });
     return sh;
   }
+  double total_blen = 0;
 
 private:
   vec<node_sptr_t> children;

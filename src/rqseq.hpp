@@ -71,7 +71,7 @@ class QSeq
 public:
   QSeq(std::filesystem::path input_path);
   ~QSeq();
-  bool read_next_batch();
+  bool read_next_batch(uint64_t max_batch_size = BATCH_SIZE);
   bool is_batch_finished();
   void clear_curr_batch();
 

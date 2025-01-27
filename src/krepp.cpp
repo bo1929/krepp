@@ -137,7 +137,8 @@ Bkrepp::Bkrepp(CLI::App& sub_build)
     ->required()
     ->check(CLI::ExistingFile);
   sub_build
-    .add_option("-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree.")
+    .add_option(
+      "-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (rooted).")
     ->required()
     ->check(CLI::ExistingFile);
   sub_build.add_option("-k,--kmer-len", k, "Length of k-mers [30].");
@@ -209,7 +210,7 @@ void Qkrepp::estimate_distances()
 {
   strstream dreport_stream;
   header_dreport(dreport_stream);
-  std::cout << dreport_stream.rdbuf();
+  (*output_stream) << dreport_stream.rdbuf();
   omp_set_num_threads(num_threads);
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
 #pragma omp parallel shared(qs)
@@ -217,10 +218,10 @@ void Qkrepp::estimate_distances()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
-        QBatch qb(index, qs, hdist_th);
+        QBatch qb(index, qs, hdist_th, tau, no_filter);
 #pragma omp task untied
         {
-          qb.estimate_distances();
+          qb.estimate_distances(*output_stream);
         }
       }
 #pragma omp taskwait
@@ -230,7 +231,7 @@ void Qkrepp::estimate_distances()
 
 void Qkrepp::end_jplace(strstream& jplace_stream)
 {
-  jplace_stream << "\t\t\t{\"p\" : [ ], \"n\" : [\"NaN\"]}\n";
+  jplace_stream << "\t\t\t{\"n\" : [\"NaN\"], \"p\" : [ ]}\n";
   jplace_stream << "\t],\n";
   jplace_stream << "\t\"tree\" : \"";
   index->get_tree()->stream_newick_str(jplace_stream, index->get_tree()->get_root());
@@ -239,9 +240,10 @@ void Qkrepp::end_jplace(strstream& jplace_stream)
 
 void Qkrepp::begin_jplace(strstream& jplace_stream)
 {
+  // TODO: Make it compatible with jplace standard.
   jplace_stream
     << "{\n\t\"version\" : 3,\n\t"
-       "\"fields\" : [\"edge_num\", \"like_weight_ratio\", \"likelihood\", \"pavg_distance\", \"pendant_length\", \"distal_length\"],\n"
+       "\"fields\" : [\"edge_num\", \"likelihood\", \"like_weight_ratio\", \"placement_distance\", \"pendant_length\", \"distal_length\"],\n"
        "\t\"metadata\" : {\n"
        "\t\t\"software\" : \"krepp\",\n"
        "\t\t\"version\" : \"" VERSION "\",\n"
@@ -255,7 +257,7 @@ void Qkrepp::place_sequences()
 {
   strstream jplace_stream;
   begin_jplace(jplace_stream);
-  std::cout << jplace_stream.rdbuf();
+  (*output_stream) << jplace_stream.rdbuf();
   omp_set_num_threads(num_threads);
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
 #pragma omp parallel shared(qs)
@@ -263,10 +265,10 @@ void Qkrepp::place_sequences()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
-        QBatch qb(index, qs, hdist_th);
+        QBatch qb(index, qs, hdist_th, tau, no_filter);
 #pragma omp task untied
         {
-          qb.place_sequences();
+          qb.place_sequences(*output_stream);
         }
       }
 #pragma omp taskwait
@@ -274,7 +276,7 @@ void Qkrepp::place_sequences()
   }
   jplace_stream.str("");
   end_jplace(jplace_stream);
-  std::cout << jplace_stream.rdbuf();
+  (*output_stream) << jplace_stream.rdbuf();
 }
 
 Ikrepp::Ikrepp(CLI::App& sub_info)
@@ -295,19 +297,28 @@ Qkrepp::Qkrepp(CLI::App& sub_query)
       "-l,--index-dir", index_dir, "Path to the directory containing the reference index.")
     ->required()
     ->check(CLI::ExistingDirectory);
-  /* sub_query.add_option( */
-  /*   "-o,--output-dir", output_dir, "Path to the directory to output results [./]."); */
+  sub_query.add_option(
+    "-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
   sub_query.add_option("-q,--query-file", query_path, "Path to FASTA/FASTQ query file.")
     ->required()
     ->check(CLI::ExistingFile);
   sub_query.add_option(
     "--hdist-th", hdist_th, "The maximum Hamming distance for a k-mer to match [4].");
   sub_query.add_option(
-    "--leave-out-ref",
-    leave_out_ref,
-    "The reference taxon to be excluded during query, useful for benchmarking and testing.");
+    "--tau", tau, "The highest Hamming distance for placement threshold (increase to relax) [3].");
+  sub_query.add_flag(
+    "--no-filter",
+    no_filter,
+    "Report matching references regardless of the statistical significance or match count (overrides --tau) [false].");
+  // sub_query.add_option(
+  //   "--leave-out-ref",
+  //   leave_out_ref,
+  //   "The reference taxon to be excluded during query, useful for benchmarking and testing.");
   sub_query.callback([&]() {
-    /* std::filesystem::create_directory(output_dir); */
+    if (!output_path.empty()) {
+      output_file.open(output_path);
+      output_stream = &output_file;
+    }
     index = std::make_shared<Index>(index_dir);
   });
 }

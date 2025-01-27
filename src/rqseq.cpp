@@ -137,7 +137,7 @@ QSeq::QSeq(std::filesystem::path input_path)
   kseq = kseq_init(gfile);
 }
 
-bool QSeq::read_next_batch()
+bool QSeq::read_next_batch(uint64_t max_batch_size)
 {
   seq_batch.clear();
   identifer_batch.clear();
@@ -145,7 +145,7 @@ bool QSeq::read_next_batch()
   identifer_batch.reserve(BATCH_SIZE);
   bool cont_reading = false;
   uint64_t ix = 0;
-  while ((ix < BATCH_SIZE) && (cont_reading = kseq_read(kseq) >= 0)) {
+  while ((ix < max_batch_size) && (cont_reading = kseq_read(kseq) >= 0)) {
     seq_batch.emplace_back(kseq->seq.s);
     identifer_batch.emplace_back(kseq->name.s);
     ix++;
