@@ -1,5 +1,53 @@
 #include "table.hpp"
 
+SFlatHT::SFlatHT(sdynht_sptr_t source)
+{
+  nkmers = source->nkmers;
+  nrows = source->enc_vvec.size();
+  inc_v.resize(nrows);
+  enc_v.reserve(nkmers);
+  inc_t limit_inc = std::numeric_limits<inc_t>::max();
+  inc_t copy_inc;
+  inc_t lix = 0;
+  for (uint32_t rix = 0; rix < nrows; ++rix) {
+    copy_inc = std::min(limit_inc, source->enc_vvec[rix].size());
+    for (inc_t i = 0; i < copy_inc; ++i) {
+      enc_v.push_back(source->enc_vvec[rix][i]);
+    }
+    lix += copy_inc;
+    inc_v[rix] = lix;
+    source->enc_vvec[rix].clear();
+  }
+}
+
+void SFlatHT::load(std::ifstream& sketch_stream)
+{
+  sketch_stream.read(reinterpret_cast<char*>(&nkmers), sizeof(uint64_t));
+  enc_v.resize(nkmers);
+  sketch_stream.read(reinterpret_cast<char*>(enc_v.data()), nkmers * sizeof(enc_t));
+  assert(nkmers == enc_v.size());
+  sketch_stream.read(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
+  inc_v.resize(nrows);
+  sketch_stream.read(reinterpret_cast<char*>(inc_v.data()), nrows * sizeof(inc_t));
+  assert(nrows == inc_v.size());
+}
+
+void SFlatHT::save(std::ofstream& sketch_stream)
+{
+  sketch_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
+  sketch_stream.write(reinterpret_cast<const char*>(enc_v.data()), sizeof(enc_t) * nkmers);
+  if (!sketch_stream.good()) {
+    std::cerr << "Writing the k-mer vector has failed!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  sketch_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
+  sketch_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * nrows);
+  if (!sketch_stream.good()) {
+    std::cerr << "Writing the index-increment vector has failed!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+}
+
 FlatHT::FlatHT(dynht_sptr_t source)
 {
   nkmers = source->nkmers;
@@ -65,7 +113,7 @@ void FlatHT::save(std::filesystem::path index_dir, std::string suffix)
   mer_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
   mer_stream.write(reinterpret_cast<const char*>(cmer_v.data()), sizeof(cmer_t) * nkmers);
   if (!mer_stream.good()) {
-    std::cerr << "Writing k-mer vector has failed!" << std::endl;
+    std::cerr << "Writing the k-mer vector has failed!" << std::endl;
     exit(EXIT_FAILURE);
   }
   mer_stream.close();
@@ -74,7 +122,7 @@ void FlatHT::save(std::filesystem::path index_dir, std::string suffix)
   inc_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
   inc_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * nrows);
   if (!inc_stream.good()) {
-    std::cerr << "Writing index-increment vector has failed!" << std::endl;
+    std::cerr << "Writing the index-increment vector has failed!" << std::endl;
     exit(EXIT_FAILURE);
   }
   inc_stream.close();
@@ -94,6 +142,15 @@ void DynHT::clear_rows()
   mer_vvec.clear();
   size_hist.clear();
   nkmers = 0;
+}
+
+void SDynHT::sort_columns()
+{
+  for (uint32_t i = 0; i < enc_vvec.size(); ++i) {
+    if (!enc_vvec[i].empty()) {
+      std::sort(enc_vvec[i].begin(), enc_vvec[i].end());
+    }
+  }
 }
 
 void DynHT::sort_columns()
@@ -130,6 +187,17 @@ void DynHT::update_size_hist()
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
     size_hist[mer_vvec[i].size()]++;
     nkmers += mer_vvec[i].size();
+  }
+}
+
+void SDynHT::make_unique()
+{
+  nkmers = 0;
+  for (uint32_t i = 0; i < enc_vvec.size(); ++i) {
+    if (!enc_vvec[i].empty()) {
+      enc_vvec[i].erase(std::unique(enc_vvec[i].begin(), enc_vvec[i].end()), enc_vvec[i].end());
+    }
+    nkmers += enc_vvec[i].size();
   }
 }
 
@@ -229,11 +297,22 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 }
 */
 
-void DynHT::fill_table(rseq_sptr_t rs)
+void SDynHT::fill_table(uint32_t nrows, rseq_sptr_t rs)
+{
+  enc_vvec.resize(nrows);
+  while (rs->read_next_seq() && rs->set_curr_seq()) {
+    rs->extract_mers(enc_vvec);
+  }
+  rs->compute_rho();
+  sort_columns();
+  make_unique();
+}
+
+void DynHT::fill_table(sh_t sh, rseq_sptr_t rs)
 {
   mer_vvec.resize(nrows);
   while (rs->read_next_seq() && rs->set_curr_seq()) {
-    rs->extract_mers(mer_vvec);
+    rs->extract_mers(mer_vvec, sh);
   }
   rs->compute_rho();
   // update_nkmers();

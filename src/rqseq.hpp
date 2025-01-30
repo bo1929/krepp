@@ -20,7 +20,7 @@ class RSeq
   friend class DynHT;
 
 public:
-  RSeq(uint8_t w, uint32_t r, bool frac, sh_t sh, lshf_sptr_t lshf, std::string input);
+  RSeq(uint8_t w, uint32_t r, bool frac, lshf_sptr_t lshf, std::string input);
   ~RSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   double get_rho() { return rho; }
@@ -37,7 +37,8 @@ public:
     size_t written = fwrite(ptr, s, nmb, fst);
     return written;
   }
-  void extract_mers(vvec<mer_t>& table);
+  template<typename T>
+  void extract_mers(vvec<T>& table, sh_t sh = 0);
   std::string download_url(std::string url);
 
 private:
@@ -45,7 +46,6 @@ private:
   uint8_t w;
   uint32_t m;
   uint32_t r;
-  sh_t sh;
   char* seq;
   char* name;
   uint64_t len;
@@ -67,6 +67,7 @@ private:
 class QSeq
 {
   friend class QBatch;
+  friend class CBatch;
 
 public:
   QSeq(std::filesystem::path input_path);

@@ -12,8 +12,9 @@ WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 PROGRAM = krepp
 OBJECTS = build/common.o \
 					build/MurmurHash3.o \
-					build/lshf.o \
-					build/index.o build/query.o build/rqseq.o \
+					build/lshf.o build/rqseq.o \
+					build/index.o build/sketch.o \
+					build/query.o build/compare.o \
 					build/record.o build/phytree.o build/table.o \
 					build/krepp.o
 

@@ -1,10 +1,9 @@
 #include "rqseq.hpp"
 
-RSeq::RSeq(uint8_t w, uint32_t r, bool frac, sh_t sh, lshf_sptr_t lshf, std::string input)
+RSeq::RSeq(uint8_t w, uint32_t r, bool frac, lshf_sptr_t lshf, std::string input)
   : w(w)
   , r(r)
   , frac(frac)
-  , sh(sh)
   , lshf(lshf)
 {
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
@@ -58,11 +57,17 @@ RSeq::~RSeq()
   }
 }
 
-void RSeq::extract_mers(vvec<mer_t>& table)
+template<typename T>
+void RSeq::extract_mers(vvec<T>& table, sh_t sh)
 {
   uint32_t i, l;
   uint32_t rix, rix_res;
-  uint8_t ldiff = w - k + 1;
+  uint8_t ldiff;
+  if (w > k) {
+    ldiff = w - k + 1;
+  } else {
+    ldiff = k + 1;
+  }
   uint64_t kix = 0;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
   std::vector<std::pair<uint64_t, uint64_t>> lsh_enc_win(ldiff);
@@ -99,9 +104,13 @@ void RSeq::extract_mers(vvec<mer_t>& table)
 #endif /* CANONICAL */
       rix = lshf->compute_hash(cminimizer.first);
       rix_res = rix % m;
-      rix /= m;
       if (frac ? rix_res <= r : rix_res == r) {
-        table[rix].emplace_back(lshf->drop_ppos_lr(cminimizer.second), sh);
+        rix = frac ? rix / m * (r + 1) + rix_res : rix / m;
+        if constexpr (std::is_same_v<T, mer_t>) {
+          table[rix].emplace_back(lshf->drop_ppos_lr(cminimizer.second), sh);
+        } else {
+          table[rix].push_back(lshf->drop_ppos_lr(cminimizer.second));
+        }
         wnix++;
         if (cminimizer.first != pminimizer.first) {
           wcix++;
@@ -159,3 +168,6 @@ bool QSeq::is_batch_finished()
   assert(seq_batch.size() == identifer_batch.size());
   return seq_batch.empty() && identifer_batch.empty();
 }
+
+template void RSeq::extract_mers(vvec<mer_t>& table, sh_t sh);
+template void RSeq::extract_mers(vvec<enc_t>& table, sh_t sh);

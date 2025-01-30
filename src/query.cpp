@@ -53,25 +53,25 @@ void QBatch::search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, q
 #ifdef CANONICAL
     if (rcenc64_bp < orenc64_bp) {
       orrix = lshf->compute_hash(orenc64_bp);
-      if (index->check_partial(orrix)) {
+      if (index->set_partial(orrix)) {
         qmers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
         onmers_or++;
       }
     } else {
       rcrix = lshf->compute_hash(rcenc64_bp);
-      if (index->check_partial(rcrix)) {
+      if (index->set_partial(rcrix)) {
         qmers_or->add_matching_mer(i - k, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
         onmers_rc++;
       }
     }
 #else
     orrix = lshf->compute_hash(orenc64_bp);
-    if (index->check_partial(orrix)) {
+    if (index->set_partial(orrix)) {
       qmers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
       onmers_or++;
     }
     rcrix = lshf->compute_hash(rcenc64_bp);
-    if (index->check_partial(rcrix)) {
+    if (index->set_partial(rcrix)) {
       qmers_rc->add_matching_mer(len - i, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
       onmers_rc++;
     }
@@ -294,13 +294,12 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
 {
   se_t se;
   node_sptr_t nd;
-  uint32_t ix;
   uint32_t hdist_curr;
   std::queue<se_t> se_q;
   std::pair<se_t, se_t> pse;
-  std::vector<cmer_t>::const_iterator iter1 = index->get_first(rix);
-  std::vector<cmer_t>::const_iterator iter2 = index->get_next(rix);
-  crecord_sptr_t crecord = index->get_crecord(rix);
+  std::vector<cmer_t>::const_iterator iter1 = index->bucket_start();
+  std::vector<cmer_t>::const_iterator iter2 = index->bucket_next();
+  crecord_sptr_t crecord = index->get_crecord();
   for (; iter1 < iter2; ++iter1) {
     hdist_curr = popcount_lr32(iter1->first ^ enc_lr);
     if (hdist_curr > hdist_th) {

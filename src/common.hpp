@@ -28,6 +28,7 @@
 #include <regex>
 #include <string>
 #include <sys/types.h>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #include <zlib.h>
@@ -57,10 +58,11 @@ using vvec = std::vector<std::vector<T>>;
 template<typename T>
 using vec = std::vector<T>;
 
-class RSeq;
-class QSeq;
 class QBatch;
 class QMers;
+class CBatch;
+class RSeq;
+class QSeq;
 class LSHF;
 class Tree;
 class Node;
@@ -69,12 +71,16 @@ class Record;
 class CRecord;
 class DynHT;
 class FlatHT;
+class SDynHT;
+class SFlatHT;
 class Index;
+class Sketch;
 
-typedef std::shared_ptr<RSeq> rseq_sptr_t;
-typedef std::shared_ptr<QSeq> qseq_sptr_t;
+typedef std::shared_ptr<CBatch> cbatch_sptr_t;
 typedef std::shared_ptr<QBatch> qbatch_sptr_t;
 typedef std::shared_ptr<QMers> qmers_sptr_t;
+typedef std::shared_ptr<RSeq> rseq_sptr_t;
+typedef std::shared_ptr<QSeq> qseq_sptr_t;
 typedef std::shared_ptr<LSHF> lshf_sptr_t;
 typedef std::shared_ptr<Tree> tree_sptr_t;
 typedef std::shared_ptr<Node> node_sptr_t;
@@ -82,8 +88,11 @@ typedef std::shared_ptr<Subset> subset_sptr_t;
 typedef std::shared_ptr<Record> record_sptr_t;
 typedef std::shared_ptr<CRecord> crecord_sptr_t;
 typedef std::shared_ptr<DynHT> dynht_sptr_t;
+typedef std::shared_ptr<SDynHT> sdynht_sptr_t;
 typedef std::shared_ptr<FlatHT> flatht_sptr_t;
+typedef std::shared_ptr<SFlatHT> sflatht_sptr_t;
 typedef std::shared_ptr<Index> index_sptr_t;
+typedef std::shared_ptr<Sketch> sketch_sptr_t;
 typedef std::pair<enc_t, se_t> cmer_t;
 typedef std::pair<se_t, se_t> pse_t;
 
