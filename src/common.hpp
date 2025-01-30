@@ -34,7 +34,7 @@
 #include <zlib.h>
 #include <stdio.h>
 
-#define VERSION "v0.0.2"
+#define VERSION "v0.0.3"
 
 extern uint32_t num_threads;
 extern std::string invocation;
