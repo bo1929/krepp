@@ -12,13 +12,16 @@ class Index
 public:
   Index(std::filesystem::path index_dir)
     : index_dir(index_dir){};
+  void make_rho_partial();
   void add_partial_index(std::string suffix);
   void add_partial_tree(std::string suffix);
   void generate_partial_tree(std::string suffix);
-  void make_rho_partial();
-  crecord_sptr_t get_crecord();
   std::vector<cmer_t>::const_iterator bucket_start();
   std::vector<cmer_t>::const_iterator bucket_next();
+  crecord_sptr_t get_crecord();
+  lshf_sptr_t get_lshf() { return lshf; }
+  tree_sptr_t get_tree() { return tree; }
+  bool check_wtree() { return wtree; }
   bool set_partial(uint32_t rix)
   {
     rix_res = rix % m;
@@ -28,16 +31,13 @@ public:
     }
     return r_to_flatht.contains(rix_res);
   }
-  flatht_sptr_t get_flatht_sptr(uint32_t rix) { return r_to_flatht[rix % m]; };
-  lshf_sptr_t get_lshf() { return lshf; }
-  tree_sptr_t get_tree() { return tree; }
-  bool check_wtree() { return wtree; }
   void display_info()
   {
     for (auto const& [key, val] : r_to_flatht) {
       val->display_info(key);
     }
   }
+  flatht_sptr_t get_flatht_sptr(uint32_t rix) { return r_to_flatht[rix % m]; };
 
 private:
   uint8_t k;

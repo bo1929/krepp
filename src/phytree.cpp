@@ -32,7 +32,7 @@ bool Tree::check_compatible(tree_sptr_t tree)
 void Tree::generate_tree(vec<std::string>& names_v)
 {
   root = std::make_shared<Node>(getptr());
-  root->generate_tree(names_v.begin(), std::prev(names_v.end()));
+  root->generate_tree(names_v.begin(), names_v.end());
   se_to_node.push_back(root);
   subtree_root = root;
   compute_bdepth();
@@ -165,8 +165,9 @@ void Node::parse(vec<std::string>& nd_v)
 
 void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
 {
-  if (name_first != name_last) {
-    name = *(name_first) = *(name_last);
+  std::size_t diff_size = (name_last - name_first);
+  if (diff_size == 1) {
+    name = *(name_first);
     blen = 1.0;
     tree->total_blen += blen;
     is_leaf = true;
@@ -179,8 +180,7 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
     se = tree->nnodes;
     tree->se_to_node.push_back(getptr());
   } else {
-    std::size_t const half_size = (name_last - name_first) / 2;
-    vec_str_iter name_half = std::next(name_first, half_size);
+    vec_str_iter name_half = std::next(name_first, diff_size / 2);
     for (uint32_t pix = 0; pix < 2; ++pix) {
       children.emplace_back(std::make_shared<Node>(tree));
       (children.back())->set_parent(getptr());

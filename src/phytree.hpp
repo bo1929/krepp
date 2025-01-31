@@ -4,7 +4,7 @@
 #include "common.hpp"
 #include "record.hpp"
 
-typedef std::vector<std::string>::iterator vec_str_iter;
+typedef std::vector<std::string>::const_iterator vec_str_iter;
 
 class Tree : public std::enable_shared_from_this<Tree>
 {

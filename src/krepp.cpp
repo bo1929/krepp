@@ -1,5 +1,4 @@
 #include "krepp.hpp"
-#include <cstdint>
 
 void BaseLSH::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m); }
 

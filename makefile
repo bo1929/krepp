@@ -8,7 +8,7 @@ else
 	LDLIBS= -lstdc++fs -lm -lz -lstdc++ -lcurl
 endif
 VARDEF= -D _WLCURL=$(WLCURL)
-CXXFLAGS = -std=c++17 -O3 -g -fopenmp
+CXXFLAGS = -std=c++17 -O3 -fopenmp
 INC = -Iexternal/CLI11/include/CLI \
 			-Iexternal/parallel-hashmap \
 			-Iexternal/boost/libs/math/include
