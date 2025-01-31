@@ -1,18 +1,18 @@
 # compiler options
 #--------------------------------------------
-WLCURL=1
 COMPILER = g++
-ifeq ($(WLCURL),0)
+WLCURL=1
+ifeq ($(WLCURL), 0)
 	LDLIBS= -lstdc++fs -lm -lz -lstdc++
-	VARDEF= -D WLCURL=$(WLCURL)
 else
 	LDLIBS= -lstdc++fs -lm -lz -lstdc++ -lcurl
-	VARDEF= 
 endif
-INC = -Iexternal/CLI11/include/CLI \
-			-Iexternal/parallel-hashmap -Iexternal/boost/libs/math/include
+VARDEF= -D _WLCURL=$(WLCURL)
 CXXFLAGS = -std=c++17 -O3 -g -fopenmp
-WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
+INC = -Iexternal/CLI11/include/CLI \
+			-Iexternal/parallel-hashmap \
+			-Iexternal/boost/libs/math/include
+WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas
 
 # project files
 #--------------------------------------------

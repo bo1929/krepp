@@ -39,7 +39,7 @@ public:
   }
   template<typename T>
   void extract_mers(vvec<T>& table, sh_t sh = 0);
-#ifndef WLCURL
+#if defined _WLCURL && _WLCURL == 1
   std::string download_url(std::string url);
 #endif
 

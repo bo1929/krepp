@@ -1,7 +1,6 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#include "omp.h"
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -10,9 +9,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#ifndef WLCURL
-  #include <curl/curl.h>
-#endif
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -35,6 +31,12 @@
 #include <vector>
 #include <zlib.h>
 #include <stdio.h>
+#if defined(_OPENMP)
+  #include "omp.h"
+#endif
+#if defined _WLCURL && _WLCURL == 1
+  #include <curl/curl.h>
+#endif
 
 #define VERSION "v0.0.3"
 
@@ -63,6 +65,7 @@ using vec = std::vector<T>;
 class QBatch;
 class QMers;
 class CBatch;
+class CSummary;
 class RSeq;
 class QSeq;
 class LSHF;

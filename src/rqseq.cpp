@@ -13,7 +13,7 @@ RSeq::RSeq(uint8_t w, uint32_t r, bool frac, lshf_sptr_t lshf, std::string input
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   is_url = std::regex_match(input, url_regexp);
   if (is_url) {
-#ifndef WLCURL
+#if defined _WLCURL && _WLCURL == 1
     input_path = download_url(input);
 #endif
   } else {
@@ -27,7 +27,7 @@ RSeq::RSeq(uint8_t w, uint32_t r, bool frac, lshf_sptr_t lshf, std::string input
   kseq = kseq_init(gfile);
 }
 
-#ifndef WLCURL
+#if defined _WLCURL && _WLCURL == 1
 std::string RSeq::download_url(std::string url)
 {
   char tmp_path[FILENAME_MAX] = "/tmp/seq";

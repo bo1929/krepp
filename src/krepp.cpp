@@ -9,7 +9,7 @@ void BaseLSH::set_nrows()
   uint32_t full_residue = hash_size % m;
   if (frac) {
     nrows = (hash_size / m) * (r + 1);
-    nrows = full_residue > r ? nrows + r : nrows + full_residue;
+    nrows = full_residue > r ? nrows + (r + 1) : nrows + full_residue;
   } else {
     nrows = (hash_size / m);
     nrows = full_residue > r ? nrows + 1 : nrows;
@@ -158,7 +158,7 @@ void BaseLSH::save_configuration(std::ofstream& cfg_stream)
   cfg_stream.write(reinterpret_cast<char*>(&h), sizeof(uint8_t));
   cfg_stream.write(reinterpret_cast<char*>(&m), sizeof(uint32_t));
   cfg_stream.write(reinterpret_cast<char*>(&r), sizeof(uint32_t));
-  cfg_stream.write(reinterpret_cast<char*>(&frac), sizeof(frac));
+  cfg_stream.write(reinterpret_cast<char*>(&frac), sizeof(bool));
   cfg_stream.write(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
   cfg_stream.write(reinterpret_cast<char*>(lshf->ppos_data()), (h) * sizeof(uint8_t));
   cfg_stream.write(reinterpret_cast<char*>(lshf->npos_data()), (k - h) * sizeof(uint8_t));
