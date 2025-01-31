@@ -95,6 +95,7 @@ class TargetIndex
 {
 public:
   void load_index();
+  bool check_wtree() { return index->check_wtree(); }
 
 protected:
   index_sptr_t index = nullptr;

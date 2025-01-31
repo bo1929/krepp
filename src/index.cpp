@@ -1,5 +1,52 @@
 #include "index.hpp"
 
+void Index::generate_partial_tree(std::string suffix)
+{
+  wtree = false;
+  std::ifstream reflist_file(index_dir / ("reflist" + suffix));
+  std::string name;
+  std::vector<std::string> names_v;
+  if (reflist_file.is_open()) {
+    while (std::getline(reflist_file, name)) {
+      names_v.push_back(name);
+    }
+    reflist_file.close();
+  } else {
+    std::cerr << "Unable to open reference list file for an index without a tree." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  tree_sptr_t curr_tree = std::make_shared<Tree>();
+  curr_tree->generate_tree(names_v);
+
+#pragma omp critical
+  {
+    if (curr_tree->check_compatible(tree)) {
+      tree = !tree ? curr_tree : tree;
+    } else {
+      std::cerr << "Partial libraries are based on different references." << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  }
+}
+
+void Index::add_partial_tree(std::string suffix)
+{
+  wtree = true;
+  tree_sptr_t curr_tree = std::make_shared<Tree>();
+  curr_tree->load(index_dir, suffix);
+
+#pragma omp critical
+  {
+    if (curr_tree->check_compatible(tree)) {
+      tree = !tree ? curr_tree : tree;
+    } else {
+      std::cerr << "Partial libraries are based on different trees." << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  }
+}
+
 void Index::add_partial_index(std::string suffix)
 {
   std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
@@ -35,19 +82,6 @@ void Index::add_partial_index(std::string suffix)
       nrows = pow(2, 2 * h);
     } else {
       std::cerr << "Partial libraries have incompatible hash functions." << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  tree_sptr_t curr_tree = std::make_shared<Tree>();
-  curr_tree->load(index_dir, suffix);
-
-#pragma omp critical
-  {
-    if (curr_tree->check_compatible(tree)) {
-      tree = !tree ? curr_tree : tree;
-    } else {
-      std::cerr << "Partial libraries are based on different trees." << std::endl;
       exit(EXIT_FAILURE);
     }
   }

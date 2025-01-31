@@ -39,7 +39,9 @@ public:
   }
   template<typename T>
   void extract_mers(vvec<T>& table, sh_t sh = 0);
+#ifndef WLCURL
   std::string download_url(std::string url);
+#endif
 
 private:
   uint8_t k;

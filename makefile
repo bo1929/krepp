@@ -1,7 +1,14 @@
 # compiler options
 #--------------------------------------------
+WLCURL=1
 COMPILER = g++
-LDLIBS = -lstdc++fs -lm -lz -lstdc++ -lcurl
+ifeq ($(WLCURL),0)
+	LDLIBS= -lstdc++fs -lm -lz -lstdc++
+	VARDEF= -D WLCURL=$(WLCURL)
+else
+	LDLIBS= -lstdc++fs -lm -lz -lstdc++ -lcurl
+	VARDEF= 
+endif
 INC = -Iexternal/CLI11/include/CLI \
 			-Iexternal/parallel-hashmap -Iexternal/boost/libs/math/include
 CXXFLAGS = -std=c++17 -O3 -g -fopenmp
@@ -25,10 +32,10 @@ all: $(PROGRAM)
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp
 	@mkdir -p build
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) $(LDLIBS) $(INC) -c src/$*.cpp -o build/$*.o
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(LDLIBS) $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o
 
 $(PROGRAM): $(OBJECTS)
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(LDLIBS) $(CPPFLAGS) $(LDFLAGS) $(INC) -o $@
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(LDLIBS) $(VARDEF) $(CPPFLAGS) $(LDFLAGS) $(INC) -o $@
 
 clean:
 	rm -f $(PROGRAM) $(OBJECTS)

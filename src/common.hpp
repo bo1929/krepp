@@ -10,7 +10,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <curl/curl.h>
+#ifndef WLCURL
+  #include <curl/curl.h>
+#endif
 #include <filesystem>
 #include <fstream>
 #include <functional>

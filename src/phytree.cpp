@@ -29,6 +29,15 @@ bool Tree::check_compatible(tree_sptr_t tree)
   return is_compatible;
 }
 
+void Tree::generate_tree(vec<std::string>& names_v)
+{
+  root = std::make_shared<Node>(getptr());
+  root->generate_tree(names_v.begin(), std::prev(names_v.end()));
+  se_to_node.push_back(root);
+  subtree_root = root;
+  compute_bdepth();
+}
+
 void Tree::parse(std::filesystem::path nwk_path)
 {
   std::ifstream tree_stream(nwk_path);
@@ -154,6 +163,47 @@ void Node::parse(vec<std::string>& nd_v)
   return;
 }
 
+void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
+{
+  if (name_first != name_last) {
+    name = *(name_first) = *(name_last);
+    blen = 1.0;
+    tree->total_blen += blen;
+    is_leaf = true;
+    card = 1;
+    sh = Subset::get_singleton_sh(name);
+    while (!sh) {
+      sh = Subset::rehash(reinterpret_cast<uint64_t>(&sh));
+    }
+    tree->nnodes++;
+    se = tree->nnodes;
+    tree->se_to_node.push_back(getptr());
+  } else {
+    std::size_t const half_size = (name_last - name_first) / 2;
+    vec_str_iter name_half = std::next(name_first, half_size);
+    for (uint32_t pix = 0; pix < 2; ++pix) {
+      children.emplace_back(std::make_shared<Node>(tree));
+      (children.back())->set_parent(getptr());
+      (children.back())->ix_child = nchildren;
+      if (pix) {
+        (children.back())->generate_tree(name_first, name_half);
+      } else {
+        (children.back())->generate_tree(name_half, name_last);
+      }
+      card += (children.back())->card;
+      sh += (children.back())->sh;
+      total_blen += (children.back())->blen;
+      total_blen += (children.back())->total_blen;
+      nchildren++;
+    }
+    is_leaf = false;
+    tree->nnodes++;
+    se = tree->nnodes;
+    name = "N" + std::to_string(se);
+    tree->se_to_node.push_back(getptr());
+  }
+}
+
 void Node::print_info()
 {
   std::string pname = parent ? parent->name : "";
@@ -239,6 +289,9 @@ double Tree::compute_distance(node_sptr_t a, node_sptr_t b)
 
 void Tree::save(std::filesystem::path index_dir, std::string suffix)
 {
+  if (nwk_str.empty()) {
+    return;
+  }
   std::ofstream tree_stream(index_dir / ("tree" + suffix));
   std::ostream_iterator<char> output_iterator(tree_stream);
   std::copy(nwk_str.begin(), nwk_str.end(), output_iterator);

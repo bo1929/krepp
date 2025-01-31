@@ -4,6 +4,8 @@
 #include "common.hpp"
 #include "record.hpp"
 
+typedef std::vector<std::string>::iterator vec_str_iter;
+
 class Tree : public std::enable_shared_from_this<Tree>
 {
   friend class Node;
@@ -17,6 +19,7 @@ public:
   bool check_compatible(tree_sptr_t tree);
   void split_nwk(vec<std::string>& n_vec);
   void parse(std::filesystem::path nwk_path);
+  void generate_tree(vec<std::string>& names_v);
   static double compute_distance(node_sptr_t a, node_sptr_t b);
   static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
   void save(std::filesystem::path index_dir, std::string suffix);
@@ -56,6 +59,7 @@ public:
   {}
   void print_info();
   void parse(vec<std::string>& n_vec);
+  void generate_tree(vec_str_iter name_first, vec_str_iter name_last);
   void set_sh(sh_t source) { sh = source; }
   void set_parent(node_sptr_t source) { parent = source; }
   node_sptr_t getptr() { return shared_from_this(); }

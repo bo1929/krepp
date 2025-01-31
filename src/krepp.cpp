@@ -1,4 +1,5 @@
 #include "krepp.hpp"
+#include <cstdint>
 
 void BaseLSH::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m); }
 
@@ -40,7 +41,19 @@ void SketchSingle::save_sketch()
 void IndexMultiple::obtain_build_tree()
 {
   tree = std::make_shared<Tree>();
-  tree->parse(nwk_path);
+  if (nwk_path.empty()) {
+    std::cerr << "No tree has given as a guide, the color index could be suboptimal." << std::endl;
+    vec<std::string> names_v;
+    for (const auto& [key, value] : name_to_path) {
+      names_v.push_back(key);
+    }
+    tree->generate_tree(names_v);
+    std::ofstream reflist_file(index_dir / ("reflist" + suffix));
+    std::ostream_iterator<std::string> reflist_iterator(reflist_file, "\n");
+    std::copy(std::begin(names_v), std::end(names_v), reflist_iterator);
+  } else {
+    tree->parse(nwk_path);
+  }
   tree->reset_traversal();
 }
 
@@ -225,7 +238,6 @@ IndexMultiple::IndexMultiple(CLI::App& sub_im)
   sub_im
     .add_option(
       "-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (rooted).")
-    ->required()
     ->check(CLI::ExistingFile);
   sub_im.add_option("-k,--kmer-len", k, "Length of k-mers [30].");
   sub_im.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+3].");
@@ -274,10 +286,15 @@ void TargetIndex::load_index()
   for (auto const& [suffix, ltypes] : suffix_to_ltype) {
     suffixes.push_back(suffix);
   }
-  std::set<std::string> lall{"cmer", "crecord", "inc", "metadata", "tree"};
+  std::set<std::string> lall_wtree{"cmer", "crecord", "inc", "metadata", "tree"};
+  std::set<std::string> lall_wotree{"cmer", "crecord", "inc", "metadata", "reflist"};
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
-    if (suffix_to_ltype[suffixes[lix]] == lall) {
+    if (suffix_to_ltype[suffixes[lix]] == lall_wtree) {
+      index->add_partial_tree(suffixes[lix]);
+      index->add_partial_index(suffixes[lix]);
+    } else if (suffix_to_ltype[suffixes[lix]] == lall_wotree) {
+      index->generate_partial_tree(suffixes[lix]);
       index->add_partial_index(suffixes[lix]);
     } else {
       std::cerr << "There is a partial index with a missing file!" << std::endl;
@@ -501,6 +518,9 @@ int main(int argc, char** argv)
   if (sub_implace.parsed()) {
     std::cerr << "Loading the index and the tree..." << std::endl;
     implace.load_index();
+    if (!implace.check_wtree()) {
+      std::cerr << "Given index does not have a backbone tree for placement..." << std::endl;
+    }
     std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
     implace.place_sequences();
   }
