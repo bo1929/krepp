@@ -7,64 +7,91 @@ Pre-compiled binaries are not available yet but hopefully will be soon.
 
 To compile from the source, simply clone the repository with its submodules and compile with
 ```bash
-sudo apt install curl
 git clone --recurse-submodules -j8 https://github.com/bo1929/krepp.git
 cd krepp && make
 ```
 and run `./krepp --help`. Then, perhaps, copy it to a directory you have in your `$PATH` (e.g., `cp ./krepp ~/.local/bin`).
 
-If you don't have `libcurl` on your system and if you are not able to install it, you can use releases named with suffix `*-no_libcurl` and the branch `libcurl-free`.
-```bash
-git clone -b libcurl-free --recurse-submodules -j8 https://github.com/bo1929/krepp.git
-cd krepp && make
-```
-Using this version, you cannot download reference genomes directly from FTP servers, you have to have all references locally stored to construct an index.
+You may not have `libcurl`  on your system, and in that case compilation would fail. You can install it (e.g., `sudo apt install curl`), and try running make again.
+Otherwise, you could simply compile without libcurl by running `make WLCURL=0`.
+Note that, without `libcurl`, you cannot use URLs to retrieve FASTA/FASTQ files directly from FTP servers, and all query/reference files will have to be stored locally.
 
 ### Building a krepp index from reference genomes
-Given a set of reference genomes and a backbone tree, krepp can build an LSH index of colored k-mers by simply running
+Given a set of reference genomes and a backbone tree, krepp can build an LSH index with colored k-mers by running
 ```bash
-krepp --num-threads $NUM_THREADS build -l $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS 
 ```
 where
 * `$NUM_THREADS` is simply the number of threads,
-* `-l` is the directory where the index will be stored (preferably a unique name),
+* `-o` is the directory where the index will be stored,
 * `-i` is a tab-separated file where the first column is IDs of references, i.e., leaves of the tree, and the second column is for paths to reference genomes (e.g., FASTA),
-* `-t` is the backbone tree in Newick format matching the genome IDs (i.e., leaf labels) given (must be rooted and with labeled internal nodes).
+* `-t` is the optional backbone tree in Newick format matching the genome IDs (i.e., leaf labels) given (must be rooted and with labeled internal nodes).
 
-Run `krepp build --help` to see more options.
-If you don't have a tree and are mainly interested in estimating distances, an arbitrary (or random) tree might just work as a workaround (with the side effect of potentially making the color index a little larger).
+Run `krepp build --help` to see more options and details.
+If you don't have a tree and if you are mainly interested in estimating distances, run `krepp index` without the `-t` option (with the side effect of potentially making the color index slightly larger).
+An index constructed without a backbone cannot be used for phylogenetic placement, but distance estimates stay the same.
 
 Instead of building an index from scratch, you could use one of the public ones.
-Currently, there are only three such indexes available for microbial and archaeal genomes.
-Note that smaller indexes were built using a reference subset of the larger one.
-Therefore, these indexes overlap, and you could just pick the one that you can afford memory-wise.
+Currently, only two such indexes are available for microbial and archaeal genomes; both allow phylogenetic placement.
+Note that the smaller index (v1) was built using a reference set which is a subset of the larger one.
+Therefore, these indexes overlap, and you could just pick the one that you can afford in terms of memory available on your machine.
 
 * Web of Life - v2 (15,493 archaeal and bacterial genomes): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv2-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv2.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv2.tsv.gz)
 * Web of Life - v1 (10,576 archaeal and bacterial genomes): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
 
-Only the index is required to query novel sequences, but genome IDs are not informative.
-You can use the provided metadata to analyze the distance estimates further for taxonomic classification or abundance profiling.
+The genome IDs that will be reported with these indexes themselves may not be informative.
+You can use the provided metadata files to analyze the your distance estimates further; perhaps for taxonomic classification or abundance profiling.
 Similarly, the backbone tree could be used for UniFrac computation.
 
-Lastly, we note that memory use increases almost linearly with `$NUM_THREADS` for the `build` subcommand, and hence, you may want to decrease it if you run out of memory.
-The peak memory usage can always be reduced to the memory level available by splitting the LSH index into batches and building each batch separately by using `-m`, `-r` and `--no-frac` options (see relevant documentation and `krank --help`).
-This is not the case for `dist` and `place` commands, feel free to use all cores available during the query-time.
+We note that memory use increases almost linearly with `$NUM_THREADS` for the `index` subcommand, and hence, you may want to decrease it if you run out of memory.
+This is not the case for `dist`, `place`, and `seek` commands, feel free to use all cores available during the query time.
+
+Another way of making the index smaller is increasing the minimizer window size (`-w`) with respect to `-k`.
+This may cost you some accuracy as fewer *k*-mers will be indexed, but shouldn't be an issue as long as it is not too aggressive (e.g., `w-k>9`).
+
+The peak memory usage during the index constructing could be also reduced to the memory level available by partitioning the index into smaller pieces.
+This is done by a variation of FracMinHash, controlled by options `-m` and `-r`.
+`krepp` partitions the index into `-m` (more or less) equally sized pieces, and these partitions could be built independently, but one can query them together.
+The `-r` option determines the partition that is going to be constructed: if `--frac` is given all partitions from 0th to `-r`th, otherwise only the `-r`th, partition will be constructed and saved (see `krank index --help` for details).
+You don't even need to construct all partitions, `krepp` will search in whatever is available, and these partitions can be distributed independently.
+The default is `-m 5 -r 1 --frac`, so 40% of the minimized *k*-mers will be indexed.
+The only requirement is keeping the `-m` value (and of course `-i` and `-t`) fixed across all partitions.
+For instance, one can index 3% percent of the reference *k*-mers and construct a lightweight index by running:
+```bash
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 99
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 98
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 97
+```
+or alternatively
+```bash
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 2 --frac
+```
+but this would be faster, but increases the memory use during the index construction, despite resulting in an index of the same size.
+Perhaps later, if you don't think this works well for your task, you can build the remaining 47% of the index size by running
+```bash
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 46 --frac
+```
+or maybe
+```bash
+seq 1 46 | xargs -I{} -P2 bash -c "krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r {}"
+```
+if you have a small memory machine. Just stick to the defaults if everything works or if you don't run out of memory.
 
 ### Estimating distances of reads to reference genomes
 Once you have the index built, query reads against it to get distance estimates is quite simple:
 ```bash
-krepp --num-threads $NUM_THREADS dist -l $INDEX_DIR -q $QUERY_PATH
+krepp dist -i $INDEX_DIR -q $QUERY_PATH --num-threads $NUM_THREADS
 ```
 where `-q` is the path of a FASTA/Q file containing query reads, and `krepp` simply outputs everything to stdout and writes log messages to stderr.
 The output is in a tab-separated format in which the first column stands for the read ID, the second column is the ID of the reference matching, and the third column is the distance estimate of krepp.
 
 ### Phylogenetic placement of reads on the backbone tree
-In addition to distance estimation, one could place reads on the backbone tree given as an input while building the index
+In addition to distance estimation, one could place reads on the backbone tree given as input while building the index
 ```bash
-krepp --num-threads $NUM_THREADS place -l $INDEX_DIR -q $QUERY_PATH
+krepp place -i $INDEX_DIR -q $QUERY_PATH --num-threads $NUM_THREADS
 ```
 where the output is in `jplace` format (version 3) (see the description [here](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0031009)).
-We allow the `p` field to be empty for sequences without any *k*-mer match.
+We leave the `p` field empty for sequences without any *k*-mer match.
 Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with empty placement fields (such as [`gappa`](github.com/lczech/gappa)), in this case you can simply filter those lines (e.g., by parsing `jplace` as a JSON file in Python or via bash scripting `grep -v "\[ \]" $QUERY_NAME.jplace | sed -z "s/},\n\t]/}\n\t]/g" > $QUERY_NAME-filtered.jplace`).
 
 ### A toy example for testing
@@ -74,7 +101,7 @@ You can build it from scratch consisting of only 25 genomes provided in `test/` 
 ```bash
 cd test/
 tar -xvf references_toy.tar.gz && xz -d references_toy/*
-../krepp --num-threads 8 build -h 11 -k 27 -w 35 -l index_toy -i input_map.tsv -t tree_toy.nwk
+../krepp index -h 11 -k 27 -w 35 -o index_toy -i input_map.tsv -t tree_toy.nwk --num-threads 8
 ```
 This command took less than 10 seconds and used 1.5GB memory for 6,975,500 indexed *k*-mers on a machine with Intel Xeon Silver 4110 CPUs.
 The resulting index will be stored in `index_toy`.
@@ -83,11 +110,11 @@ Alternatively, you could download one of the larger public libraries to make it 
 #### Querying novel sequences against the reference index
 Once you have your index (e.g., the one we built above: `index_toy`), you can estimate distance by running:
 ```bash
-../krepp --num-threads 8 dist -l index_toy -q query_toy.fq | tee distances_toy.tsv
+../krepp --num-threads 8 dist -i index_toy -q query_toy.fq | tee distances_toy.tsv
 ```
 The first five lines of `distances_toy.tsv` are going to look like:
 ```
-#software: krepp	#version: v0.0.2	#invocation :../krepp --num-threads 8 dist -l index_toy -q query_toy.fq
+#software: krepp	#version: v0.0.4	#invocation :../krepp --num-threads 8 dist -l index_toy -q query_toy.fq
 SEQ_ID	REFERENCE_NAME	DIST
 ||61435-4122	G000341695	0.0898062
 ||61435-4949	G000830905	0.147048
@@ -98,7 +125,7 @@ SEQ_ID	REFERENCE_NAME	DIST
 
 Quite similarly, you can place reads by running:
 ```bash
-../krepp --num-threads 8 place -l index_toy -q query_toy.fq | tee placements_toy.jplace
+../krepp --num-threads 8 place -i index_toy -q query_toy.fq | tee placements_toy.jplace
 ```
 
 The resulting placement file is a JSON file in a special format called `jplace`:
@@ -108,20 +135,19 @@ head -n15 placements_toy.jplace
 ```
 {
 	"version" : 3,
-	"fields" : ["edge_num", "like_weight_ratio", "likelihood", "pendant_length", "distal_length"],
+        "fields" : ["edge_num", "likelihood", "like_weight_ratio", "placement_distance", "pendant_length", "distal_length"],
 	"metadata" : {
 		"software" : "krepp",
-		"version" : "v0.0.1",
+		"version" : "v0.0.4",
 		"repository" : "https://github.com/bo1929/krepp",
 		"invocation" : "../krepp --num-threads 8 place -l index_toy -q query_toy.fq"
 	},
 	"placements" :
 		[
-			{"p" : [[39, 0.000000, 20.671067, 0.000010, 0.001088]], "n" : ["||61435-4122"]},
-			{"p" : [[40, 2.308570, 45.363721, 0.000010, 0.008363]], "n" : ["||61435-4949"]},
-			{"p" : [[41, 1.938949, 37.197833, 0.000010, 0.149723]], "n" : ["||61435-317"]},
-			{"p" : [[40, 0.043721, 38.058347, 0.000010, 0.008363]], "n" : ["||61435-2985"]},
-
+			{"n" : ["||61435-4122"], "p" : [[39, 0, 0.00108799, -12.2542, 0, 0.0257952]]},
+			{"n" : ["||61435-4949"], "p" : [[38, 0, 0.000709545, -35.0081, 0.96283, 0.0362437]]},
+			{"n" : ["||61435-317"], "p" : [[35, 0, 0.00585016, -28.701, 6.56765, 0.0363296]]},
+			{"n" : ["||61435-2985"], "p" : [[38, 0, 0.000709545, -25.4031, 0.0492549, 0.0114681]]},
 ```
 
 You can proceed with your down-stream analysis using other tools, such as [`gappa`](github.com/lczech/gappa):
