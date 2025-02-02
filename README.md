@@ -1,9 +1,16 @@
 # krepp
 A k-mer-based maximum likelihood method for estimating distances of reads to genomes and phylogenetic placement.
 
+- [Installing krepp or compiling from source.](#installing-krepp-or-compiling-from-source)
+- [Building an index from multiple reference genomes](#building-an-index-from-multiple-reference-genomes)
+- [Estimating distances of reads to all reference genomes](#estimating-distances-of-reads-to-reference-genomes)
+- [Phylogenetic placement of reads on a backbone tree](#phylogenetic-placement-of-reads-on-a-backbone-tree)
+- [Practical distance estimation by sketching a file](#practical-distance-estimation-by-sketching-a-file)
+- [A toy example for testing](#a-toy-example-for-testing)
+
 ## Quick start
-### Installing and compiling krepp from source
-Pre-compiled binaries are not available yet but hopefully will be soon.
+### Installing krepp or compiling from source
+Pre-compiled binaries are only available for Linux and x64 architecture, see the [latest release](https://github.com/bo1929/krepp/releases/tag/v0.0.4).
 
 To compile from the source, simply clone the repository with its submodules and compile with
 ```bash
@@ -16,7 +23,7 @@ You may not have `libcurl`  on your system, and in that case, compilation would 
 Otherwise, you could simply compile without libcurl by running `make WLCURL=0`.
 Note that, without `libcurl`, you cannot use URLs to retrieve FASTA/FASTQ files directly from FTP servers, and all query/reference files will have to be stored locally.
 
-### Building a krepp index from reference genomes
+### Building an index from multiple reference genomes
 Given a set of reference genomes and a backbone tree, krepp can build an LSH index with colored k-mers by running
 ```bash
 krepp index -o $INDEX_DIR -i $INPUT_FILE -t $BACKBONE_NEWICK --num-threads $NUM_THREADS 
@@ -78,7 +85,7 @@ seq 1 46 | xargs -I{} -P2 bash -c "krepp index -o $INDEX_DIR -i $INPUT_FILE -t $
 
 Just stick to the defaults if everything works or if you don't run out of memory.
 
-### Estimating distances of reads to reference genomes
+### Estimating distances of reads to all reference genomes
 Once you have the index built, query reads against it to get distance estimates is quite simple:
 ```bash
 krepp dist -i $INDEX_DIR -q $QUERY_FILE --num-threads $NUM_THREADS -o ${QUERY_NAME}.tsv
@@ -86,7 +93,7 @@ krepp dist -i $INDEX_DIR -q $QUERY_FILE --num-threads $NUM_THREADS -o ${QUERY_NA
 where `-q` is the path (or URL) of a FASTA/Q file containing query sequences, and `krepp` simply outputs everything to stdout and writes log messages to stderr.
 The output is in a tab-separated format where the first column stands for the sequence ID, the second column is the ID of the reference matching, and the third column is the distance estimate.
 
-### Phylogenetic placement of reads on the backbone tree
+### Phylogenetic placement of reads on a backbone tree
 In addition to distance estimation, one could place reads on the backbone tree given as input while building the index
 ```bash
 krepp place -i $INDEX_DIR -q $QUERY_FILE --num-threads $NUM_THREADS -o ${QUERY_NAME}.jplace
@@ -95,7 +102,7 @@ where the output is in `jplace` format (version 3) (see the description [here](h
 We leave the `p` field empty for sequences without any *k*-mer match.
 Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with empty placement fields (such as [`gappa`](github.com/lczech/gappa)), in this case you can simply filter those lines (e.g., by parsing `jplace` as a JSON file in Python or via bash scripting `grep -v "\[ \]" ${QUERY_NAME}.jplace | sed -z "s/},\n\t]/}\n\t]/g" > ${QUERY_NAME}-filtered.jplace`).
 
-### Practical distance estimation by sketching a single FASTA/Q
+### Practical distance estimation by sketching a file
 
 In addition to indexing multiple references together, `krepp` can also create a sketch from a FASTA/Q file for practical analysis with respect to a single reference.
 Simply run
