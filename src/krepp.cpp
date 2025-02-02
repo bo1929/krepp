@@ -30,14 +30,13 @@ void BaseLSH::save_configuration(std::ofstream& cfg_stream)
 
 void TargetSketch::load_sketch()
 {
-  sketch = std::make_shared<Sketch>(sketch_path);
   sketch->load_full_sketch();
   sketch->make_rho_partial();
 }
 void TargetIndex::ensure_wbackbone()
 {
   if (!index->check_wbackbone()) {
-    std::cerr << "Given index lacks a backbone tree required for this subcommand..." << std::endl;
+    std::cerr << "Given index lacks a backbone tree required for this sc..." << std::endl;
     exit(EXIT_FAILURE);
   }
 }
@@ -80,7 +79,7 @@ void TargetIndex::load_index()
 
 void SketchSingle::create_sketch()
 {
-  rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, lshf, input_path);
+  rseq_sptr_t rs = std::make_shared<RSeq>(input_file, lshf, w, r, frac);
   sdynht_sptr_t sdynht = std::make_shared<SDynHT>();
   sdynht->fill_table(nrows, rs);
   sketch_sflatht = std::make_shared<SFlatHT>(sdynht);
@@ -123,13 +122,13 @@ void IndexMultiple::obtain_build_tree()
 
 void IndexMultiple::read_input_file()
 {
-  std::ifstream input_file(input_path);
-  if (!input_file.good()) {
-    std::cerr << "Error opening " << input_path << std::endl;
+  std::ifstream input_stream(input_file);
+  if (!input_stream.good()) {
+    std::cerr << "Error opening " << input_file << std::endl;
     exit(EXIT_FAILURE);
   }
   std::string line;
-  while (std::getline(input_file, line)) {
+  while (std::getline(input_stream, line)) {
     std::istringstream iss(line);
     std::string input, name;
     if (!(std::getline(iss, name, '\t') && std::getline(iss, input, '\t'))) {
@@ -139,7 +138,7 @@ void IndexMultiple::read_input_file()
     name_to_path[name] = input;
     names_v.push_back(name);
   }
-  input_file.close();
+  input_stream.close();
 }
 
 void IndexMultiple::build_index()
@@ -218,7 +217,7 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
   if (nd->check_leaf()) {
     sh_t sh = nd->get_sh();
     if (name_to_path.find(nd->get_name()) != name_to_path.end()) {
-      rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, lshf, name_to_path[nd->get_name()]);
+      rseq_sptr_t rs = std::make_shared<RSeq>(name_to_path[nd->get_name()], lshf, w, r, frac);
       dynht->fill_table(sh, rs);
       dynht->get_record()->insert_rho(nd->get_sh(), rs->get_rho());
 #pragma omp critical
@@ -280,7 +279,7 @@ void QuerySketch::seek_sequences()
   strstream dreport_stream;
   header_dreport(dreport_stream);
   omp_set_num_threads(num_threads);
-  qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
+  qseq_sptr_t qs = std::make_shared<QSeq>(query_file);
 #pragma omp parallel shared(qs)
   {
 #pragma omp single
@@ -303,7 +302,7 @@ void QueryIndex::estimate_distances()
   header_dreport(dreport_stream);
   (*output_stream) << dreport_stream.rdbuf();
   omp_set_num_threads(num_threads);
-  qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
+  qseq_sptr_t qs = std::make_shared<QSeq>(query_file);
 #pragma omp parallel shared(qs)
   {
 #pragma omp single
@@ -350,7 +349,7 @@ void QueryIndex::place_sequences()
   begin_jplace(jplace_stream);
   (*output_stream) << jplace_stream.rdbuf();
   omp_set_num_threads(num_threads);
-  qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
+  qseq_sptr_t qs = std::make_shared<QSeq>(query_file);
 #pragma omp parallel shared(qs)
   {
 #pragma omp single
@@ -372,123 +371,78 @@ void QueryIndex::place_sequences()
 
 void InfoIndex::display_info() { index->display_info(); }
 
-InfoIndex::InfoIndex(CLI::App& subcommand)
+InfoIndex::InfoIndex(CLI::App& sc)
 {
-  subcommand
-    .add_option("-l,--index-dir", index_dir, "Path to the directory containing reference index.")
-    ->required()
-    ->check(CLI::ExistingDirectory);
-  subcommand.callback([&]() { index = std::make_shared<Index>(index_dir); });
+  sc.add_option("-i,--index-dir", index_dir, "Directory <path> containing reference index.")->required()->check(CLI::ExistingDirectory);
+  sc.callback([&]() { index = std::make_shared<Index>(index_dir); });
 }
 
-SketchSingle::SketchSingle(CLI::App& subcommand)
+SketchSingle::SketchSingle(CLI::App& sc)
 {
   set_sketch_defaults();
-  subcommand
-    .add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")
-    ->required();
-  subcommand
-    .add_option("-i,--input-file",
-                input_path,
-                "Path (or URL) to the input FASTA/FASTQ file (gzip compatible).")
-    ->required();
-  subcommand.add_option("-k,--kmer-len", k, "Length of k-mers [30].");
-  subcommand.add_option("-w,--win-len", w, "Length of minimizer window (w>=k) [k].");
-  subcommand.add_option("-h,--num-positions", h, "Number of positions for the LSH [10].");
-  subcommand.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [2].");
-  subcommand.add_option(
-    "-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
-  subcommand.add_flag(
-    "--frac,!--no-frac", frac, "If given, k-mers with r > LSH(x) mod m will be excluded [false].");
-  subcommand.callback([&]() {
-    if (!(subcommand.count("-w") + subcommand.count("--win-len"))) {
-      w = k;
+  sc.add_option("-i,--input-file", input_file, "Path (or URL) to the input FASTA/FASTQ query file (gzip compatible).")->required();
+  sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")->required();
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers [26].");
+  sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k) [k+6].");
+  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [10].");
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].");
+  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
+  sc.add_flag("--frac,!--no-frac", frac, "Also include k-mers with r < LSH(x) mod m [false].");
+  sc.callback([&]() {
+    if (!(sc.count("-w") + sc.count("--win-len"))) {
+      w = k + 6;
     }
   });
 }
 
-QuerySketch::QuerySketch(CLI::App& sub_dist)
+QuerySketch::QuerySketch(CLI::App& sc)
 {
-  sub_dist.add_option("-s,--sketch-path", sketch_path, "Path to the sketch file to seek.")
-    ->required()
-    ->check(CLI::ExistingFile);
-  sub_dist.add_option(
-    "-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
-  sub_dist.add_option("-q,--query-file", query_path, "Path to FASTA/FASTQ query file.")
-    ->required()
-    ->check(CLI::ExistingFile);
-  sub_dist.add_option(
-    "--hdist-th", hdist_th, "The maximum Hamming distance for a k-mer to match [4].");
-  sub_dist.callback([&]() {
+  sc.add_option("-q,--query-file", query_file, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required();
+  sc.add_option("-i,--sketch-path", sketch_path, "Sketch file at <path> to query.")->required()->check(CLI::ExistingFile);
+  sc.add_option("-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].");
+  sc.callback([&]() {
     if (!output_path.empty()) {
       output_file.open(output_path);
       output_stream = &output_file;
     }
+    sketch = std::make_shared<Sketch>(sketch_path);
   });
 }
 
-IndexMultiple::IndexMultiple(CLI::App& subcommand)
+IndexMultiple::IndexMultiple(CLI::App& sc)
 {
   set_index_defaults();
-  subcommand
-    .add_option(
-      "-l,--index-dir", index_dir, "Path to the directory in which the index will be stored.")
-    ->required();
-  subcommand
-    .add_option("-i,--input-file",
-                input_path,
-                "Path to the tsv-file containing paths/urls and names of references.")
-    ->required()
-    ->check(CLI::ExistingFile);
-  subcommand
-    .add_option(
-      "-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (rooted).")
-    ->check(CLI::ExistingFile);
-  subcommand.add_option("-k,--kmer-len", k, "Length of k-mers [30].");
-  subcommand.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+3].");
-  subcommand.add_option("-h,--num-positions", h, "Number of positions for the LSH [14].");
-  subcommand.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [2].");
-  subcommand.add_option(
-    "-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
-  subcommand.add_flag(
-    "--frac,!--no-frac", frac, "If given, k-mers with r > LSH(x) mod m will be excluded [false].");
-  subcommand.callback([&]() {
-    if (!(subcommand.count("-w") + subcommand.count("--win-len"))) {
-      w = k + 3;
+  sc.add_option("-i,--input-file", input_file, "Path to the tsv file with paths/URLs (gzip compatible) and reference IDs.")->required()->check(CLI::ExistingFile);
+  sc.add_option("-o,--index-dir", index_dir, "Directory <path> in which the index will be stored.")->required();
+  sc.add_option("-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (must be rooted).")->check(CLI::ExistingFile);
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers [29].");
+  sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+6].");
+  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [13].");
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].");
+  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
+  sc.add_flag("--frac,!--no-frac", frac, "Also include k-mers with r < LSH(x) mod m [false].");
+  sc.callback([&]() {
+    if (!(sc.count("-w") + sc.count("--win-len"))) {
+      w = k + 6;
     }
     std::filesystem::create_directory(index_dir);
     suffix = "-";
-    /* suffix += "k" + std::to_string(k) + "w" + std::to_string(w) + "h" + std::to_string(h); */
     suffix += "m" + std::to_string(m) + "r" + std::to_string(r);
     suffix += frac ? "-frac" : "-no_frac";
   });
 }
 
-QueryIndex::QueryIndex(CLI::App& subcommand)
+QueryIndex::QueryIndex(CLI::App& sc)
 {
-  subcommand
-    .add_option(
-      "-l,--index-dir", index_dir, "Path to the directory containing the reference index.")
-    ->required()
-    ->check(CLI::ExistingDirectory);
-  subcommand.add_option(
-    "-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
-  subcommand.add_option("-q,--query-file", query_path, "Path to FASTA/FASTQ query file.")
-    ->required()
-    ->check(CLI::ExistingFile);
-  subcommand.add_option(
-    "--hdist-th", hdist_th, "The maximum Hamming distance for a k-mer to match [4].");
-  subcommand.add_option(
-    "--tau", tau, "The highest Hamming distance for placement threshold (increase to relax) [3].");
-  subcommand.add_flag(
-    "--no-filter",
-    no_filter,
-    "Report matching references regardless of the statistical significance or match count (overrides --tau) [false].");
-  // subcommand.add_option(
-  //   "--leave-out-ref",
-  //   leave_out_ref,
-  //   "The reference taxon to be excluded during query, useful for benchmarking and testing.");
-  subcommand.callback([&]() {
+  sc.add_option("-q,--query-file", query_file, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required();
+  sc.add_option("-i,--index-dir", index_dir, "Directory <path> containing the reference index.")->required()->check(CLI::ExistingDirectory);
+  sc.add_option("-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].");
+  sc.add_option("--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [3].");
+  sc.add_flag("--no-filter", no_filter, "Report of the statistical significance or match count (overrides --tau) [false].");
+  sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing.");
+  sc.callback([&]() {
     if (!output_path.empty()) {
       output_file.open(output_path);
       output_stream = &output_file;
@@ -501,39 +455,30 @@ int main(int argc, char** argv)
 {
   PRINT_VERSION
   std::ios::sync_with_stdio(false);
-  CLI::App app{"krepp: "
-               "a tool for k-mer-based search, distance estimation & phylogenetic placement."};
+  CLI::App app{"krepp: a tool for k-mer-based search, distance estimation & phylogenetic placement."};
   app.set_help_flag("--help");
   bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.require_subcommand();
   uint32_t seed = 0;
-  app.add_option(
-    "--seed", seed, "Random seed for the LSH and other parts that require randomness [0].");
+  app.add_option("--seed", seed, "Random seed for the LSH and other parts that require randomness [0].");
   app.callback([&]() {
     if (app.count("--seed")) {
       gen.seed(seed);
     }
   });
-  app.add_option(
-    "--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism [0].");
+  app.add_option("--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism [1].");
 
-  auto& sub_index =
-    *app.add_subcommand("build", "Build an index from k-mers of reference genomes.");
-  auto& sub_place =
-    *app.add_subcommand("place", "Place queries on a tree with respect to an index.");
-  auto& sub_dist =
-    *app.add_subcommand("dist", "Estimate distances of queries to genomes in an index.");
-  auto& sub_inspect =
-    *app.add_subcommand("inspect", "Display statistics and information for a given index.");
-  auto& sub_sketch =
-    *app.add_subcommand("sketch", "Create a sketch from k-mers in a single FASTA/FASTQ file.");
-  auto& sub_seek =
-    *app.add_subcommand("seek", "Seek query sequences in a sketch and estimate distances.");
+  auto& sub_index = *app.add_subcommand("index", "Build an index from k-mers of reference genomes.");
+  auto& sub_place = *app.add_subcommand("place", "Place queries on a tree with respect to an index.");
+  auto& sc = *app.add_subcommand("dist", "Estimate distances of queries to genomes in an index.");
+  auto& sub_inspect = *app.add_subcommand("inspect", "Display statistics and information for a given index.");
+  auto& sub_sketch = *app.add_subcommand("sketch", "Create a sketch from k-mers in a single FASTA/FASTQ file.");
+  auto& sub_seek = *app.add_subcommand("seek", "Seek query sequences in a sketch and estimate distances.");
 
   IndexMultiple krepp_index(sub_index);
   QueryIndex krepp_place(sub_place);
-  QueryIndex krepp_dist(sub_dist);
+  QueryIndex krepp_dist(sc);
   InfoIndex krepp_inspect(sub_inspect);
   SketchSingle krepp_sketch(sub_sketch);
   QuerySketch krepp_seek(sub_seek);
@@ -574,7 +519,7 @@ int main(int argc, char** argv)
     std::cerr << "Done placing queries, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
-  if (sub_dist.parsed()) {
+  if (sc.parsed()) {
     std::cerr << "Loading the index and initializing..." << std::endl;
     krepp_dist.load_index();
     std::cerr << "Estimating distances between given sequences and references..." << std::endl;

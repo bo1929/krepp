@@ -1,6 +1,6 @@
 #include "rqseq.hpp"
 
-RSeq::RSeq(uint8_t w, uint32_t r, bool frac, lshf_sptr_t lshf, std::string input)
+RSeq::RSeq(std::string file, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac)
   : w(w)
   , r(r)
   , frac(frac)
@@ -11,13 +11,15 @@ RSeq::RSeq(uint8_t w, uint32_t r, bool frac, lshf_sptr_t lshf, std::string input
   m = lshf->get_m();
   mask_bp = u64m >> ((32 - k) * 2);
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
-  is_url = std::regex_match(input, url_regexp);
+  is_url = std::regex_match(file, url_regexp);
   if (is_url) {
 #if defined _WLCURL && _WLCURL == 1
-    input_path = download_url(input);
+    input_path = download_url(file);
+#else
+    std::cerr << "Failed to download from URL, compiled without libcurl!" << std::endl;
 #endif
   } else {
-    input_path = input;
+    input_path = file;
   }
   gfile = gzopen(input_path.c_str(), "rb");
   if (gfile == nullptr) {
@@ -26,31 +28,6 @@ RSeq::RSeq(uint8_t w, uint32_t r, bool frac, lshf_sptr_t lshf, std::string input
   }
   kseq = kseq_init(gfile);
 }
-
-#if defined _WLCURL && _WLCURL == 1
-std::string RSeq::download_url(std::string url)
-{
-  char tmp_path[FILENAME_MAX] = "/tmp/seq";
-  const char* sx = std::to_string(gp_hash(url)).c_str();
-  strcat(tmp_path, sx);
-  strcat(tmp_path, ".XXXXXX");
-  int tmp_fd = mkstemp(tmp_path);
-  CURL* curl;
-  FILE* fp;
-  CURLcode resb;
-  curl = curl_easy_init();
-  if (curl) {
-    fp = fopen(tmp_path, "wb");
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-    resb = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    fclose(fp);
-  }
-  return tmp_path;
-}
-#endif
 
 RSeq::~RSeq()
 {
@@ -138,13 +115,22 @@ void QSeq::clear_curr_batch()
   identifer_batch.clear();
 }
 
-QSeq::QSeq(std::filesystem::path input_path)
-  : input_path(input_path)
-  , batch_size(0)
+QSeq::QSeq(std::string file)
+  : batch_size(0)
 {
+  is_url = std::regex_match(file, url_regexp);
+  if (is_url) {
+#if defined _WLCURL && _WLCURL == 1
+    input_path = download_url(file);
+#else
+    std::cerr << "Failed to download from URL, compiled without libcurl!" << std::endl;
+#endif
+  } else {
+    input_path = file;
+  }
   gfile = gzopen(input_path.c_str(), "rb");
   if (gfile == nullptr) {
-    std::cerr << "Failed to open the file at " << input_path << std::endl;
+    std::cerr << "Failed to open thefile at " << input_path << std::endl;
     exit(1);
   }
   kseq = kseq_init(gfile);

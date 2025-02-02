@@ -21,11 +21,11 @@ public:
   void save_configuration(std::ofstream& cfg_stream);
   void set_sketch_defaults()
   {
-    k = 29;
-    w = k + 3;
+    k = 26;
+    w = k + 6;
     h = 10;
     m = 5;
-    r = 0;
+    r = 1;
     frac = false;
     nrows = pow(2, 2 * h - 1);
   }
@@ -33,9 +33,9 @@ public:
   {
     k = 29;
     w = k + 6;
-    h = 14;
+    h = 13;
     m = 5;
-    r = 0;
+    r = 1;
     frac = false;
     nrows = pow(2, 2 * h - 1);
   }
@@ -75,21 +75,21 @@ protected:
 class SketchSingle : public BaseLSH
 {
 public:
-  SketchSingle(CLI::App& subcommand);
+  SketchSingle(CLI::App& sc);
   void create_sketch();
   void save_sketch();
 
 private:
   double rho;
-  sflatht_sptr_t sketch_sflatht = nullptr;
-  std::filesystem::path input_path;
+  std::string input_file;
   std::filesystem::path sketch_path;
+  sflatht_sptr_t sketch_sflatht = nullptr;
 };
 
 class IndexMultiple : public BaseLSH
 {
 public:
-  IndexMultiple(CLI::App& subcommand);
+  IndexMultiple(CLI::App& sc);
   void obtain_build_tree();
   void read_input_file();
   void save_index();
@@ -97,36 +97,36 @@ public:
   void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht);
 
 private:
-  parallel_flat_phmap<std::string, std::string> name_to_path;
-  vec<std::string> names_v;
   std::string suffix;
   tuint_t build_count = 0;
-  tree_sptr_t tree = nullptr;
-  flatht_sptr_t root_flatht = nullptr;
-  std::filesystem::path input_path;
+  vec<std::string> names_v;
+  std::filesystem::path input_file;
   std::filesystem::path index_dir;
   std::filesystem::path nwk_path;
+  tree_sptr_t tree = nullptr;
+  flatht_sptr_t root_flatht = nullptr;
+  parallel_flat_phmap<std::string, std::string> name_to_path;
 };
 
 class QuerySketch : public TargetSketch
 {
 public:
-  QuerySketch(CLI::App& subcommand);
+  QuerySketch(CLI::App& sc);
   void seek_sequences();
   void header_dreport(strstream& dreport_stream);
 
 private:
+  std::string query_file;
   std::filesystem::path output_path;
   std::ofstream output_file;
   std::ostream* output_stream = &std::cout;
   uint32_t hdist_th = 4;
-  std::filesystem::path query_path;
 };
 
 class QueryIndex : public TargetIndex
 {
 public:
-  QueryIndex(CLI::App& subcommand);
+  QueryIndex(CLI::App& sc);
   void estimate_distances();
   void place_sequences();
   void header_dreport(strstream& dreport_stream);
@@ -134,19 +134,19 @@ public:
   void end_jplace(strstream& jplace_stream);
 
 private:
+  std::string query_file;
   std::filesystem::path output_path;
   std::ofstream output_file;
   std::ostream* output_stream = &std::cout;
   uint32_t tau = 3;
   uint32_t hdist_th = 4;
   bool no_filter = false;
-  std::filesystem::path query_path;
 };
 
 class InfoIndex : public TargetIndex
 {
 public:
-  InfoIndex(CLI::App& subcommand);
+  InfoIndex(CLI::App& sc);
   void display_info();
 };
 
