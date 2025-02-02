@@ -79,7 +79,7 @@ void TargetIndex::load_index()
 
 void SketchSingle::create_sketch()
 {
-  rseq_sptr_t rs = std::make_shared<RSeq>(input_file, lshf, w, r, frac);
+  rseq_sptr_t rs = std::make_shared<RSeq>(input, lshf, w, r, frac);
   sdynht_sptr_t sdynht = std::make_shared<SDynHT>();
   sdynht->fill_table(nrows, rs);
   sketch_sflatht = std::make_shared<SFlatHT>(sdynht);
@@ -122,9 +122,9 @@ void IndexMultiple::obtain_build_tree()
 
 void IndexMultiple::read_input_file()
 {
-  std::ifstream input_stream(input_file);
+  std::ifstream input_stream(input);
   if (!input_stream.good()) {
-    std::cerr << "Error opening " << input_file << std::endl;
+    std::cerr << "Error opening " << input << std::endl;
     exit(EXIT_FAILURE);
   }
   std::string line;
@@ -279,7 +279,7 @@ void QuerySketch::seek_sequences()
   strstream dreport_stream;
   header_dreport(dreport_stream);
   omp_set_num_threads(num_threads);
-  qseq_sptr_t qs = std::make_shared<QSeq>(query_file);
+  qseq_sptr_t qs = std::make_shared<QSeq>(query);
 #pragma omp parallel shared(qs)
   {
 #pragma omp single
@@ -302,7 +302,7 @@ void QueryIndex::estimate_distances()
   header_dreport(dreport_stream);
   (*output_stream) << dreport_stream.rdbuf();
   omp_set_num_threads(num_threads);
-  qseq_sptr_t qs = std::make_shared<QSeq>(query_file);
+  qseq_sptr_t qs = std::make_shared<QSeq>(query);
 #pragma omp parallel shared(qs)
   {
 #pragma omp single
@@ -349,7 +349,7 @@ void QueryIndex::place_sequences()
   begin_jplace(jplace_stream);
   (*output_stream) << jplace_stream.rdbuf();
   omp_set_num_threads(num_threads);
-  qseq_sptr_t qs = std::make_shared<QSeq>(query_file);
+  qseq_sptr_t qs = std::make_shared<QSeq>(query);
 #pragma omp parallel shared(qs)
   {
 #pragma omp single
@@ -380,27 +380,31 @@ InfoIndex::InfoIndex(CLI::App& sc)
 SketchSingle::SketchSingle(CLI::App& sc)
 {
   set_sketch_defaults();
-  sc.add_option("-i,--input-file", input_file, "Path (or URL) to the input FASTA/FASTQ query file (gzip compatible).")->required();
+  sc.add_option("-i,--input-file", input, "Input FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required()->check(url_validator|CLI::ExistingFile);
   sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")->required();
-  sc.add_option("-k,--kmer-len", k, "Length of k-mers [26].");
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers [26].")->check(CLI::Range(19,31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k) [k+6].");
-  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [10].");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].");
-  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
-  sc.add_flag("--frac,!--no-frac", frac, "Also include k-mers with r < LSH(x) mod m [false].");
+  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [k-16].");
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")->check(CLI::PositiveNumber);
+  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")->check(CLI::NonNegativeNumber);
+  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [false].");
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
+      h = k - 16;
+    }
+    if (!validate_configuration()){
+      exit(EXIT_FAILURE);
     }
   });
 }
 
 QuerySketch::QuerySketch(CLI::App& sc)
 {
-  sc.add_option("-q,--query-file", query_file, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required();
+  sc.add_option("-q,--query", query, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required()->check(url_validator|CLI::ExistingFile);
   sc.add_option("-i,--sketch-path", sketch_path, "Sketch file at <path> to query.")->required()->check(CLI::ExistingFile);
-  sc.add_option("-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].");
+  sc.add_option("-o,--output-path", output_path, "Write output to a file at <path> [stdout].");
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!output_path.empty()) {
       output_file.open(output_path);
@@ -413,18 +417,22 @@ QuerySketch::QuerySketch(CLI::App& sc)
 IndexMultiple::IndexMultiple(CLI::App& sc)
 {
   set_index_defaults();
-  sc.add_option("-i,--input-file", input_file, "Path to the tsv file with paths/URLs (gzip compatible) and reference IDs.")->required()->check(CLI::ExistingFile);
+  sc.add_option("-i,--input-file", input, "TSV file <path> mapping reference IDs to (gzip compatible) paths/URLs.")->required()->check(CLI::ExistingFile);
   sc.add_option("-o,--index-dir", index_dir, "Directory <path> in which the index will be stored.")->required();
   sc.add_option("-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (must be rooted).")->check(CLI::ExistingFile);
-  sc.add_option("-k,--kmer-len", k, "Length of k-mers [29].");
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers [29].")->check(CLI::Range(19,31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+6].");
-  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [13].");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].");
-  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
-  sc.add_flag("--frac,!--no-frac", frac, "Also include k-mers with r < LSH(x) mod m [false].");
+  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [k-16].");
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")->check(CLI::PositiveNumber);
+  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")->check(CLI::NonNegativeNumber);
+  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [false].");
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
+      h = k - 16;
+    }
+    if (!validate_configuration()){
+      exit(EXIT_FAILURE);
     }
     std::filesystem::create_directory(index_dir);
     suffix = "-";
@@ -435,13 +443,13 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
 
 QueryIndex::QueryIndex(CLI::App& sc)
 {
-  sc.add_option("-q,--query-file", query_file, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required();
+  sc.add_option("-q,--query", query, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required()->check(url_validator|CLI::ExistingFile);
   sc.add_option("-i,--index-dir", index_dir, "Directory <path> containing the reference index.")->required()->check(CLI::ExistingDirectory);
-  sc.add_option("-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].");
-  sc.add_option("--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [3].");
+  sc.add_option("-o,--output-path", output_path, "Write output to a file at <path> [stdout].");
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")->check(CLI::NonNegativeNumber);
+  sc.add_option("--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [2].")->check(CLI::NonNegativeNumber);
   sc.add_flag("--no-filter", no_filter, "Report of the statistical significance or match count (overrides --tau) [false].");
-  sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing.");
+  /* sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing."); */
   sc.callback([&]() {
     if (!output_path.empty()) {
       output_file.open(output_path);
@@ -457,6 +465,8 @@ int main(int argc, char** argv)
   std::ios::sync_with_stdio(false);
   CLI::App app{"krepp: a tool for k-mer-based search, distance estimation & phylogenetic placement."};
   app.set_help_flag("--help");
+  app.fallthrough();
+
   bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.require_subcommand();

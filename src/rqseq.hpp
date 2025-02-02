@@ -57,7 +57,7 @@ class RSeq : public HandlerURL
   friend class DynHT;
 
 public:
-  RSeq(std::string file, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac);
+  RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac);
   ~RSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   double get_rho() { return rho; }
@@ -99,7 +99,7 @@ class QSeq : public HandlerURL
   friend class SBatch;
 
 public:
-  QSeq(std::string file);
+  QSeq(std::string input);
   ~QSeq();
   bool read_next_batch(uint64_t max_batch_size = BATCH_SIZE);
   bool is_batch_finished();

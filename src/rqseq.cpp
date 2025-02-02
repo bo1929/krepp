@@ -1,6 +1,6 @@
 #include "rqseq.hpp"
 
-RSeq::RSeq(std::string file, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac)
+RSeq::RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac)
   : w(w)
   , r(r)
   , frac(frac)
@@ -11,15 +11,15 @@ RSeq::RSeq(std::string file, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac)
   m = lshf->get_m();
   mask_bp = u64m >> ((32 - k) * 2);
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
-  is_url = std::regex_match(file, url_regexp);
+  is_url = std::regex_match(input, url_regexp);
   if (is_url) {
 #if defined _WLCURL && _WLCURL == 1
-    input_path = download_url(file);
+    input_path = download_url(input);
 #else
     std::cerr << "Failed to download from URL, compiled without libcurl!" << std::endl;
 #endif
   } else {
-    input_path = file;
+    input_path = input;
   }
   gfile = gzopen(input_path.c_str(), "rb");
   if (gfile == nullptr) {
@@ -115,18 +115,18 @@ void QSeq::clear_curr_batch()
   identifer_batch.clear();
 }
 
-QSeq::QSeq(std::string file)
+QSeq::QSeq(std::string input)
   : batch_size(0)
 {
-  is_url = std::regex_match(file, url_regexp);
+  is_url = std::regex_match(input, url_regexp);
   if (is_url) {
 #if defined _WLCURL && _WLCURL == 1
-    input_path = download_url(file);
+    input_path = download_url(input);
 #else
     std::cerr << "Failed to download from URL, compiled without libcurl!" << std::endl;
 #endif
   } else {
-    input_path = file;
+    input_path = input;
   }
   gfile = gzopen(input_path.c_str(), "rb");
   if (gfile == nullptr) {
