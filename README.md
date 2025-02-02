@@ -3,7 +3,7 @@ A k-mer-based maximum likelihood method for estimating distances of reads to gen
 
 - [Installing krepp or compiling from source.](#installing-krepp-or-compiling-from-source)
 - [Building an index from multiple reference genomes](#building-an-index-from-multiple-reference-genomes)
-- [Estimating distances of reads to all reference genomes](#estimating-distances-of-reads-to-reference-genomes)
+- [Estimating distances of reads to all reference genomes](#estimating-distances-of-reads-to-all-reference-genomes)
 - [Phylogenetic placement of reads on a backbone tree](#phylogenetic-placement-of-reads-on-a-backbone-tree)
 - [Practical distance estimation by sketching a file](#practical-distance-estimation-by-sketching-a-file)
 - [A toy example for testing](#a-toy-example-for-testing)
