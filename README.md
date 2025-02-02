@@ -52,28 +52,28 @@ This may cost you some accuracy as fewer *k*-mers will be indexed, but shouldn't
 The peak memory usage during the index constructing could be also reduced to the memory level available by partitioning the index into smaller pieces.
 This is done by a variation of FracMinHash, controlled by options `-m` and `-r`.
 `krepp` partitions the index into `-m` (more or less) equally sized pieces, and these partitions could be built independently, but one can query them together.
-The `-r` option determines the partition that is going to be constructed: if `--frac` is given all partitions from 0th to `-r`th, otherwise only the `-r`th, partition will be constructed and saved (see `krank index --help` for details).
+The `-r` option determines the partition that is going to be constructed: if `--no-frac` is given only the `-r`th partition, otherwise all partitions from 0th to `-r`th, will be constructed and saved (see `krank index --help` for details).
 You don't even need to construct all partitions, `krepp` will search in whatever is available, and these partitions can be distributed independently.
-The default is `-m 5 -r 1 --frac`, so 40% of the minimized *k*-mers will be indexed.
+The default is `-m 5 -r 1 --frac`, so 40% (0th and 1st out of 5 partitions) of the minimized *k*-mers will be indexed.
 The only requirement is keeping the `-m` value (and of course `-i` and `-t`) fixed across all partitions.
 For instance, one can index 3% percent of the reference *k*-mers and construct a lightweight index by running:
 ```bash
-krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 99
-krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 98
-krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 97
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 99 --no-frac
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 98 --no-frac
+krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 97 --no-frac
 ```
 or alternatively
 ```bash
 krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 2 --frac
 ```
-but this would be faster, but increases the memory use during the index construction, despite resulting in an index of the same size.
+this would be faster with the increased the memory use during the index construction, despite resulting in an index of the same size.
 Perhaps later, if you don't think this works well for your task, you can build the remaining 47% of the index size by running
 ```bash
 krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r 46 --frac
 ```
 or maybe
 ```bash
-seq 1 46 | xargs -I{} -P2 bash -c "krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r {}"
+seq 1 46 | xargs -I{} -P2 bash -c "krepp index -o $INDEX_DIR -i $PATHS_MAPPING -t $BACKBONE_NEWICK --num-threads $NUM_THREADS -m 100 -r {} --no-frac"
 ```
 if you have a small memory machine. Just stick to the defaults if everything works or if you don't run out of memory.
 
