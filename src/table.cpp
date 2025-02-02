@@ -36,16 +36,8 @@ void SFlatHT::save(std::ofstream& sketch_stream)
 {
   sketch_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
   sketch_stream.write(reinterpret_cast<const char*>(enc_v.data()), sizeof(enc_t) * nkmers);
-  if (!sketch_stream.good()) {
-    std::cerr << "Writing the k-mer vector has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
   sketch_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
   sketch_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * nrows);
-  if (!sketch_stream.good()) {
-    std::cerr << "Writing the index-increment vector has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
 }
 
 FlatHT::FlatHT(dynht_sptr_t source)
@@ -70,62 +62,24 @@ FlatHT::FlatHT(dynht_sptr_t source)
   }
 }
 
-void FlatHT::load(std::filesystem::path index_dir, std::string suffix)
+void FlatHT::load(std::ifstream& mer_stream, std::ifstream& inc_stream)
 {
-  std::filesystem::path mer_path = index_dir / ("cmer" + suffix);
-  std::ifstream mer_stream(mer_path, std::ifstream::binary);
-  if (!mer_stream.is_open()) {
-    std::cerr << "Failed to open " << mer_path << std::endl;
-    exit(EXIT_FAILURE);
-  } else {
-    mer_stream.read(reinterpret_cast<char*>(&nkmers), sizeof(uint64_t));
-    cmer_v.resize(nkmers);
-    mer_stream.read(reinterpret_cast<char*>(cmer_v.data()), nkmers * sizeof(cmer_t));
-    assert(nkmers == cmer_v.size());
-  }
-  if (!mer_stream.good()) {
-    std::cerr << "Reading k-mer vector to has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  mer_stream.close();
-
-  std::filesystem::path inc_path = index_dir / ("inc" + suffix);
-  std::ifstream inc_stream(inc_path, std::ifstream::binary);
-  if (!inc_stream.is_open()) {
-    std::cerr << "Failed to open " << inc_path << std::endl;
-    exit(EXIT_FAILURE);
-  } else {
-    inc_stream.read(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
-    inc_v.resize(nrows);
-    inc_stream.read(reinterpret_cast<char*>(inc_v.data()), nrows * sizeof(inc_t));
-    assert(nrows == inc_v.size());
-  }
-  if (!inc_stream.good()) {
-    std::cerr << "Reading index-increment vector has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  inc_stream.close();
+  mer_stream.read(reinterpret_cast<char*>(&nkmers), sizeof(uint64_t));
+  cmer_v.resize(nkmers);
+  mer_stream.read(reinterpret_cast<char*>(cmer_v.data()), nkmers * sizeof(cmer_t));
+  assert(nkmers == cmer_v.size());
+  inc_stream.read(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
+  inc_v.resize(nrows);
+  inc_stream.read(reinterpret_cast<char*>(inc_v.data()), nrows * sizeof(inc_t));
+  assert(nrows == inc_v.size());
 }
 
-void FlatHT::save(std::filesystem::path index_dir, std::string suffix)
+void FlatHT::save(std::ofstream& mer_stream, std::ofstream& inc_stream)
 {
-  std::ofstream mer_stream(index_dir / ("cmer" + suffix), std::ofstream::binary);
   mer_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
   mer_stream.write(reinterpret_cast<const char*>(cmer_v.data()), sizeof(cmer_t) * nkmers);
-  if (!mer_stream.good()) {
-    std::cerr << "Writing the k-mer vector has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  mer_stream.close();
-
-  std::ofstream inc_stream(index_dir / ("inc" + suffix), std::ofstream::binary);
   inc_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
   inc_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * nrows);
-  if (!inc_stream.good()) {
-    std::cerr << "Writing the index-increment vector has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  inc_stream.close();
 }
 
 void DynHT::print_info()
@@ -257,11 +211,11 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
   temp_v.reserve(source_v.size() + dest_v.size());
   auto it_dest = dest_v.begin(), it_source = source_v.begin();
   for (; it_source != source_v.end(); ++it_source) {
-    while (it_dest != dest_v.end() && it_source->encoding > it_dest->encoding) {
+    while ((it_dest != dest_v.end()) && (it_source->encoding > it_dest->encoding)) {
       temp_v.push_back(*it_dest);
       it_dest++;
     }
-    while (it_dest != dest_v.end() && it_source->encoding == it_dest->encoding) {
+    while ((it_dest != dest_v.end()) && (it_source->encoding == it_dest->encoding)) {
       it_source->sh = record->add_subset(it_dest->sh, it_source->sh);
       it_dest++;
     }

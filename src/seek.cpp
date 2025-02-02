@@ -1,7 +1,7 @@
-#include "compare.hpp"
+#include "seek.hpp"
 #include <boost/math/tools/minima.hpp>
 
-CBatch::CBatch(sketch_sptr_t sketch, qseq_sptr_t qs, uint32_t hdist_th)
+SBatch::SBatch(sketch_sptr_t sketch, qseq_sptr_t qs, uint32_t hdist_th)
   : sketch(sketch)
   , hdist_th(hdist_th)
 {
@@ -19,7 +19,7 @@ CBatch::CBatch(sketch_sptr_t sketch, qseq_sptr_t qs, uint32_t hdist_th)
   rho = sketch->get_rho();
 }
 
-void CBatch::estimate_distances(std::ostream& output_stream)
+void SBatch::seek_sequences(std::ostream& output_stream)
 {
   strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
@@ -27,8 +27,8 @@ void CBatch::estimate_distances(std::ostream& output_stream)
     uint64_t len = seq_batch[bix].size();
     enmers = len - k + 1;
 
-    CSummary or_summary(enmers, hdist_th);
-    CSummary rc_summary(enmers, hdist_th);
+    SSummary or_summary(enmers, hdist_th);
+    SSummary rc_summary(enmers, hdist_th);
     search_mers(seq, len, or_summary, rc_summary);
 
     if (or_summary.match_count + rc_summary.match_count) {
@@ -47,7 +47,7 @@ void CBatch::estimate_distances(std::ostream& output_stream)
   output_stream << batch_stream.rdbuf();
 }
 
-void CBatch::search_mers(const char* seq, uint64_t len, CSummary& or_summary, CSummary& rc_summary)
+void SBatch::search_mers(const char* seq, uint64_t len, SSummary& or_summary, SSummary& rc_summary)
 {
   uint32_t i, l;
   uint32_t orrix, rcrix;
@@ -72,36 +72,35 @@ void CBatch::search_mers(const char* seq, uint64_t len, CSummary& or_summary, CS
 #ifdef CANONICAL
     if (rcenc64_bp < orenc64_bp) {
       orrix = lshf->compute_hash(orenc64_bp);
-      if (sketch->set_partial(orrix)) {
+      if (sketch->check_partial(orrix)) {
         or_summary.add_matching_mer(sketch, orrix, lshf->drop_ppos_lr(orenc64_lr));
       }
     } else {
       rcrix = lshf->compute_hash(rcenc64_bp);
-      if (sketch->set_partial(rcrix)) {
+      if (sketch->check_partial(rcrix)) {
         rc_summary.add_matching_mer(sketch, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
       }
     }
 #else
     orrix = lshf->compute_hash(orenc64_bp);
-    if (sketch->set_partial(orrix)) {
+    if (sketch->check_partial(orrix)) {
       or_summary.add_matching_mer(sketch, orrix, lshf->drop_ppos_lr(orenc64_lr));
     }
     rcrix = lshf->compute_hash(rcenc64_bp);
-    if (sketch->set_partial(rcrix)) {
+    if (sketch->check_partial(rcrix)) {
       rc_summary.add_matching_mer(sketch, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
     }
 #endif /* CANONICAL */
   }
 }
 
-void CSummary::add_matching_mer(sketch_sptr_t sketch, uint32_t rix, enc_t enc_lr)
+void SSummary::add_matching_mer(sketch_sptr_t sketch, uint32_t rix, enc_t enc_lr)
 {
   uint32_t hdist_curr;
   uint32_t hdist_min = hdist_th + 1;
-  std::vector<enc_t>::const_iterator iter1 = sketch->bucket_start();
-  std::vector<enc_t>::const_iterator iter2 = sketch->bucket_next();
-  for (; iter1 < iter2; ++iter1) {
-    hdist_curr = popcount_lr32((*iter1) ^ enc_lr);
+  std::pair<vec_enc_it, vec_enc_it> indices = sketch->bucket_indices(rix);
+  for (; indices.first < indices.second; ++indices.first) {
+    hdist_curr = popcount_lr32((*indices.first) ^ enc_lr);
     if (hdist_curr < hdist_min) {
       hdist_min = hdist_curr;
     }
@@ -112,7 +111,7 @@ void CSummary::add_matching_mer(sketch_sptr_t sketch, uint32_t rix, enc_t enc_lr
     hdisthist_v[hdist_min]++;
   }
 }
-void CSummary::optimize_likelihood(optimize::HDistHistLLH llhfunc, double rho)
+void SSummary::optimize_likelihood(optimize::HDistHistLLH llhfunc, double rho)
 {
   llhfunc.set_parameters(hdisthist_v.data(), mismatch_count, rho);
   std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.5, 16);

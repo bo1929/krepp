@@ -1,6 +1,8 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
+#include <parallel_hashmap/phmap.h>
+#include <parallel_hashmap/btree.h>
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -19,8 +21,6 @@
 #include <memory>
 #include <numeric>
 #include <ostream>
-#include <parallel_hashmap/phmap.h>
-#include <parallel_hashmap/btree.h>
 #include <queue>
 #include <random>
 #include <regex>
@@ -38,7 +38,8 @@
   #include <curl/curl.h>
 #endif
 
-#define VERSION "v0.0.3"
+#define VERSION "v0.0.4"
+#define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
 extern std::string invocation;
@@ -62,10 +63,8 @@ using vvec = std::vector<std::vector<T>>;
 template<typename T>
 using vec = std::vector<T>;
 
-class QBatch;
-class QMers;
-class CBatch;
-class CSummary;
+class IBatch;
+class SBatch;
 class RSeq;
 class QSeq;
 class LSHF;
@@ -81,9 +80,8 @@ class SFlatHT;
 class Index;
 class Sketch;
 
-typedef std::shared_ptr<CBatch> cbatch_sptr_t;
-typedef std::shared_ptr<QBatch> qbatch_sptr_t;
-typedef std::shared_ptr<QMers> qmers_sptr_t;
+typedef std::shared_ptr<SBatch> sbatch_sptr_t;
+typedef std::shared_ptr<IBatch> ibatch_sptr_t;
 typedef std::shared_ptr<RSeq> rseq_sptr_t;
 typedef std::shared_ptr<QSeq> qseq_sptr_t;
 typedef std::shared_ptr<LSHF> lshf_sptr_t;
@@ -98,6 +96,7 @@ typedef std::shared_ptr<FlatHT> flatht_sptr_t;
 typedef std::shared_ptr<SFlatHT> sflatht_sptr_t;
 typedef std::shared_ptr<Index> index_sptr_t;
 typedef std::shared_ptr<Sketch> sketch_sptr_t;
+
 typedef std::pair<enc_t, se_t> cmer_t;
 typedef std::pair<se_t, se_t> pse_t;
 
@@ -235,27 +234,5 @@ using btree_phmap = phmap::btree_map<K, V>;
 
 template<class K, class V>
 using node_phmap = phmap::node_hash_map<K, V>;
-
-static inline double kendalls_tau(double* v1, double* v2, tuint_t len)
-{
-  assert(len > 1);
-  uint32_t i, j;
-  int nC = 0, nD = 0;
-  uint32_t n1 = 0, n2 = 0;
-  uint32_t n0 = len * (len - 1) / 2;
-  for (i = 0; i < (len - 1); i++) {
-    for (j = i + 1; j < len; j++) {
-      if ((v1[i] > v1[j] && v2[i] > v2[j]) || (v1[i] < v1[j] && v2[i] < v2[j]))
-        ++nC;
-      if ((v1[i] > v1[j] && v2[i] < v2[j]) || (v1[i] < v1[j] && v2[i] > v2[j]))
-        ++nD;
-      if (v1[i] == v1[j])
-        ++n1;
-      if (v2[i] == v2[j])
-        ++n2;
-    }
-  }
-  return static_cast<double>(nC - nD) / sqrt((n0 - n1) * (n0 - n2));
-}
 
 #endif

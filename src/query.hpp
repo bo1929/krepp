@@ -13,16 +13,18 @@ namespace optimize {
 }
 
 class Minfo;
+class IMers;
 typedef std::shared_ptr<Minfo> minfo_sptr_t;
 typedef std::unique_ptr<Minfo> minfo_uptr_t;
+typedef std::shared_ptr<IMers> imers_sptr_t;
 
-class QMers : public std::enable_shared_from_this<QMers>
+class IMers : public std::enable_shared_from_this<IMers>
 {
-  friend class QBatch;
+  friend class IBatch;
 
 public:
-  QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th);
-  qmers_sptr_t getptr() { return shared_from_this(); }
+  IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th);
+  imers_sptr_t getptr() { return shared_from_this(); }
   void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
 
 private:
@@ -39,12 +41,12 @@ private:
   parallel_flat_phmap<node_sptr_t, minfo_sptr_t> leaf_to_minfo = {};
 };
 
-class QBatch
+class IBatch
 {
 public:
-  QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t tau, bool no_filter);
-  void search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
-  void summarize_matches(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc);
+  IBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t tau, bool no_filter);
+  void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
+  void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void estimate_distances(std::ostream& output_stream);
   void place_sequences(std::ostream& output_stream);
   void report_distances(strstream& batch_stream);
@@ -79,7 +81,7 @@ protected:
 
 class Minfo
 {
-  friend class QBatch;
+  friend class IBatch;
 
   // struct match_t
   // {

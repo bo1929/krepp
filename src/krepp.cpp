@@ -15,6 +15,69 @@ void BaseLSH::set_nrows()
   }
 }
 
+void BaseLSH::save_configuration(std::ofstream& cfg_stream)
+{
+  cfg_stream.write(reinterpret_cast<char*>(&k), sizeof(uint8_t));
+  cfg_stream.write(reinterpret_cast<char*>(&w), sizeof(uint8_t));
+  cfg_stream.write(reinterpret_cast<char*>(&h), sizeof(uint8_t));
+  cfg_stream.write(reinterpret_cast<char*>(&m), sizeof(uint32_t));
+  cfg_stream.write(reinterpret_cast<char*>(&r), sizeof(uint32_t));
+  cfg_stream.write(reinterpret_cast<char*>(&frac), sizeof(bool));
+  cfg_stream.write(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
+  cfg_stream.write(reinterpret_cast<char*>(lshf->ppos_data()), (h) * sizeof(uint8_t));
+  cfg_stream.write(reinterpret_cast<char*>(lshf->npos_data()), (k - h) * sizeof(uint8_t));
+}
+
+void TargetSketch::load_sketch()
+{
+  sketch = std::make_shared<Sketch>(sketch_path);
+  sketch->load_full_sketch();
+  sketch->make_rho_partial();
+}
+void TargetIndex::ensure_wbackbone()
+{
+  if (!index->check_wbackbone()) {
+    std::cerr << "Given index lacks a backbone tree required for this subcommand..." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+}
+
+void TargetIndex::load_index()
+{
+  node_phmap<std::string, std::set<std::string>> suffix_to_ltype;
+  for (const auto& entry : std::filesystem::directory_iterator(index_dir)) {
+    std::string filename, ltype, mrcfg, fracv;
+    size_t pos1, pos2;
+    filename = entry.path().filename();
+    pos1 = filename.find("-", 0);
+    pos2 = filename.find("-", pos1 + 1);
+    ltype = filename.substr(0, pos1);
+    mrcfg = filename.substr(pos1, pos2 - pos1);
+    fracv = filename.substr(pos2, filename.size() - pos2);
+    suffix_to_ltype[mrcfg + fracv].insert(ltype);
+  }
+  std::vector<std::string> suffixes;
+  for (auto const& [suffix, ltypes] : suffix_to_ltype) {
+    suffixes.push_back(suffix);
+  }
+  std::set<std::string> lall_wbackbone{"cmer", "crecord", "inc", "metadata", "tree"};
+  std::set<std::string> lall_wobackbone{"cmer", "crecord", "inc", "metadata", "reflist"};
+#pragma omp parallel for num_threads(num_threads), schedule(static)
+  for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
+    if (suffix_to_ltype[suffixes[lix]] == lall_wbackbone) {
+      index->load_partial_tree(suffixes[lix]);
+      index->load_partial_index(suffixes[lix]);
+    } else if (suffix_to_ltype[suffixes[lix]] == lall_wobackbone) {
+      index->generate_partial_tree(suffixes[lix]);
+      index->load_partial_index(suffixes[lix]);
+    } else {
+      std::cerr << "There is a partial index with a missing file!" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  }
+  index->make_rho_partial();
+}
+
 void SketchSingle::create_sketch()
 {
   rseq_sptr_t rs = std::make_shared<RSeq>(w, r, frac, lshf, input_path);
@@ -26,12 +89,12 @@ void SketchSingle::create_sketch()
 
 void SketchSingle::save_sketch()
 {
-  std::ofstream sketch_stream(output_path, std::ofstream::binary);
+  std::ofstream sketch_stream(sketch_path, std::ofstream::binary);
   sketch_sflatht->save(sketch_stream);
   save_configuration(sketch_stream);
   sketch_stream.write(reinterpret_cast<char*>(&rho), sizeof(double));
   if (!sketch_stream.good()) {
-    std::cerr << "Writing the metadata for the index has failed!" << std::endl;
+    std::cerr << "Failed to write the sketch!" << std::endl;
     exit(EXIT_FAILURE);
   }
   sketch_stream.close();
@@ -42,16 +105,18 @@ void IndexMultiple::obtain_build_tree()
   tree = std::make_shared<Tree>();
   if (nwk_path.empty()) {
     std::cerr << "No tree has given as a guide, the color index could be suboptimal." << std::endl;
-    vec<std::string> names_v;
-    for (const auto& [key, value] : name_to_path) {
-      names_v.push_back(key);
-    }
     tree->generate_tree(names_v);
-    std::ofstream reflist_file(index_dir / ("reflist" + suffix));
-    std::ostream_iterator<std::string> reflist_iterator(reflist_file, "\n");
-    std::copy(std::begin(names_v), std::end(names_v), reflist_iterator);
   } else {
-    tree->parse(nwk_path);
+    std::ifstream tree_stream(nwk_path);
+    if (!tree_stream.good()) {
+      std::cerr << "Error opening " << nwk_path << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    tree->load(tree_stream);
+    if (!tree_stream.good()) {
+      std::cerr << "Failed to read the backbone tree of the index!" << std::endl;
+      exit(EXIT_FAILURE);
+    }
   }
   tree->reset_traversal();
 }
@@ -68,10 +133,11 @@ void IndexMultiple::read_input_file()
     std::istringstream iss(line);
     std::string input, name;
     if (!(std::getline(iss, name, '\t') && std::getline(iss, input, '\t'))) {
-      std::cerr << "Failed to read file for reference name to path mapping" << std::endl;
+      std::cerr << "Failed to read the reference name to path/URL mapping!" << std::endl;
       exit(EXIT_FAILURE);
     }
     name_to_path[name] = input;
+    names_v.push_back(name);
   }
   input_file.close();
 }
@@ -95,9 +161,56 @@ void IndexMultiple::build_index()
 
 void IndexMultiple::save_index()
 {
-  root_flatht->save(index_dir, suffix);
-  root_flatht->get_tree()->save(index_dir, suffix);
-  root_flatht->get_crecord()->save(index_dir, suffix);
+  std::ofstream mer_stream(index_dir / ("cmer" + suffix), std::ofstream::binary);
+  std::ofstream inc_stream(index_dir / ("inc" + suffix), std::ofstream::binary);
+  root_flatht->save(mer_stream, inc_stream);
+  if (!mer_stream.good()) {
+    std::cerr << "Failed to write the k-mer array of the index!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  if (!inc_stream.good()) {
+    std::cerr << "Failed to read the offset array of a partial index!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  inc_stream.close();
+  mer_stream.close();
+
+  std::ofstream crecord_stream(index_dir / ("crecord" + suffix), std::ofstream::binary);
+  root_flatht->get_crecord()->save(crecord_stream);
+  if (!crecord_stream.good()) {
+    std::cerr << "Failed to write the color array of the index!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  crecord_stream.close();
+
+  if (nwk_path.empty()) {
+    std::cerr << "Skipped saving a backbone for the index!" << std::endl;
+    std::ofstream reflist_stream(index_dir / ("reflist" + suffix));
+    std::ostream_iterator<std::string> reflist_iterator(reflist_stream, "\n");
+    std::copy(std::begin(names_v), std::end(names_v), reflist_iterator);
+    if (!reflist_stream.good()) {
+      std::cerr << "Failed to write the reference list of the index!" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    reflist_stream.close();
+  } else {
+    std::ofstream tree_stream(index_dir / ("tree" + suffix));
+    root_flatht->get_tree()->save(tree_stream);
+    if (!tree_stream.good()) {
+      std::cerr << "Failed to write the backbone tree of the index!" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    tree_stream.close();
+  }
+
+  std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
+  std::ofstream metadata_stream(metadata_path, std::ofstream::binary);
+  save_configuration(metadata_stream);
+  if (!metadata_stream.good()) {
+    std::cerr << "Failed to write the metadata of the index!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  metadata_stream.close();
 }
 
 void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
@@ -150,157 +263,10 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
   }
 }
 
-void BaseLSH::save_configuration(std::ofstream& cfg_stream)
+void QuerySketch::header_dreport(strstream& dreport_stream)
 {
-  cfg_stream.write(reinterpret_cast<char*>(&k), sizeof(uint8_t));
-  cfg_stream.write(reinterpret_cast<char*>(&w), sizeof(uint8_t));
-  cfg_stream.write(reinterpret_cast<char*>(&h), sizeof(uint8_t));
-  cfg_stream.write(reinterpret_cast<char*>(&m), sizeof(uint32_t));
-  cfg_stream.write(reinterpret_cast<char*>(&r), sizeof(uint32_t));
-  cfg_stream.write(reinterpret_cast<char*>(&frac), sizeof(bool));
-  cfg_stream.write(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
-  cfg_stream.write(reinterpret_cast<char*>(lshf->ppos_data()), (h) * sizeof(uint8_t));
-  cfg_stream.write(reinterpret_cast<char*>(lshf->npos_data()), (k - h) * sizeof(uint8_t));
-}
-
-void IndexMultiple::save_metadata()
-{
-  std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
-  std::ofstream metadata_stream(metadata_path, std::ofstream::binary);
-  save_configuration(metadata_stream);
-  if (!metadata_stream.good()) {
-    std::cerr << "Writing the metadata for the index has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  metadata_stream.close();
-}
-
-SketchSingle::SketchSingle(CLI::App& sub_ss)
-{
-  sub_ss
-    .add_option("-o,--output-path", output_path, "Path to store the resulting binary sketch file.")
-    ->required();
-  sub_ss
-    .add_option("-i,--input-file",
-                input_path,
-                "Path (or URL) to the input FASTA/FASTQ file (gzip compatible).")
-    ->required();
-  sub_ss.add_option("-k,--kmer-len", k, "Length of k-mers [30].");
-  sub_ss.add_option("-w,--win-len", w, "Length of minimizer window (w>=k) [k].");
-  sub_ss.add_option("-h,--num-positions", h, "Number of positions for the LSH [10].");
-  sub_ss.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [2].");
-  sub_ss.add_option(
-    "-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
-  sub_ss.add_flag(
-    "--frac,!--no-frac", frac, "If given, k-mers with r > LSH(x) mod m will be excluded [false].");
-  sub_ss.callback([&]() {
-    set_nrows();
-    set_lshf();
-    if (!(sub_ss.count("-w") + sub_ss.count("--win-len"))) {
-      w = k;
-    }
-  });
-}
-
-CompareSketch::CompareSketch(CLI::App& sub_sscomp)
-{
-  sub_sscomp.add_option("-s,--sketch-path", sketch_path, "Path to the sketch file to compare.")
-    ->required()
-    ->check(CLI::ExistingFile);
-  sub_sscomp.add_option(
-    "-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
-  sub_sscomp.add_option("-q,--query-file", query_path, "Path to FASTA/FASTQ query file.")
-    ->required()
-    ->check(CLI::ExistingFile);
-  sub_sscomp.add_option(
-    "--hdist-th", hdist_th, "The maximum Hamming distance for a k-mer to match [4].");
-  sub_sscomp.callback([&]() {
-    if (!output_path.empty()) {
-      output_file.open(output_path);
-      output_stream = &output_file;
-    }
-  });
-}
-
-IndexMultiple::IndexMultiple(CLI::App& sub_im)
-{
-  sub_im
-    .add_option(
-      "-l,--index-dir", index_dir, "Path to the directory in which the index will be stored.")
-    ->required();
-  sub_im
-    .add_option("-i,--input-file",
-                input_path,
-                "Path to the tsv-file containing paths/urls and names of references.")
-    ->required()
-    ->check(CLI::ExistingFile);
-  sub_im
-    .add_option(
-      "-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (rooted).")
-    ->check(CLI::ExistingFile);
-  sub_im.add_option("-k,--kmer-len", k, "Length of k-mers [30].");
-  sub_im.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+3].");
-  sub_im.add_option("-h,--num-positions", h, "Number of positions for the LSH [14].");
-  sub_im.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [2].");
-  sub_im.add_option(
-    "-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
-  sub_im.add_flag(
-    "--frac,!--no-frac", frac, "If given, k-mers with r > LSH(x) mod m will be excluded [false].");
-  sub_im.callback([&]() {
-    set_nrows();
-    set_lshf();
-    if (!(sub_im.count("-w") + sub_im.count("--win-len"))) {
-      w = k + 3;
-    }
-    std::filesystem::create_directory(index_dir);
-    suffix = "-";
-    /* suffix += "k" + std::to_string(k) + "w" + std::to_string(w) + "h" + std::to_string(h); */
-    suffix += "m" + std::to_string(m) + "r" + std::to_string(r);
-    suffix += frac ? "-frac" : "-no_frac";
-  });
-}
-
-void TargetSketch::load_sketch()
-{
-  sketch = std::make_shared<Sketch>(sketch_path);
-  sketch->load();
-  sketch->make_rho_partial();
-}
-
-void TargetIndex::load_index()
-{
-  node_phmap<std::string, std::set<std::string>> suffix_to_ltype;
-  for (const auto& entry : std::filesystem::directory_iterator(index_dir)) {
-    std::string filename, ltype, mrcfg, fracv;
-    size_t pos1, pos2;
-    filename = entry.path().filename();
-    pos1 = filename.find("-", 0);
-    pos2 = filename.find("-", pos1 + 1);
-    ltype = filename.substr(0, pos1);
-    mrcfg = filename.substr(pos1, pos2 - pos1);
-    fracv = filename.substr(pos2, filename.size() - pos2);
-    suffix_to_ltype[mrcfg + fracv].insert(ltype);
-  }
-  std::vector<std::string> suffixes;
-  for (auto const& [suffix, ltypes] : suffix_to_ltype) {
-    suffixes.push_back(suffix);
-  }
-  std::set<std::string> lall_wtree{"cmer", "crecord", "inc", "metadata", "tree"};
-  std::set<std::string> lall_wotree{"cmer", "crecord", "inc", "metadata", "reflist"};
-#pragma omp parallel for num_threads(num_threads), schedule(static)
-  for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
-    if (suffix_to_ltype[suffixes[lix]] == lall_wtree) {
-      index->add_partial_tree(suffixes[lix]);
-      index->add_partial_index(suffixes[lix]);
-    } else if (suffix_to_ltype[suffixes[lix]] == lall_wotree) {
-      index->generate_partial_tree(suffixes[lix]);
-      index->add_partial_index(suffixes[lix]);
-    } else {
-      std::cerr << "There is a partial index with a missing file!" << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  }
-  index->make_rho_partial();
+  dreport_stream << "#software: krepp\t#version: " VERSION "\t#invocation :" + invocation;
+  dreport_stream << "\nSEQ_ID\tDIST\n";
 }
 
 void QueryIndex::header_dreport(strstream& dreport_stream)
@@ -309,9 +275,10 @@ void QueryIndex::header_dreport(strstream& dreport_stream)
   dreport_stream << "\nSEQ_ID\tREFERENCE_NAME\tDIST\n";
 }
 
-void CompareSketch::estimate_distances()
+void QuerySketch::seek_sequences()
 {
   strstream dreport_stream;
+  header_dreport(dreport_stream);
   omp_set_num_threads(num_threads);
   qseq_sptr_t qs = std::make_shared<QSeq>(query_path);
 #pragma omp parallel shared(qs)
@@ -319,10 +286,10 @@ void CompareSketch::estimate_distances()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
-        CBatch cb(sketch, qs, hdist_th);
+        SBatch sb(sketch, qs, hdist_th);
 #pragma omp task untied
         {
-          cb.estimate_distances(*output_stream);
+          sb.seek_sequences(*output_stream);
         }
       }
 #pragma omp taskwait
@@ -342,10 +309,10 @@ void QueryIndex::estimate_distances()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
-        QBatch qb(index, qs, hdist_th, tau, no_filter);
+        IBatch ib(index, qs, hdist_th, tau, no_filter);
 #pragma omp task untied
         {
-          qb.estimate_distances(*output_stream);
+          ib.estimate_distances(*output_stream);
         }
       }
 #pragma omp taskwait
@@ -364,7 +331,7 @@ void QueryIndex::end_jplace(strstream& jplace_stream)
 
 void QueryIndex::begin_jplace(strstream& jplace_stream)
 {
-  // TODO: Make it compatible with jplace standard.
+  // Keep it compatible with jplace standard.
   jplace_stream
     << "{\n\t\"version\" : 3,\n\t"
        "\"fields\" : [\"edge_num\", \"likelihood\", \"like_weight_ratio\", \"placement_distance\", \"pendant_length\", \"distal_length\"],\n"
@@ -389,10 +356,10 @@ void QueryIndex::place_sequences()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
-        QBatch qb(index, qs, hdist_th, tau, no_filter);
+        IBatch ib(index, qs, hdist_th, tau, no_filter);
 #pragma omp task untied
         {
-          qb.place_sequences(*output_stream);
+          ib.place_sequences(*output_stream);
         }
       }
 #pragma omp taskwait
@@ -403,42 +370,125 @@ void QueryIndex::place_sequences()
   (*output_stream) << jplace_stream.rdbuf();
 }
 
-InfoIndex::InfoIndex(CLI::App& sub_iminfo)
+void InfoIndex::display_info() { index->display_info(); }
+
+InfoIndex::InfoIndex(CLI::App& subcommand)
 {
-  sub_iminfo
+  subcommand
     .add_option("-l,--index-dir", index_dir, "Path to the directory containing reference index.")
     ->required()
     ->check(CLI::ExistingDirectory);
-  sub_iminfo.callback([&]() { index = std::make_shared<Index>(index_dir); });
+  subcommand.callback([&]() { index = std::make_shared<Index>(index_dir); });
 }
 
-void InfoIndex::display_info() { index->display_info(); }
-
-QueryIndex::QueryIndex(CLI::App& sub_query)
+SketchSingle::SketchSingle(CLI::App& subcommand)
 {
-  sub_query
+  set_sketch_defaults();
+  subcommand
+    .add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")
+    ->required();
+  subcommand
+    .add_option("-i,--input-file",
+                input_path,
+                "Path (or URL) to the input FASTA/FASTQ file (gzip compatible).")
+    ->required();
+  subcommand.add_option("-k,--kmer-len", k, "Length of k-mers [30].");
+  subcommand.add_option("-w,--win-len", w, "Length of minimizer window (w>=k) [k].");
+  subcommand.add_option("-h,--num-positions", h, "Number of positions for the LSH [10].");
+  subcommand.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [2].");
+  subcommand.add_option(
+    "-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
+  subcommand.add_flag(
+    "--frac,!--no-frac", frac, "If given, k-mers with r > LSH(x) mod m will be excluded [false].");
+  subcommand.callback([&]() {
+    if (!(subcommand.count("-w") + subcommand.count("--win-len"))) {
+      w = k;
+    }
+  });
+}
+
+QuerySketch::QuerySketch(CLI::App& sub_dist)
+{
+  sub_dist.add_option("-s,--sketch-path", sketch_path, "Path to the sketch file to seek.")
+    ->required()
+    ->check(CLI::ExistingFile);
+  sub_dist.add_option(
+    "-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
+  sub_dist.add_option("-q,--query-file", query_path, "Path to FASTA/FASTQ query file.")
+    ->required()
+    ->check(CLI::ExistingFile);
+  sub_dist.add_option(
+    "--hdist-th", hdist_th, "The maximum Hamming distance for a k-mer to match [4].");
+  sub_dist.callback([&]() {
+    if (!output_path.empty()) {
+      output_file.open(output_path);
+      output_stream = &output_file;
+    }
+  });
+}
+
+IndexMultiple::IndexMultiple(CLI::App& subcommand)
+{
+  set_index_defaults();
+  subcommand
+    .add_option(
+      "-l,--index-dir", index_dir, "Path to the directory in which the index will be stored.")
+    ->required();
+  subcommand
+    .add_option("-i,--input-file",
+                input_path,
+                "Path to the tsv-file containing paths/urls and names of references.")
+    ->required()
+    ->check(CLI::ExistingFile);
+  subcommand
+    .add_option(
+      "-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (rooted).")
+    ->check(CLI::ExistingFile);
+  subcommand.add_option("-k,--kmer-len", k, "Length of k-mers [30].");
+  subcommand.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+3].");
+  subcommand.add_option("-h,--num-positions", h, "Number of positions for the LSH [14].");
+  subcommand.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [2].");
+  subcommand.add_option(
+    "-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].");
+  subcommand.add_flag(
+    "--frac,!--no-frac", frac, "If given, k-mers with r > LSH(x) mod m will be excluded [false].");
+  subcommand.callback([&]() {
+    if (!(subcommand.count("-w") + subcommand.count("--win-len"))) {
+      w = k + 3;
+    }
+    std::filesystem::create_directory(index_dir);
+    suffix = "-";
+    /* suffix += "k" + std::to_string(k) + "w" + std::to_string(w) + "h" + std::to_string(h); */
+    suffix += "m" + std::to_string(m) + "r" + std::to_string(r);
+    suffix += frac ? "-frac" : "-no_frac";
+  });
+}
+
+QueryIndex::QueryIndex(CLI::App& subcommand)
+{
+  subcommand
     .add_option(
       "-l,--index-dir", index_dir, "Path to the directory containing the reference index.")
     ->required()
     ->check(CLI::ExistingDirectory);
-  sub_query.add_option(
+  subcommand.add_option(
     "-o,--output-path", output_path, "Write results to a file at <path> [stdout].");
-  sub_query.add_option("-q,--query-file", query_path, "Path to FASTA/FASTQ query file.")
+  subcommand.add_option("-q,--query-file", query_path, "Path to FASTA/FASTQ query file.")
     ->required()
     ->check(CLI::ExistingFile);
-  sub_query.add_option(
+  subcommand.add_option(
     "--hdist-th", hdist_th, "The maximum Hamming distance for a k-mer to match [4].");
-  sub_query.add_option(
+  subcommand.add_option(
     "--tau", tau, "The highest Hamming distance for placement threshold (increase to relax) [3].");
-  sub_query.add_flag(
+  subcommand.add_flag(
     "--no-filter",
     no_filter,
     "Report matching references regardless of the statistical significance or match count (overrides --tau) [false].");
-  // sub_query.add_option(
+  // subcommand.add_option(
   //   "--leave-out-ref",
   //   leave_out_ref,
   //   "The reference taxon to be excluded during query, useful for benchmarking and testing.");
-  sub_query.callback([&]() {
+  subcommand.callback([&]() {
     if (!output_path.empty()) {
       output_file.open(output_path);
       output_stream = &output_file;
@@ -449,44 +499,44 @@ QueryIndex::QueryIndex(CLI::App& sub_query)
 
 int main(int argc, char** argv)
 {
+  PRINT_VERSION
   std::ios::sync_with_stdio(false);
   CLI::App app{"krepp: "
-               "a tool for k-mer-based search in large genome collections & metagenomic analysis."};
+               "a tool for k-mer-based search, distance estimation & phylogenetic placement."};
   app.set_help_flag("--help");
   bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.require_subcommand();
   uint32_t seed = 0;
   app.add_option(
-    "--seed", seed, "Random seed for the LSH and other parts that require randomness.");
+    "--seed", seed, "Random seed for the LSH and other parts that require randomness [0].");
   app.callback([&]() {
     if (app.count("--seed")) {
       gen.seed(seed);
     }
   });
   app.add_option(
-    "--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism.");
+    "--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism [0].");
 
-  auto& sub_im = *app.add_subcommand("build", "Build an index from k-mers of reference genomes.");
-  IndexMultiple im(sub_im);
+  auto& sub_index =
+    *app.add_subcommand("build", "Build an index from k-mers of reference genomes.");
+  auto& sub_place =
+    *app.add_subcommand("place", "Place queries on a tree with respect to an index.");
+  auto& sub_dist =
+    *app.add_subcommand("dist", "Estimate distances of queries to genomes in an index.");
+  auto& sub_inspect =
+    *app.add_subcommand("inspect", "Display statistics and information for a given index.");
+  auto& sub_sketch =
+    *app.add_subcommand("sketch", "Create a sketch from k-mers in a single FASTA/FASTQ file.");
+  auto& sub_seek =
+    *app.add_subcommand("seek", "Seek query sequences in a sketch and estimate distances.");
 
-  auto& sub_implace = *app.add_subcommand(
-    "place", "Place query sequences on the backbone tree using reference k-mers in an index.");
-  QueryIndex implace(sub_implace);
-
-  auto& sub_imdist = *app.add_subcommand(
-    "dist", "Estimate distances between query sequences and matching references in an index.");
-  QueryIndex imdist(sub_imdist);
-
-  auto& sub_iminfo =
-    *app.add_subcommand("info", "Display statistics and information for a given index.");
-  InfoIndex iminfo(sub_iminfo);
-
-  auto& sub_ss = *app.add_subcommand("sketch", "Sketch k-mers in a single FASTA/FASTQ file.");
-  SketchSingle ss(sub_ss);
-
-  auto& sub_sscomp = *app.add_subcommand("compare", "Compare query sequences with a sketch.");
-  CompareSketch sscomp(sub_sscomp);
+  IndexMultiple krepp_index(sub_index);
+  QueryIndex krepp_place(sub_place);
+  QueryIndex krepp_dist(sub_dist);
+  InfoIndex krepp_inspect(sub_inspect);
+  SketchSingle krepp_sketch(sub_sketch);
+  QuerySketch krepp_seek(sub_seek);
 
   CLI11_PARSE(app, argc, argv);
   for (int i = 0; i < argc; ++i) {
@@ -496,59 +546,75 @@ int main(int argc, char** argv)
 
   auto tstart = std::chrono::system_clock::now();
   std::time_t tstart_f = std::chrono::system_clock::to_time_t(tstart);
-  std::cerr << std::ctime(&tstart_f) << "\n";
+  std::cerr << std::ctime(&tstart_f);
 
-  if (sub_im.parsed()) {
+  if (sub_index.parsed()) {
     std::cerr << "Reading the tree and initializing the index..." << std::endl;
-    im.read_input_file();
-    im.obtain_build_tree();
-
+    krepp_index.set_nrows();
+    krepp_index.set_lshf();
+    krepp_index.read_input_file();
+    krepp_index.obtain_build_tree();
     std::cerr << "Building the index..." << std::endl;
-    im.build_index();
+    krepp_index.build_index();
     std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
-    std::cerr << "\nFinished building, elapsed: " << es_b.count() << " seconds" << std::endl;
-
-    im.save_index();
-    im.save_metadata();
+    std::cerr << std::endl << "Finished indexing, elapsed: " << es_b.count() << " sec" << std::endl;
+    krepp_index.save_index();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
-    std::cerr << "\nDone converting & saving, elapsed: " << es_s.count() << " seconds" << std::endl;
+    std::cerr << "Done converting & saving, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
-  if (sub_implace.parsed()) {
-    std::cerr << "Loading the index and the tree..." << std::endl;
-    implace.load_index();
-    if (!implace.check_wtree()) {
-      std::cerr << "Given index does not have a backbone tree for placement..." << std::endl;
-    }
+  if (sub_place.parsed()) {
+    std::cerr << "Loading the index and the backbone tree..." << std::endl;
+    krepp_place.load_index();
+    krepp_place.ensure_wbackbone();
     std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
-    implace.place_sequences();
+    std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
+    krepp_place.place_sequences();
+    std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
+    std::cerr << "Done placing queries, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
-  if (sub_imdist.parsed()) {
-    std::cerr << "Loading the index and the tree..." << std::endl;
-    imdist.load_index();
+  if (sub_dist.parsed()) {
+    std::cerr << "Loading the index and initializing..." << std::endl;
+    krepp_dist.load_index();
     std::cerr << "Estimating distances between given sequences and references..." << std::endl;
-    imdist.estimate_distances();
+    std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
+    krepp_dist.estimate_distances();
+    std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
+    std::cerr << "Done estimating distances, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
-  if (sub_iminfo.parsed()) {
-    iminfo.load_index();
-    iminfo.display_info();
+  if (sub_inspect.parsed()) {
+    std::cerr << "Inspecting the index..." << std::endl;
+    krepp_inspect.load_index();
+    krepp_inspect.display_info();
+    std::cerr << "Done reporting the index information..." << std::endl;
   }
 
-  if (sub_ss.parsed()) {
-    ss.create_sketch();
-    ss.save_sketch();
+  if (sub_sketch.parsed()) {
+    std::cerr << "Initializing the sketch..." << std::endl;
+    krepp_sketch.set_nrows();
+    krepp_sketch.set_lshf();
+    std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
+    krepp_sketch.create_sketch();
+    krepp_sketch.save_sketch();
+    std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
+    std::cerr << "Done skething & saving, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
-  if (sub_sscomp.parsed()) {
-    sscomp.load_sketch();
-    sscomp.estimate_distances();
+  if (sub_seek.parsed()) {
+    std::cerr << "Loading the sketch..." << std::endl;
+    krepp_seek.load_sketch();
+    std::cerr << "Seeking query sequences in the sktech..." << std::endl;
+    std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
+    krepp_seek.seek_sequences();
+    std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
+    std::cerr << "Done seeking sequences, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
   auto tend = std::chrono::system_clock::now();
   std::time_t tend_f = std::chrono::system_clock::to_time_t(tend);
-  std::cerr << "\n" << std::ctime(&tend_f);
+  std::cerr << std::ctime(&tend_f);
 
   return 0;
 }

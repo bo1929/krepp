@@ -1,6 +1,7 @@
 #ifndef _HDHISTLLH_H
 #define _HDHISTLLH_H
 
+// TODO: Make this templated.
 namespace optimize {
   class HDistHistLLH
   {

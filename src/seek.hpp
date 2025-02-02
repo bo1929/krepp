@@ -12,14 +12,14 @@ namespace optimize {
   class HDistHistLLH;
 }
 
-typedef std::shared_ptr<CSummary> csummary_sptr_t;
+class SSummary;
 
-class CSummary
+class SSummary
 {
-  friend class CBatch;
+  friend class SBatch;
 
 public:
-  CSummary(uint64_t enmers, uint32_t hdist_th)
+  SSummary(uint64_t enmers, uint32_t hdist_th)
     : hdist_th(hdist_th)
     , mismatch_count(enmers)
   {
@@ -37,12 +37,12 @@ private:
   std::vector<double> hdisthist_v;
 };
 
-class CBatch
+class SBatch
 {
 public:
-  CBatch(sketch_sptr_t sketch, qseq_sptr_t qs, uint32_t hdist_th);
-  void estimate_distances(std::ostream& output_stream);
-  void search_mers(const char* seq, uint64_t len, CSummary& or_summary, CSummary& rc_summary);
+  SBatch(sketch_sptr_t sketch, qseq_sptr_t qs, uint32_t hdist_th);
+  void seek_sequences(std::ostream& output_stream);
+  void search_mers(const char* seq, uint64_t len, SSummary& or_summary, SSummary& rc_summary);
 
 private:
   uint32_t k;

@@ -38,21 +38,6 @@ void Tree::generate_tree(vec<std::string>& names_v)
   compute_bdepth();
 }
 
-void Tree::parse(std::filesystem::path nwk_path)
-{
-  std::ifstream tree_stream(nwk_path);
-  nwk_str =
-    std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
-  tree_stream.close();
-  vec<std::string> nd_v;
-  split_nwk(nd_v);
-  root = std::make_shared<Node>(getptr());
-  root->parse(nd_v);
-  se_to_node.push_back(root);
-  subtree_root = root;
-  compute_bdepth();
-}
-
 void Tree::stream_newick_str(strstream& nwk_strstream, node_sptr_t nd)
 {
   if (!nd->check_leaf()) {
@@ -196,11 +181,13 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
       total_blen += (children.back())->total_blen;
       nchildren++;
     }
+    blen = 1.0;
     is_leaf = false;
     tree->nnodes++;
     se = tree->nnodes;
     name = "N" + std::to_string(se);
     tree->se_to_node.push_back(getptr());
+    tree->total_blen += blen;
   }
 }
 
@@ -287,27 +274,16 @@ double Tree::compute_distance(node_sptr_t a, node_sptr_t b)
   return distance;
 }
 
-void Tree::save(std::filesystem::path index_dir, std::string suffix)
+void Tree::save(std::ofstream& tree_stream)
 {
-  if (nwk_str.empty()) {
-    return;
-  }
-  std::ofstream tree_stream(index_dir / ("tree" + suffix));
   std::ostream_iterator<char> output_iterator(tree_stream);
   std::copy(nwk_str.begin(), nwk_str.end(), output_iterator);
-  if (!tree_stream.good()) {
-    std::cerr << "Writing the parsed reference tree has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  tree_stream.close();
 }
 
-void Tree::load(std::filesystem::path index_dir, std::string suffix)
+void Tree::load(std::ifstream& tree_stream)
 {
-  std::ifstream tree_stream(index_dir / ("tree" + suffix));
   nwk_str =
     std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
-  tree_stream.close();
   vec<std::string> nd_v;
   split_nwk(nd_v);
   root = std::make_shared<Node>(getptr());

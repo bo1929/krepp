@@ -5,7 +5,7 @@
 #define CHISQ_THRESHOLD 2.706
 /* #define CHISQ_THRESHOLD 1.642 */
 
-QBatch::QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t tau, bool no_filter)
+IBatch::IBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t tau, bool no_filter)
   : index(index)
   , hdist_th(hdist_th)
   , tau(tau)
@@ -25,7 +25,7 @@ QBatch::QBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t t
   mask_bp = u64m >> ((32 - k) * 2);
 }
 
-void QBatch::search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
+void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc)
 {
   enmers = len - k + 1;
   onmers_or = 0;
@@ -53,42 +53,42 @@ void QBatch::search_mers(const char* seq, uint64_t len, qmers_sptr_t qmers_or, q
 #ifdef CANONICAL
     if (rcenc64_bp < orenc64_bp) {
       orrix = lshf->compute_hash(orenc64_bp);
-      if (index->set_partial(orrix)) {
-        qmers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
+      if (index->check_partial(orrix)) {
+        imers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
         onmers_or++;
       }
     } else {
       rcrix = lshf->compute_hash(rcenc64_bp);
-      if (index->set_partial(rcrix)) {
-        qmers_or->add_matching_mer(i - k, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
+      if (index->check_partial(rcrix)) {
+        imers_rc->add_matching_mer(i - k, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
         onmers_rc++;
       }
     }
 #else
     orrix = lshf->compute_hash(orenc64_bp);
-    if (index->set_partial(orrix)) {
-      qmers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
+    if (index->check_partial(orrix)) {
+      imers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
       onmers_or++;
     }
     rcrix = lshf->compute_hash(rcenc64_bp);
-    if (index->set_partial(rcrix)) {
-      qmers_rc->add_matching_mer(len - i, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
+    if (index->check_partial(rcrix)) {
+      imers_rc->add_matching_mer(len - i, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
       onmers_rc++;
     }
 #endif /* CANONICAL */
   }
 }
 
-void QBatch::summarize_matches(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
+void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
 {
   nd_closest = tree->get_root();
   mi_closest = std::make_shared<Minfo>(hdist_th);
   node_to_minfo.clear();
-  qmers_or->hdist_filt = 2 * qmers_or->hdist_filt + 1;
-  qmers_rc->hdist_filt = 2 * qmers_rc->hdist_filt + 1;
-  for (auto [nd, mi] : qmers_or->leaf_to_minfo) {
+  imers_or->hdist_filt = 2 * imers_or->hdist_filt + 1;
+  imers_rc->hdist_filt = 2 * imers_rc->hdist_filt + 1;
+  for (auto [nd, mi] : imers_or->leaf_to_minfo) {
     // mi->compute_gamma();
-    if (mi->hdist_min > qmers_or->hdist_filt) {
+    if (mi->hdist_min > imers_or->hdist_filt) {
       continue;
     }
     mi->optimize_likelihood(llhfunc);
@@ -98,9 +98,9 @@ void QBatch::summarize_matches(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
     }
     node_to_minfo[nd] = mi;
   }
-  for (auto [nd, mi] : qmers_rc->leaf_to_minfo) {
+  for (auto [nd, mi] : imers_rc->leaf_to_minfo) {
     // mi->compute_gamma();
-    if (mi->hdist_min > qmers_rc->hdist_filt) {
+    if (mi->hdist_min > imers_rc->hdist_filt) {
       continue;
     }
     mi->optimize_likelihood(llhfunc);
@@ -110,32 +110,32 @@ void QBatch::summarize_matches(qmers_sptr_t qmers_or, qmers_sptr_t qmers_rc)
     }
     node_to_minfo[nd] = mi;
     // If both in reverse-complement and the original sequence, decide:
-    if ((qmers_or->leaf_to_minfo).contains(nd) &&
-        mi->d_llh > (qmers_or->leaf_to_minfo)[nd]->d_llh) {
-      node_to_minfo[nd] = (qmers_or->leaf_to_minfo)[nd];
+    if ((imers_or->leaf_to_minfo).contains(nd) &&
+        mi->d_llh > (imers_or->leaf_to_minfo)[nd]->d_llh) {
+      node_to_minfo[nd] = (imers_or->leaf_to_minfo)[nd];
     }
   }
 }
 
-void QBatch::estimate_distances(std::ostream& output_stream)
+void IBatch::estimate_distances(std::ostream& output_stream)
 {
   strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
 
-    qmers_sptr_t qmers_or = std::make_shared<QMers>(index, len, hdist_th);
-    qmers_sptr_t qmers_rc = std::make_shared<QMers>(index, len, hdist_th);
+    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
+    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
 
-    search_mers(seq, len, qmers_or, qmers_rc);
-    summarize_matches(qmers_or, qmers_rc);
+    search_mers(seq, len, imers_or, imers_rc);
+    summarize_matches(imers_or, imers_rc);
     report_distances(batch_stream);
   }
 #pragma omp critical
   output_stream << batch_stream.rdbuf();
 }
 
-void QBatch::report_distances(strstream& batch_stream)
+void IBatch::report_distances(strstream& batch_stream)
 {
   if (no_filter) {
     for (auto& [nd, mi] : node_to_minfo) {
@@ -154,25 +154,25 @@ void QBatch::report_distances(strstream& batch_stream)
   }
 }
 
-void QBatch::place_sequences(std::ostream& output_stream)
+void IBatch::place_sequences(std::ostream& output_stream)
 {
   strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
 
-    qmers_sptr_t qmers_or = std::make_shared<QMers>(index, len, hdist_th);
-    qmers_sptr_t qmers_rc = std::make_shared<QMers>(index, len, hdist_th);
+    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
+    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
 
-    search_mers(seq, len, qmers_or, qmers_rc);
-    summarize_matches(qmers_or, qmers_rc);
+    search_mers(seq, len, imers_or, imers_rc);
+    summarize_matches(imers_or, imers_rc);
     report_placement(batch_stream);
   }
 #pragma omp critical
   output_stream << batch_stream.rdbuf();
 }
 
-void QBatch::report_placement(strstream& batch_stream)
+void IBatch::report_placement(strstream& batch_stream)
 {
   batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], ";
   node_sptr_t nd_pp = nullptr;
@@ -273,7 +273,7 @@ void QBatch::report_placement(strstream& batch_stream)
   }
 }
 
-QMers::QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
+IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
   : index(index)
   , len(len)
   , hdist_th(hdist_th)
@@ -290,25 +290,24 @@ QMers::QMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
   }
 }
 
-void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
+void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
 {
   se_t se;
   node_sptr_t nd;
   uint32_t hdist_curr;
   std::queue<se_t> se_q;
   std::pair<se_t, se_t> pse;
-  std::vector<cmer_t>::const_iterator iter1 = index->bucket_start();
-  std::vector<cmer_t>::const_iterator iter2 = index->bucket_next();
-  crecord_sptr_t crecord = index->get_crecord();
-  for (; iter1 < iter2; ++iter1) {
-    hdist_curr = popcount_lr32(iter1->first ^ enc_lr);
+  std::pair<vec_cmer_it, vec_cmer_it> indices = index->bucket_indices(rix);
+  crecord_sptr_t crecord = index->get_crecord(rix);
+  for (; indices.first < indices.second; ++indices.first) {
+    hdist_curr = popcount_lr32(indices.first->first ^ enc_lr);
     if (hdist_curr > hdist_th) {
       continue;
     }
     if (hdist_curr < hdist_filt) {
       hdist_filt = hdist_curr;
     }
-    se_q.push(iter1->second);
+    se_q.push(indices.first->second);
     while (!se_q.empty()) {
       se = se_q.front();
       se_q.pop();
@@ -323,7 +322,7 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
         if (!leaf_to_minfo.contains(nd)) {
           leaf_to_minfo[nd] = std::make_shared<Minfo>(hdist_th, enmers, crecord->get_rho(se));
         }
-        leaf_to_minfo[nd]->update_match(iter1->first, pos, hdist_curr);
+        leaf_to_minfo[nd]->update_match(indices.first->first, pos, hdist_curr);
       } else {
         for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
           se_q.push((*std::next(nd->get_children(), i))->get_se());
@@ -345,7 +344,7 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
 /*   uint32_t ugamma = 0; */
 /*   for (i = 0; i < match_v.size(); ++i) { */
 /*     if (i == 0) { */
-/*       ugamma = qmers->k; */
+/*       ugamma = imers->k; */
 /*       continue; */
 /*     } */
 /*     if (match_v[i].pos > match_v[i - 1].pos) { */
@@ -353,13 +352,13 @@ void QMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
 /*     } else { */
 /*       s = (match_v[i - 1].pos - match_v[i].pos); */
 /*     } */
-/*     if (s > qmers->k) { */
-/*       ugamma += qmers->k; */
+/*     if (s > imers->k) { */
+/*       ugamma += imers->k; */
 /*     } else { */
 /*       ugamma += s; */
 /*     } */
 /*   } */
-/*   gamma = ugamma / (nmers + qmers->k - 1); */
+/*   gamma = ugamma / (nmers + imers->k - 1); */
 /* } */
 
 double Minfo::likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc)

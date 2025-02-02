@@ -19,11 +19,11 @@ public:
   bool check_compatible(tree_sptr_t tree);
   void split_nwk(vec<std::string>& n_vec);
   void parse(std::filesystem::path nwk_path);
+  void save(std::ofstream& tree_stream);
+  void load(std::ifstream& tree_stream);
   void generate_tree(vec<std::string>& names_v);
   static double compute_distance(node_sptr_t a, node_sptr_t b);
   static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
-  void save(std::filesystem::path index_dir, std::string suffix);
-  void load(std::filesystem::path index_dir, std::string suffix);
   void stream_newick_str(std::stringstream& nwk_strstream, node_sptr_t nd);
   void set_subtree(node_sptr_t source) { subtree_root = source; }
   node_sptr_t get_node(se_t se) const { return se_to_node[se]; }

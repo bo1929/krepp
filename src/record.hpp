@@ -65,12 +65,12 @@ public:
   sh_t add_subset(sh_t sh1, sh_t sh2);
   void union_record(record_sptr_t source);
   void decode_sh(sh_t sh, vec<node_sptr_t>& subset_v);
-  bool check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2);
-  void insert_rho(sh_t sh, double rho) { sh_to_rho[sh] = rho; }
+  bool check_subset_collision(subset_sptr_t s, subset_sptr_t s1, subset_sptr_t s2);
+  uint64_t get_size() { return sh_to_subset.size(); }
   record_sptr_t getptr() { return shared_from_this(); }
+  void insert_rho(sh_t sh, double rho) { sh_to_rho[sh] = rho; }
   se_t map_compact(sh_t sh) { return sh_to_se[sh]; }
   tree_sptr_t get_tree() { return tree; }
-  uint64_t get_size() { return sh_to_subset.size(); }
 
 private:
   tree_sptr_t tree = nullptr;
@@ -94,12 +94,12 @@ public:
   void print_info();
   void apply_rho_coef(double coef);
   void decode_se(se_t se, vec<node_sptr_t>& subset_v);
-  void load(std::filesystem::path index_dir, std::string suffix);
-  void save(std::filesystem::path index_dir, std::string suffix);
+  void load(std::ifstream& crecord_stream);
+  void save(std::ofstream& crecord_stream);
+  se_t get_nsubsets() { return nsubsets; }
   crecord_sptr_t getptr() { return shared_from_this(); }
   pse_t get_pse(se_t se) const { return se_to_pse[se]; }
   double get_rho(se_t se) const { return se_to_rho[se]; }
-  se_t get_nsubsets() { return nsubsets; }
   void display_info(uint32_t r, vec<uint64_t>& se_to_count);
 
 private:

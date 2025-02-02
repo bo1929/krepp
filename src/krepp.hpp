@@ -7,7 +7,7 @@
 #include "lshf.hpp"
 #include "phytree.hpp"
 #include "query.hpp"
-#include "compare.hpp"
+#include "seek.hpp"
 #include "record.hpp"
 #include "rqseq.hpp"
 #include "table.hpp"
@@ -19,30 +19,36 @@ public:
   void set_lshf();
   void set_nrows();
   void save_configuration(std::ofstream& cfg_stream);
+  void set_sketch_defaults()
+  {
+    k = 29;
+    w = k + 3;
+    h = 10;
+    m = 5;
+    r = 0;
+    frac = false;
+    nrows = pow(2, 2 * h - 1);
+  }
+  void set_index_defaults()
+  {
+    k = 29;
+    w = k + 6;
+    h = 14;
+    m = 5;
+    r = 0;
+    frac = false;
+    nrows = pow(2, 2 * h - 1);
+  }
 
-protected: // TODO: adaptive defaults for sketch versus index.
-  uint8_t w = k + 3;
-  uint8_t k = 29;
-  uint8_t h = 14;
-  uint32_t m = 2;
-  uint32_t r = 1;
-  bool frac = false;
-  uint32_t nrows = pow(2, 2 * h - 1);
+protected:
+  uint8_t w;
+  uint8_t k;
+  uint8_t h;
+  bool frac;
+  uint32_t m;
+  uint32_t r;
+  uint32_t nrows;
   lshf_sptr_t lshf = nullptr;
-};
-
-class SketchSingle : public BaseLSH
-{
-public:
-  SketchSingle(CLI::App& sub_ss);
-  void create_sketch();
-  void save_sketch();
-
-private:
-  double rho;
-  sflatht_sptr_t sketch_sflatht = nullptr;
-  std::filesystem::path input_path;
-  std::filesystem::path output_path;
 };
 
 class TargetSketch
@@ -55,57 +61,72 @@ protected:
   std::filesystem::path sketch_path;
 };
 
-class CompareSketch : public TargetSketch
-{
-public:
-  CompareSketch(CLI::App& sub_sscomp);
-  void estimate_distances();
-
-private:
-  uint32_t hdist_th = 4;
-  std::filesystem::path output_path;
-  std::ofstream output_file;
-  std::ostream* output_stream = &std::cout;
-  std::filesystem::path query_path;
-};
-
-class IndexMultiple : public BaseLSH
-{
-public:
-  IndexMultiple(CLI::App& sub_im);
-  void obtain_build_tree();
-  void save_metadata();
-  void save_index();
-  void build_index();
-  void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht);
-  void read_input_file();
-
-private:
-  std::string suffix;
-  tuint_t build_count = 0;
-  std::filesystem::path input_path;
-  std::filesystem::path index_dir;
-  std::filesystem::path nwk_path;
-  tree_sptr_t tree = nullptr;
-  flatht_sptr_t root_flatht = nullptr;
-  parallel_flat_phmap<std::string, std::string> name_to_path;
-};
-
 class TargetIndex
 {
 public:
   void load_index();
-  bool check_wtree() { return index->check_wtree(); }
+  void ensure_wbackbone();
 
 protected:
   index_sptr_t index = nullptr;
   std::filesystem::path index_dir;
 };
 
+class SketchSingle : public BaseLSH
+{
+public:
+  SketchSingle(CLI::App& subcommand);
+  void create_sketch();
+  void save_sketch();
+
+private:
+  double rho;
+  sflatht_sptr_t sketch_sflatht = nullptr;
+  std::filesystem::path input_path;
+  std::filesystem::path sketch_path;
+};
+
+class IndexMultiple : public BaseLSH
+{
+public:
+  IndexMultiple(CLI::App& subcommand);
+  void obtain_build_tree();
+  void read_input_file();
+  void save_index();
+  void build_index();
+  void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht);
+
+private:
+  parallel_flat_phmap<std::string, std::string> name_to_path;
+  vec<std::string> names_v;
+  std::string suffix;
+  tuint_t build_count = 0;
+  tree_sptr_t tree = nullptr;
+  flatht_sptr_t root_flatht = nullptr;
+  std::filesystem::path input_path;
+  std::filesystem::path index_dir;
+  std::filesystem::path nwk_path;
+};
+
+class QuerySketch : public TargetSketch
+{
+public:
+  QuerySketch(CLI::App& subcommand);
+  void seek_sequences();
+  void header_dreport(strstream& dreport_stream);
+
+private:
+  std::filesystem::path output_path;
+  std::ofstream output_file;
+  std::ostream* output_stream = &std::cout;
+  uint32_t hdist_th = 4;
+  std::filesystem::path query_path;
+};
+
 class QueryIndex : public TargetIndex
 {
 public:
-  QueryIndex(CLI::App& sub_imquery);
+  QueryIndex(CLI::App& subcommand);
   void estimate_distances();
   void place_sequences();
   void header_dreport(strstream& dreport_stream);
@@ -116,8 +137,8 @@ private:
   std::filesystem::path output_path;
   std::ofstream output_file;
   std::ostream* output_stream = &std::cout;
-  uint32_t hdist_th = 4;
   uint32_t tau = 3;
+  uint32_t hdist_th = 4;
   bool no_filter = false;
   std::filesystem::path query_path;
 };
@@ -125,7 +146,7 @@ private:
 class InfoIndex : public TargetIndex
 {
 public:
-  InfoIndex(CLI::App& sub_iminfo);
+  InfoIndex(CLI::App& subcommand);
   void display_info();
 };
 

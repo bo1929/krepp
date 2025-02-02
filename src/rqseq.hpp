@@ -68,8 +68,8 @@ private:
 
 class QSeq
 {
-  friend class QBatch;
-  friend class CBatch;
+  friend class IBatch;
+  friend class SBatch;
 
 public:
   QSeq(std::filesystem::path input_path);

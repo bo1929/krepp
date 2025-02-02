@@ -1,6 +1,6 @@
 #include "sketch.hpp"
 
-void Sketch::load()
+void Sketch::load_full_sketch()
 {
   std::ifstream sketch_stream(sketch_path, std::ifstream::binary);
   sflatht = std::make_shared<SFlatHT>();
@@ -18,7 +18,7 @@ void Sketch::load()
   sketch_stream.read(reinterpret_cast<char*>(&rho), sizeof(double));
 
   if (!sketch_stream.good()) {
-    std::cerr << "Reading the sketch file has failed!" << std::endl;
+    std::cerr << "Failed to read the sketch file!" << std::endl;
     exit(EXIT_FAILURE);
   }
   sketch_stream.close();
@@ -35,6 +35,9 @@ void Sketch::make_rho_partial()
   }
 }
 
-std::vector<enc_t>::const_iterator Sketch::bucket_start() { return sflatht->bucket_start(offset); }
-
-std::vector<enc_t>::const_iterator Sketch::bucket_next() { return sflatht->bucket_next(offset); }
+std::pair<vec_enc_it, vec_enc_it> Sketch::bucket_indices(uint32_t rix)
+{
+  uint32_t rix_res = rix % m;
+  uint32_t offset = frac ? (rix / m) * (r + 1) + rix_res : rix / m;
+  return std::make_pair(sflatht->bucket_start(offset), sflatht->bucket_next(offset));
+}

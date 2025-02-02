@@ -1,4 +1,5 @@
 #include "record.hpp"
+#include "common.hpp"
 
 Record::Record(tree_sptr_t tree)
   : tree(tree)
@@ -18,6 +19,7 @@ Record::Record(tree_sptr_t tree)
   }
   tree->reset_traversal();
   while (check_tree_collision()) {
+    std::cerr << "Rehashing the tree to resolve collisions..." << std::endl;
     rehash_tree();
   }
   sh_to_subset[0] = std::make_shared<Subset>(0, 0, 0);
@@ -76,19 +78,33 @@ void Record::rehash_tree()
 
 sh_t Record::add_subset(sh_t sh1, sh_t sh2)
 {
-  if (!(sh_to_subset.contains(sh1) && sh_to_subset.contains(sh2))) {
+  subset_sptr_t subset1 = nullptr;
+  sh_to_subset.if_contains(
+    sh1, [&subset1](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) {
+      subset1 = v.second;
+    });
+  subset_sptr_t subset2 = nullptr;
+  sh_to_subset.if_contains(
+    sh2, [&subset2](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) {
+      subset2 = v.second;
+    });
+  if (!(subset1 && subset2)) {
     std::cerr << "Cannot make the subset for the partition: (" << sh1 << ", " << sh2 << ")\n";
     std::quick_exit(EXIT_FAILURE);
   }
-  subset_sptr_t subset1 = sh_to_subset[sh1];
-  subset_sptr_t subset2 = sh_to_subset[sh2];
   sh_t sh = sh1 + sh2;
   sh_t nonce = 0;
-  while (check_subset_collision(sh + nonce, subset1, subset2)) {
+  subset_sptr_t subset = nullptr;
+  while (sh_to_subset.if_contains(
+           sh + nonce,
+           [&subset](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) {
+             subset = v.second;
+           }) &&
+         check_subset_collision(subset, subset1, subset2)) {
     nonce = Subset::rehash(nonce++ * sh1 * sh2);
   }
   sh += nonce;
-  if (!sh_to_subset.contains(sh)) {
+  if (!subset) {
     sh_to_subset[sh] =
       std::make_shared<Subset>(sh,
                                subset1->card > subset2->card ? subset1->sh : subset2->sh,
@@ -108,21 +124,16 @@ void Record::union_record(record_sptr_t source)
   tree = root->get_tree();
 }
 
-bool Record::check_subset_collision(sh_t sh, subset_sptr_t subset1, subset_sptr_t subset2)
+bool Record::check_subset_collision(subset_sptr_t s, subset_sptr_t s1, subset_sptr_t s2)
 {
-  if (sh == 0) {
-    return true;
-  } else if (sh_to_subset.contains(sh)) {
-    subset_sptr_t subset = sh_to_subset[sh];
-    if (subset->ch == 0) {
-      return true;
-    } else if ((subset->ch == subset1->sh || subset->ch == subset2->sh)) {
-      return false;
-    } else {
-      return true;
-    }
-  } else {
+  if (!s) {
     return false;
+  } else if (s->ch == 0 || s->sh == 0) {
+    return true;
+  } else if ((s->ch == s1->sh || s->ch == s2->sh)) {
+    return false;
+  } else {
+    return true;
   }
 }
 
@@ -200,40 +211,22 @@ CRecord::CRecord(tree_sptr_t tree)
   tree->reset_traversal();
 }
 
-void CRecord::load(std::filesystem::path index_dir, std::string suffix)
+void CRecord::load(std::ifstream& crecord_stream)
 {
-  std::filesystem::path crecord_path = index_dir / ("crecord" + suffix);
-  std::ifstream crecord_stream(crecord_path, std::ifstream::binary);
-  if (!crecord_stream.is_open()) {
-    std::cerr << "Failed to open " << crecord_path << std::endl;
-    exit(EXIT_FAILURE);
-  } else {
-    crecord_stream.read(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
-    crecord_stream.read(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
-    se_to_pse.resize(nsubsets);
-    crecord_stream.read(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
-    se_to_rho.resize(nnodes);
-    crecord_stream.read(reinterpret_cast<char*>(se_to_rho.data()), sizeof(double) * nnodes);
-  }
-  if (!crecord_stream.good()) {
-    std::cerr << "Reading subset enumerations has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  crecord_stream.close();
+  crecord_stream.read(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
+  crecord_stream.read(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
+  se_to_pse.resize(nsubsets);
+  crecord_stream.read(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
+  se_to_rho.resize(nnodes);
+  crecord_stream.read(reinterpret_cast<char*>(se_to_rho.data()), sizeof(double) * nnodes);
 }
 
-void CRecord::save(std::filesystem::path index_dir, std::string suffix)
+void CRecord::save(std::ofstream& crecord_stream)
 {
-  std::ofstream crecord_stream(index_dir / ("crecord" + suffix), std::ofstream::binary);
   crecord_stream.write(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
   crecord_stream.write(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
   crecord_stream.write(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
   crecord_stream.write(reinterpret_cast<char*>(se_to_rho.data()), sizeof(double) * nnodes);
-  if (!crecord_stream.good()) {
-    std::cerr << "Writing subset enumerations has failed!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  crecord_stream.close();
 }
 
 void Record::decode_sh(sh_t sh, vec<node_sptr_t>& subset_v)

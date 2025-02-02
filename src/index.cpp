@@ -2,7 +2,7 @@
 
 void Index::generate_partial_tree(std::string suffix)
 {
-  wtree = false;
+  wbackbone = false;
   std::ifstream reflist_file(index_dir / ("reflist" + suffix));
   std::string name;
   std::vector<std::string> names_v;
@@ -15,10 +15,8 @@ void Index::generate_partial_tree(std::string suffix)
     std::cerr << "Unable to open reference list file for an index without a tree." << std::endl;
     exit(EXIT_FAILURE);
   }
-
   tree_sptr_t curr_tree = std::make_shared<Tree>();
   curr_tree->generate_tree(names_v);
-
 #pragma omp critical
   {
     if (curr_tree->check_compatible(tree)) {
@@ -30,12 +28,22 @@ void Index::generate_partial_tree(std::string suffix)
   }
 }
 
-void Index::add_partial_tree(std::string suffix)
+void Index::load_partial_tree(std::string suffix)
 {
-  wtree = true;
+  wbackbone = true;
   tree_sptr_t curr_tree = std::make_shared<Tree>();
-  curr_tree->load(index_dir, suffix);
-
+  std::filesystem::path nwk_path = index_dir / ("tree" + suffix);
+  std::ifstream tree_stream(nwk_path);
+  if (!tree_stream.is_open()) {
+    std::cerr << "Failed to open " << nwk_path << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  curr_tree->load(tree_stream);
+  if (!tree_stream.good()) {
+    std::cerr << "Failed to read the backbone tree of a partial index!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  tree_stream.close();
 #pragma omp critical
   {
     if (curr_tree->check_compatible(tree)) {
@@ -47,7 +55,7 @@ void Index::add_partial_tree(std::string suffix)
   }
 }
 
-void Index::add_partial_index(std::string suffix)
+void Index::load_partial_index(std::string suffix)
 {
   std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
   std::ifstream metadata_stream(metadata_path, std::ifstream::binary);
@@ -65,13 +73,12 @@ void Index::add_partial_index(std::string suffix)
   metadata_stream.read(reinterpret_cast<char*>(ppos_v.data()), ppos_v.size() * sizeof(uint8_t));
   metadata_stream.read(reinterpret_cast<char*>(npos_v.data()), npos_v.size() * sizeof(uint8_t));
   if (!metadata_stream.good()) {
-    std::cerr << "Reading the metadata for the partial index has failed!" << std::endl;
+    std::cerr << "Failed to read the metadata of a partial skecth!" << std::endl;
     exit(EXIT_FAILURE);
   }
   metadata_stream.close();
 
   lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_curr, ppos_v, npos_v);
-
 #pragma omp critical
   {
     if (curr_lshf->check_compatible(lshf)) {
@@ -88,15 +95,48 @@ void Index::add_partial_index(std::string suffix)
 
   crecord_sptr_t curr_crecord;
   flatht_sptr_t curr_flatht;
-
 #pragma omp critical
   {
     curr_crecord = std::make_shared<CRecord>(tree);
     curr_flatht = std::make_shared<FlatHT>(tree, curr_crecord);
   }
 
-  curr_crecord->load(index_dir, suffix);
-  curr_flatht->load(index_dir, suffix);
+  std::filesystem::path mer_path = index_dir / ("cmer" + suffix);
+  std::ifstream mer_stream(mer_path, std::ifstream::binary);
+  if (!mer_stream.is_open()) {
+    std::cerr << "Failed to open " << mer_path << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  std::filesystem::path inc_path = index_dir / ("inc" + suffix);
+  std::ifstream inc_stream(inc_path, std::ifstream::binary);
+  if (!inc_stream.is_open()) {
+    std::cerr << "Failed to open " << inc_path << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  curr_flatht->load(mer_stream, inc_stream);
+  if (!mer_stream.good()) {
+    std::cerr << "Failed to read the k-mer vector of a partial index!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  mer_stream.close();
+  if (!inc_stream.good()) {
+    std::cerr << "Failed to read the offset array of a partial index!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  inc_stream.close();
+
+  std::filesystem::path crecord_path = index_dir / ("crecord" + suffix);
+  std::ifstream crecord_stream(crecord_path, std::ifstream::binary);
+  if (!crecord_stream.is_open()) {
+    std::cerr << "Failed to open " << crecord_path << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  curr_crecord->load(crecord_stream);
+  if (!crecord_stream.good()) {
+    std::cerr << "Failed to read the color array of a partial index!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  crecord_stream.close();
 
 #pragma omp critical
   {
@@ -112,17 +152,18 @@ void Index::add_partial_index(std::string suffix)
   }
 }
 
-std::vector<cmer_t>::const_iterator Index::bucket_start()
+std::pair<vec_cmer_it, vec_cmer_it> Index::bucket_indices(uint32_t rix)
 {
-  return r_to_flatht[rix_res]->bucket_start(offset);
+  uint32_t rix_res = rix % m;
+  uint32_t offset = rix / m;
+  if (r_to_numerator[rix_res] > 1) {
+    offset = offset * r_to_numerator[rix_res] + rix_res;
+  }
+  return std::make_pair(r_to_flatht[rix_res]->bucket_start(offset),
+                        r_to_flatht[rix_res]->bucket_next(offset));
 }
 
-std::vector<cmer_t>::const_iterator Index::bucket_next()
-{
-  return r_to_flatht[rix_res]->bucket_next(offset);
-}
-
-crecord_sptr_t Index::get_crecord() { return r_to_flatht[rix_res]->get_crecord(); }
+crecord_sptr_t Index::get_crecord(uint32_t rix) { return r_to_flatht[rix % m]->get_crecord(); }
 
 void Index::make_rho_partial()
 {
