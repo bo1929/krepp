@@ -387,7 +387,7 @@ SketchSingle::SketchSingle(CLI::App& sc)
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [k-16].");
   sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")->check(CLI::NonNegativeNumber);
-  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [false].");
+  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [true].");
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
@@ -425,7 +425,7 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [k-16].");
   sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")->check(CLI::NonNegativeNumber);
-  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [false].");
+  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [true].");
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;

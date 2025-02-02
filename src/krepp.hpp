@@ -39,7 +39,7 @@ public:
     h = 10;
     m = 5;
     r = 1;
-    frac = false;
+    frac = true;
     nrows = pow(2, 2 * h - 1);
   }
   void set_index_defaults()
@@ -49,7 +49,7 @@ public:
     h = 13;
     m = 5;
     r = 1;
-    frac = false;
+    frac = true;
     nrows = pow(2, 2 * h - 1);
   }
   bool validate_configuration()
