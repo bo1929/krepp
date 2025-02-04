@@ -333,7 +333,7 @@ void QueryIndex::begin_jplace(strstream& jplace_stream)
   // Keep it compatible with jplace standard.
   jplace_stream
     << "{\n\t\"version\" : 3,\n\t"
-       "\"fields\" : [\"edge_num\", \"likelihood\", \"like_weight_ratio\", \"placement_distance\", \"pendant_length\", \"distal_length\"],\n"
+       "\"fields\" : [\"edge_num\", \"pendant_length\", \"distal_length\", \"likelihood\", \"like_weight_ratio\", \"placement_distance\"],\n"
        "\t\"metadata\" : {\n"
        "\t\t\"software\" : \"krepp\",\n"
        "\t\t\"version\" : \"" VERSION "\",\n"
