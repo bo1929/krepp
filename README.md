@@ -100,7 +100,7 @@ krepp place -i $INDEX_DIR -q $QUERY_FILE --num-threads $NUM_THREADS -o ${QUERY_N
 ```
 where the output is in `jplace` format (version 3) (see the description [here](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0031009)).
 We leave the `p` field empty for sequences without any *k*-mer match.
-Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with empty placement fields (such as [`gappa`](github.com/lczech/gappa)), in this case you can simply filter those lines (e.g., by parsing `jplace` as a JSON file in Python or via bash scripting `grep -v "\[ \]" ${QUERY_NAME}.jplace | sed -z "s/},\n\t]/}\n\t]/g" > ${QUERY_NAME}-filtered.jplace`).
+Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with empty placement fields (such as [`gappa`](https://github.com/lczech/gappa)), in this case you can simply filter those lines (e.g., by parsing `jplace` as a JSON file in Python or via bash scripting `grep -v "\[ \]" ${QUERY_NAME}.jplace | sed -z "s/},\n\t]/}\n\t]/g" > ${QUERY_NAME}-filtered.jplace`).
 
 ### Practical distance estimation by sketching a file
 
@@ -173,7 +173,7 @@ head -n15 placements_toy.jplace
 			{"n" : ["||61435-2985"], "p" : [[38, 0, 0.000709545, -25.4031, 0.0492549, 0.0114681]]},
 ```
 
-You can proceed with your down-stream analysis using other tools, such as [`gappa`](github.com/lczech/gappa):
+You can proceed with your down-stream analysis using other tools, such as [`gappa`](https://github.com/lczech/gappa):
 ```bash
 # filtering sequences without any match and hence an empty placement field
 grep -v "\[ \]" placements_toy.jplace | sed -z "s/},\n\t]/}\n\t]/g" > placements_toy-filtered.jplace
