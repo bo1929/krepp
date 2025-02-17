@@ -145,8 +145,10 @@ void IndexMultiple::build_index()
 {
   record_sptr_t record = std::make_shared<Record>(tree);
   dynht_sptr_t root_dynht = std::make_shared<DynHT>(nrows, tree, record);
+#if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
   omp_set_nested(1);
+#endif
 #pragma omp parallel
   {
 #pragma omp single
@@ -238,20 +240,28 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
   } else {
     assert(nd->get_nchildren() > 0);
     vec<dynht_sptr_t> children_dynht_v;
+#if defined(_OPENMP) && _WOPENMP == 1
     omp_lock_t parent_lock;
     omp_init_lock(&parent_lock);
+#endif
     for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
       children_dynht_v.emplace_back(std::make_shared<DynHT>(nrows, tree, dynht->get_record()));
 #pragma omp task untied shared(dynht)
       {
         build_for_subtree(*std::next(nd->get_children(), i), children_dynht_v[i]);
+#if defined(_OPENMP) && _WOPENMP == 1
         omp_set_lock(&parent_lock);
+#endif
         dynht->union_table(children_dynht_v[i]);
+#if defined(_OPENMP) && _WOPENMP == 1
         omp_unset_lock(&parent_lock);
+#endif
       }
     }
 #pragma omp taskwait
+#if defined(_OPENMP) && _WOPENMP == 1
     omp_destroy_lock(&parent_lock);
+#endif
 #pragma omp critical
     {
       std::cerr << "\33[2K\r" << std::flush;
@@ -278,7 +288,9 @@ void QuerySketch::seek_sequences()
 {
   strstream dreport_stream;
   header_dreport(dreport_stream);
+#if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
+#endif
   qseq_sptr_t qs = std::make_shared<QSeq>(query);
 #pragma omp parallel shared(qs)
   {
@@ -301,7 +313,9 @@ void QueryIndex::estimate_distances()
   strstream dreport_stream;
   header_dreport(dreport_stream);
   (*output_stream) << dreport_stream.rdbuf();
+#if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
+#endif
   qseq_sptr_t qs = std::make_shared<QSeq>(query);
 #pragma omp parallel shared(qs)
   {
@@ -348,7 +362,9 @@ void QueryIndex::place_sequences()
   strstream jplace_stream;
   begin_jplace(jplace_stream);
   (*output_stream) << jplace_stream.rdbuf();
+#if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
+#endif
   qseq_sptr_t qs = std::make_shared<QSeq>(query);
 #pragma omp parallel shared(qs)
   {

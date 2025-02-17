@@ -1,17 +1,28 @@
 # compiler options
 #--------------------------------------------
 COMPILER = g++
-WLCURL=1
+WLCURL = 1
+WOPENMP = 1
+CSTATIC = 0
 
-ifeq ($(WLCURL), 0)
-	LDLIBS= -lstdc++fs -lm -lz -lstdc++
+CXXFLAGS = -std=c++17 -O3
+
+ifeq ($(CSTATIC), 0)
+	LDLIBS = -lstdc++fs -lm -lz -lstdc++
 else
-	LDLIBS= -lstdc++fs -lm -lz -lstdc++ -lcurl
+	LDLIBS = --static -lstdc++fs -lm -lz -static-libgcc -static-libstdc++
 endif
 
-VARDEF= -D _WLCURL=$(WLCURL)
+ifneq ($(WLCURL), 0)
+	LDLIBS += -lcurl
+endif
 
-CXXFLAGS = -std=c++17 -O3 -fopenmp
+ifneq ($(WOPENMP), 0)
+	LDLIBS += -lgomp
+	CXXFLAGS += -fopenmp
+endif
+
+VARDEF= -D _WLCURL=$(WLCURL) -D _WOPENMP=$(WOPENMP)
 
 INC = -Iexternal/CLI11/include/CLI \
 			-Iexternal/parallel-hashmap \
@@ -37,10 +48,10 @@ all: $(PROGRAM)
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp
 	@mkdir -p build
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(LDLIBS) $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(LDLIBS) $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o
 
 $(PROGRAM): $(OBJECTS)
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(LDLIBS) $(VARDEF) $(CPPFLAGS) $(LDFLAGS) $(INC) -o $@
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(LDLIBS) $(VARDEF) $(LDFLAGS) $(INC) -o $@
 
 clean:
 	rm -f $(PROGRAM) $(OBJECTS)

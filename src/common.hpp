@@ -31,14 +31,14 @@
 #include <vector>
 #include <zlib.h>
 #include <stdio.h>
-#if defined(_OPENMP)
+#if defined(_OPENMP) && _WOPENMP == 1
   #include "omp.h"
 #endif
-#if defined _WLCURL && _WLCURL == 1
+#if defined(_WLCURL) && _WLCURL == 1
   #include <curl/curl.h>
 #endif
 
-#define VERSION "v0.4.1"
+#define VERSION "v0.4.2"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
