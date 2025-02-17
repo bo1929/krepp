@@ -10,7 +10,7 @@ A k-mer-based maximum likelihood method for estimating distances of reads to gen
 
 ## Quick start
 ### Installing krepp or compiling from source
-Pre-compiled binaries are only available for Linux and x64 architecture, see the [latest release](https://github.com/bo1929/krepp/releases/tag/v0.0.4).
+Pre-compiled binaries are only available for Linux and x64 architecture, see the [latest release](https://github.com/bo1929/krepp/releases/tag/v0.4.2).
 
 To compile from the source, simply clone the repository with its submodules and compile with
 ```bash
