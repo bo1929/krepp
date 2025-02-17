@@ -112,7 +112,7 @@ krepp sketch -i $INPUT_FILE -o $SKETCH_PATH --num-threads $NUM_THREADS
 where `-i` is an URL or a filepath containing reference sequences from which *k*-mers will be extracted, and `-o` is the path that the resulting skecth will be saved in.
 A sketch can not be used for phylogenetic placement, but you can efficiently seek query sequences in a sketch to get distance estimates by running
 ```bash
-krepp seek -i $SKETCH_PATH -q $QUERY_FILE --num-threads $NUM_THREADS -o {QUERY_NAME}.tsv
+krepp seek -i $SKETCH_PATH -q $QUERY_FILE --num-threads $NUM_THREADS -o ${QUERY_NAME}.tsv
 ```
 
 The output is in a tab-separated format with two columns: *i)* the sequence ID and *ii)* the distance estimate.
