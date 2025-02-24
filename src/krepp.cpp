@@ -389,27 +389,35 @@ void InfoIndex::display_info() { index->display_info(); }
 
 InfoIndex::InfoIndex(CLI::App& sc)
 {
-  sc.add_option("-i,--index-dir", index_dir, "Directory <path> containing reference index.")->required()->check(CLI::ExistingDirectory);
+  sc.add_option("-i,--index-dir", index_dir, "Directory <path> containing reference index.")
+    ->required()
+    ->check(CLI::ExistingDirectory);
   sc.callback([&]() { index = std::make_shared<Index>(index_dir); });
 }
 
 SketchSingle::SketchSingle(CLI::App& sc)
 {
   set_sketch_defaults();
-  sc.add_option("-i,--input-file", input, "Input FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required()->check(url_validator|CLI::ExistingFile);
-  sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")->required();
-  sc.add_option("-k,--kmer-len", k, "Length of k-mers [26].")->check(CLI::Range(19,31));
+  sc.add_option(
+      "-i,--input-file", input, "Input FASTA/FASTQ file <path> (or URL) (gzip compatible).")
+    ->required()
+    ->check(url_validator | CLI::ExistingFile);
+  sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")
+    ->required();
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers [26].")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k) [k+6].");
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [k-16].");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")->check(CLI::PositiveNumber);
-  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")->check(CLI::NonNegativeNumber);
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")
+    ->check(CLI::PositiveNumber);
+  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")
+    ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [true].");
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
       h = k - 16;
     }
-    if (!validate_configuration()){
+    if (!validate_configuration()) {
       exit(EXIT_FAILURE);
     }
   });
@@ -417,10 +425,15 @@ SketchSingle::SketchSingle(CLI::App& sc)
 
 QuerySketch::QuerySketch(CLI::App& sc)
 {
-  sc.add_option("-q,--query", query, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required()->check(url_validator|CLI::ExistingFile);
-  sc.add_option("-i,--sketch-path", sketch_path, "Sketch file at <path> to query.")->required()->check(CLI::ExistingFile);
+  sc.add_option("-q,--query", query, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")
+    ->required()
+    ->check(url_validator | CLI::ExistingFile);
+  sc.add_option("-i,--sketch-path", sketch_path, "Sketch file at <path> to query.")
+    ->required()
+    ->check(CLI::ExistingFile);
   sc.add_option("-o,--output-path", output_path, "Write output to a file at <path> [stdout].");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")->check(CLI::NonNegativeNumber);
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")
+    ->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!output_path.empty()) {
       output_file.open(output_path);
@@ -433,21 +446,30 @@ QuerySketch::QuerySketch(CLI::App& sc)
 IndexMultiple::IndexMultiple(CLI::App& sc)
 {
   set_index_defaults();
-  sc.add_option("-i,--input-file", input, "TSV file <path> mapping reference IDs to (gzip compatible) paths/URLs.")->required()->check(CLI::ExistingFile);
-  sc.add_option("-o,--index-dir", index_dir, "Directory <path> in which the index will be stored.")->required();
-  sc.add_option("-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (must be rooted).")->check(CLI::ExistingFile);
-  sc.add_option("-k,--kmer-len", k, "Length of k-mers [29].")->check(CLI::Range(19,31));
+  sc.add_option("-i,--input-file",
+                input,
+                "TSV file <path> mapping reference IDs to (gzip compatible) paths/URLs.")
+    ->required()
+    ->check(CLI::ExistingFile);
+  sc.add_option("-o,--index-dir", index_dir, "Directory <path> in which the index will be stored.")
+    ->required();
+  sc.add_option(
+      "-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (must be rooted).")
+    ->check(CLI::ExistingFile);
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers [29].")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+6].");
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [k-16].");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")->check(CLI::PositiveNumber);
-  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")->check(CLI::NonNegativeNumber);
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")
+    ->check(CLI::PositiveNumber);
+  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")
+    ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [true].");
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
       h = k - 16;
     }
-    if (!validate_configuration()){
+    if (!validate_configuration()) {
       exit(EXIT_FAILURE);
     }
     std::filesystem::create_directory(index_dir);
@@ -459,12 +481,22 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
 
 QueryIndex::QueryIndex(CLI::App& sc)
 {
-  sc.add_option("-q,--query", query, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")->required()->check(url_validator|CLI::ExistingFile);
-  sc.add_option("-i,--index-dir", index_dir, "Directory <path> containing the reference index.")->required()->check(CLI::ExistingDirectory);
+  sc.add_option("-q,--query", query, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")
+    ->required()
+    ->check(url_validator | CLI::ExistingFile);
+  sc.add_option("-i,--index-dir", index_dir, "Directory <path> containing the reference index.")
+    ->required()
+    ->check(CLI::ExistingDirectory);
   sc.add_option("-o,--output-path", output_path, "Write output to a file at <path> [stdout].");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")->check(CLI::NonNegativeNumber);
-  sc.add_option("--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [2].")->check(CLI::NonNegativeNumber);
-  sc.add_flag("--no-filter", no_filter, "Report of the statistical significance or match count (overrides --tau) [false].");
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")
+    ->check(CLI::NonNegativeNumber);
+  sc.add_option(
+      "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [2].")
+    ->check(CLI::NonNegativeNumber);
+  sc.add_flag(
+    "--no-filter",
+    no_filter,
+    "Report regardless of the statistical significance or match count (overrides --tau) [false].");
   /* sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing."); */
   sc.callback([&]() {
     if (!output_path.empty()) {
@@ -479,7 +511,8 @@ int main(int argc, char** argv)
 {
   PRINT_VERSION
   std::ios::sync_with_stdio(false);
-  CLI::App app{"krepp: a tool for k-mer-based search, distance estimation & phylogenetic placement."};
+  CLI::App app{
+    "krepp: a tool for k-mer-based search, distance estimation & phylogenetic placement."};
   app.set_help_flag("--help");
   app.fallthrough();
 
@@ -487,20 +520,27 @@ int main(int argc, char** argv)
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.require_subcommand();
   uint32_t seed = 0;
-  app.add_option("--seed", seed, "Random seed for the LSH and other parts that require randomness [0].");
+  app.add_option(
+    "--seed", seed, "Random seed for the LSH and other parts that require randomness [0].");
   app.callback([&]() {
     if (app.count("--seed")) {
       gen.seed(seed);
     }
   });
-  app.add_option("--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism [1].");
+  app.add_option(
+    "--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism [1].");
 
-  auto& sub_index = *app.add_subcommand("index", "Build an index from k-mers of reference genomes.");
-  auto& sub_place = *app.add_subcommand("place", "Place queries on a tree with respect to an index.");
+  auto& sub_index =
+    *app.add_subcommand("index", "Build an index from k-mers of reference genomes.");
+  auto& sub_place =
+    *app.add_subcommand("place", "Place queries on a tree with respect to an index.");
   auto& sc = *app.add_subcommand("dist", "Estimate distances of queries to genomes in an index.");
-  auto& sub_inspect = *app.add_subcommand("inspect", "Display statistics and information for a given index.");
-  auto& sub_sketch = *app.add_subcommand("sketch", "Create a sketch from k-mers in a single FASTA/FASTQ file.");
-  auto& sub_seek = *app.add_subcommand("seek", "Seek query sequences in a sketch and estimate distances.");
+  auto& sub_inspect =
+    *app.add_subcommand("inspect", "Display statistics and information for a given index.");
+  auto& sub_sketch =
+    *app.add_subcommand("sketch", "Create a sketch from k-mers in a single FASTA/FASTQ file.");
+  auto& sub_seek =
+    *app.add_subcommand("seek", "Seek query sequences in a sketch and estimate distances.");
 
   IndexMultiple krepp_index(sub_index);
   QueryIndex krepp_place(sub_place);
