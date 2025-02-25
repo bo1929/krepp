@@ -5,7 +5,6 @@
 #include "lshf.hpp"
 #include "table.hpp"
 
-#define RBATCH_SIZE 512
 /* #define CANONICAL */
 
 class HandlerURL
@@ -107,7 +106,7 @@ public:
 
 private:
   uint64_t cbatch_size = 0;
-  uint64_t rbatch_size = RBATCH_SIZE;
+  uint64_t rbatch_size = 256;
   bool is_url;
   gzFile gfile;
   kseq_t* kseq;

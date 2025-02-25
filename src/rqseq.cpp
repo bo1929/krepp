@@ -128,10 +128,9 @@ QSeq::QSeq(std::string input)
     input_path = input;
   }
   gfile = gzopen(input_path.c_str(), "rb");
-  /* auto enum_reads = std::filesystem::file_size(input_path) / 320; */
-  /* rbatch_size = enum_reads / num_threads; */
-  /* std::cerr << "The expected number of reads is " << enum_reads << std::endl; */
-  /* std::cerr << "Read batch size is " << rbatch_size << std::endl; */
+  rbatch_size = (std::filesystem::file_size(input_path) / 200) / num_threads;
+  rbatch_size = std::min(rbatch_size, static_cast<uint64_t>(16384));
+  rbatch_size = std::max(rbatch_size, static_cast<uint64_t>(512));
   if (gfile == nullptr) {
     std::cerr << "Failed to open thefile at " << input_path << std::endl;
     exit(1);
