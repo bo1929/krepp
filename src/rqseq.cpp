@@ -116,7 +116,6 @@ void QSeq::clear_curr_batch()
 }
 
 QSeq::QSeq(std::string input)
-  : batch_size(0)
 {
   is_url = std::regex_match(input, url_regexp);
   if (is_url) {
@@ -129,6 +128,10 @@ QSeq::QSeq(std::string input)
     input_path = input;
   }
   gfile = gzopen(input_path.c_str(), "rb");
+  /* auto enum_reads = std::filesystem::file_size(input_path) / 320; */
+  /* rbatch_size = enum_reads / num_threads; */
+  /* std::cerr << "The expected number of reads is " << enum_reads << std::endl; */
+  /* std::cerr << "Read batch size is " << rbatch_size << std::endl; */
   if (gfile == nullptr) {
     std::cerr << "Failed to open thefile at " << input_path << std::endl;
     exit(1);
@@ -136,20 +139,20 @@ QSeq::QSeq(std::string input)
   kseq = kseq_init(gfile);
 }
 
-bool QSeq::read_next_batch(uint64_t max_batch_size)
+bool QSeq::read_next_batch()
 {
   seq_batch.clear();
   identifer_batch.clear();
-  seq_batch.reserve(BATCH_SIZE);
-  identifer_batch.reserve(BATCH_SIZE);
+  seq_batch.reserve(rbatch_size);
+  identifer_batch.reserve(rbatch_size);
   bool cont_reading = false;
   uint64_t ix = 0;
-  while ((ix < max_batch_size) && (cont_reading = kseq_read(kseq) >= 0)) {
+  while ((ix < rbatch_size) && (cont_reading = kseq_read(kseq) >= 0)) {
     seq_batch.emplace_back(kseq->seq.s);
     identifer_batch.emplace_back(kseq->name.s);
     ix++;
   }
-  batch_size = ix;
+  cbatch_size = ix;
   return cont_reading;
 }
 

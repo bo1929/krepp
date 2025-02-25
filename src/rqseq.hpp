@@ -5,8 +5,7 @@
 #include "lshf.hpp"
 #include "table.hpp"
 
-// TODO: Try to optimize this or make it a function of input size.
-#define BATCH_SIZE 512
+#define RBATCH_SIZE 512
 /* #define CANONICAL */
 
 class HandlerURL
@@ -101,15 +100,17 @@ class QSeq : public HandlerURL
 public:
   QSeq(std::string input);
   ~QSeq();
-  bool read_next_batch(uint64_t max_batch_size = BATCH_SIZE);
+  bool read_next_batch();
   bool is_batch_finished();
   void clear_curr_batch();
+  uint64_t get_cbatch_size() { return cbatch_size; }
 
 private:
+  uint64_t cbatch_size = 0;
+  uint64_t rbatch_size = RBATCH_SIZE;
   bool is_url;
   gzFile gfile;
   kseq_t* kseq;
-  uint64_t batch_size;
   vec<std::string> seq_batch;
   vec<std::string> identifer_batch;
   std::filesystem::path input_path;

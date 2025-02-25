@@ -150,6 +150,7 @@ public:
   QuerySketch(CLI::App& sc);
   void seek_sequences();
   void header_dreport(strstream& dreport_stream);
+  uint32_t get_total_qseq() { return total_qseq; }
 
 private:
   std::string query;
@@ -157,6 +158,7 @@ private:
   std::ofstream output_file;
   std::ostream* output_stream = &std::cout;
   uint32_t hdist_th = 4;
+  uint64_t total_qseq = 0;
 };
 
 class QueryIndex : public TargetIndex
@@ -168,6 +170,7 @@ public:
   void header_dreport(strstream& dreport_stream);
   void begin_jplace(strstream& jplace_stream);
   void end_jplace(strstream& jplace_stream);
+  uint32_t get_total_qseq() { return total_qseq; }
 
 private:
   std::string query;
@@ -177,6 +180,7 @@ private:
   uint32_t tau = 2;
   uint32_t hdist_th = 4;
   bool no_filter = false;
+  uint64_t total_qseq = 0;
 };
 
 class InfoIndex : public TargetIndex

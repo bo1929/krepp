@@ -16,7 +16,7 @@ IBatch::IBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t t
   k = lshf->get_k();
   h = lshf->get_h();
   m = lshf->get_m();
-  batch_size = qs->batch_size;
+  batch_size = qs->cbatch_size;
   std::swap(qs->seq_batch, seq_batch);
   std::swap(qs->identifer_batch, identifer_batch);
   llhfunc = optimize::HDistHistLLH(h, k, hdist_th);

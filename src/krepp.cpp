@@ -36,7 +36,7 @@ void TargetSketch::load_sketch()
 void TargetIndex::ensure_wbackbone()
 {
   if (!index->check_wbackbone()) {
-    std::cerr << "Given index lacks a backbone tree required for this sc..." << std::endl;
+    std::cerr << "Given index lacks a backbone tree required for this subcommand..." << std::endl;
     exit(EXIT_FAILURE);
   }
 }
@@ -297,6 +297,7 @@ void QuerySketch::seek_sequences()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
+        total_qseq += qs->get_cbatch_size();
         SBatch sb(sketch, qs, hdist_th);
 #pragma omp task untied
         {
@@ -322,6 +323,7 @@ void QueryIndex::estimate_distances()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
+        total_qseq += qs->get_cbatch_size();
         IBatch ib(index, qs, hdist_th, tau, no_filter);
 #pragma omp task untied
         {
@@ -371,6 +373,7 @@ void QueryIndex::place_sequences()
 #pragma omp single
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
+        total_qseq += qs->get_cbatch_size();
         IBatch ib(index, qs, hdist_th, tau, no_filter);
 #pragma omp task untied
         {
@@ -530,24 +533,24 @@ int main(int argc, char** argv)
   app.add_option(
     "--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism [1].");
 
-  auto& sub_index =
-    *app.add_subcommand("index", "Build an index from k-mers of reference genomes.");
-  auto& sub_place =
+  auto& sc_index = *app.add_subcommand("index", "Build an index from k-mers of reference genomes.");
+  auto& sc_place =
     *app.add_subcommand("place", "Place queries on a tree with respect to an index.");
-  auto& sc = *app.add_subcommand("dist", "Estimate distances of queries to genomes in an index.");
-  auto& sub_inspect =
+  auto& sc_dist =
+    *app.add_subcommand("dist", "Estimate distances of queries to genomes in an index.");
+  auto& sc_inspect =
     *app.add_subcommand("inspect", "Display statistics and information for a given index.");
-  auto& sub_sketch =
+  auto& sc_sketch =
     *app.add_subcommand("sketch", "Create a sketch from k-mers in a single FASTA/FASTQ file.");
-  auto& sub_seek =
+  auto& sc_seek =
     *app.add_subcommand("seek", "Seek query sequences in a sketch and estimate distances.");
 
-  IndexMultiple krepp_index(sub_index);
-  QueryIndex krepp_place(sub_place);
-  QueryIndex krepp_dist(sc);
-  InfoIndex krepp_inspect(sub_inspect);
-  SketchSingle krepp_sketch(sub_sketch);
-  QuerySketch krepp_seek(sub_seek);
+  IndexMultiple krepp_index(sc_index);
+  QueryIndex krepp_place(sc_place);
+  QueryIndex krepp_dist(sc_dist);
+  InfoIndex krepp_inspect(sc_inspect);
+  SketchSingle krepp_sketch(sc_sketch);
+  QuerySketch krepp_seek(sc_seek);
 
   CLI11_PARSE(app, argc, argv);
   for (int i = 0; i < argc; ++i) {
@@ -559,7 +562,7 @@ int main(int argc, char** argv)
   std::time_t tstart_f = std::chrono::system_clock::to_time_t(tstart);
   std::cerr << std::ctime(&tstart_f);
 
-  if (sub_index.parsed()) {
+  if (sc_index.parsed()) {
     std::cerr << "Reading the tree and initializing the index..." << std::endl;
     krepp_index.set_nrows();
     krepp_index.set_lshf();
@@ -574,7 +577,7 @@ int main(int argc, char** argv)
     std::cerr << "Done converting & saving, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
-  if (sub_place.parsed()) {
+  if (sc_place.parsed()) {
     std::cerr << "Loading the index and the backbone tree..." << std::endl;
     krepp_place.load_index();
     krepp_place.ensure_wbackbone();
@@ -583,9 +586,10 @@ int main(int argc, char** argv)
     krepp_place.place_sequences();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
     std::cerr << "Done placing queries, elapsed: " << es_s.count() << " sec" << std::endl;
+    std::cerr << "Total number of sequences queried: " << krepp_place.get_total_qseq() << std::endl;
   }
 
-  if (sc.parsed()) {
+  if (sc_dist.parsed()) {
     std::cerr << "Loading the index and initializing..." << std::endl;
     krepp_dist.load_index();
     std::cerr << "Estimating distances between given sequences and references..." << std::endl;
@@ -593,16 +597,17 @@ int main(int argc, char** argv)
     krepp_dist.estimate_distances();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
     std::cerr << "Done estimating distances, elapsed: " << es_s.count() << " sec" << std::endl;
+    std::cerr << "Total number of sequences queried: " << krepp_dist.get_total_qseq() << std::endl;
   }
 
-  if (sub_inspect.parsed()) {
+  if (sc_inspect.parsed()) {
     std::cerr << "Inspecting the index..." << std::endl;
     krepp_inspect.load_index();
     krepp_inspect.display_info();
     std::cerr << "Done reporting the index information..." << std::endl;
   }
 
-  if (sub_sketch.parsed()) {
+  if (sc_sketch.parsed()) {
     std::cerr << "Initializing the sketch..." << std::endl;
     krepp_sketch.set_nrows();
     krepp_sketch.set_lshf();
@@ -613,7 +618,7 @@ int main(int argc, char** argv)
     std::cerr << "Done skething & saving, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
-  if (sub_seek.parsed()) {
+  if (sc_seek.parsed()) {
     std::cerr << "Loading the sketch..." << std::endl;
     krepp_seek.load_sketch();
     std::cerr << "Seeking query sequences in the sktech..." << std::endl;
@@ -621,6 +626,7 @@ int main(int argc, char** argv)
     krepp_seek.seek_sequences();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
     std::cerr << "Done seeking sequences, elapsed: " << es_s.count() << " sec" << std::endl;
+    std::cerr << "Total number of sequences queried: " << krepp_seek.get_total_qseq() << std::endl;
   }
 
   auto tend = std::chrono::system_clock::now();
