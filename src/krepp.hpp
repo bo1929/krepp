@@ -165,6 +165,8 @@ class QueryIndex : public TargetIndex
 {
 public:
   QueryIndex(CLI::App& sc);
+  void init_sc_place(CLI::App& sc);
+  void init_sc_dist(CLI::App& sc);
   void estimate_distances();
   void place_sequences();
   void header_dreport(strstream& dreport_stream);
@@ -179,6 +181,7 @@ private:
   std::ostream* output_stream = &std::cout;
   uint32_t tau = 2;
   uint32_t hdist_th = 4;
+  double dist_max = 0.2;
   bool no_filter = false;
   uint64_t total_qseq = 0;
 };

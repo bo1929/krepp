@@ -5,9 +5,15 @@
 #define CHISQ_THRESHOLD 2.706
 /* #define CHISQ_THRESHOLD 1.642 */
 
-IBatch::IBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t tau, bool no_filter)
+IBatch::IBatch(index_sptr_t index,
+               qseq_sptr_t qs,
+               uint32_t hdist_th,
+               double dist_max,
+               uint32_t tau,
+               bool no_filter)
   : index(index)
   , hdist_th(hdist_th)
+  , dist_max(dist_max)
   , tau(tau)
   , no_filter(no_filter)
 {
@@ -137,6 +143,10 @@ void IBatch::estimate_distances(std::ostream& output_stream)
 
 void IBatch::report_distances(strstream& batch_stream)
 {
+  if (node_to_minfo.empty() || (!no_filter && (mi_closest->d_llh > dist_max))) {
+    batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
+    return;
+  }
   if (no_filter) {
     for (auto& [nd, mi] : node_to_minfo) {
       batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
@@ -148,9 +158,6 @@ void IBatch::report_distances(strstream& batch_stream)
         batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
       }
     }
-  }
-  if (node_to_minfo.empty()) {
-    batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
   }
 }
 

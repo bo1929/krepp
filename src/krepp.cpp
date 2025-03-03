@@ -324,7 +324,7 @@ void QueryIndex::estimate_distances()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, tau, no_filter);
+        IBatch ib(index, qs, hdist_th, dist_max, tau, no_filter);
 #pragma omp task untied
         {
           ib.estimate_distances(*output_stream);
@@ -374,7 +374,7 @@ void QueryIndex::place_sequences()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, tau, no_filter);
+        IBatch ib(index, qs, hdist_th, dist_max, tau, no_filter);
 #pragma omp task untied
         {
           ib.place_sequences(*output_stream);
@@ -482,6 +482,22 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
   });
 }
 
+void QueryIndex::init_sc_place(CLI::App& sc)
+{
+  sc.add_option(
+      "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [2].")
+    ->check(CLI::NonNegativeNumber);
+}
+
+void QueryIndex::init_sc_dist(CLI::App& sc)
+{
+  sc.add_option(
+      "--dist-max",
+      dist_max,
+      "Maximum distance to report for matching references, the output may become too large if high [0.2].")
+    ->check(CLI::Range(1e-8, 0.33));
+}
+
 QueryIndex::QueryIndex(CLI::App& sc)
 {
   sc.add_option("-q,--query", query, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")
@@ -493,13 +509,10 @@ QueryIndex::QueryIndex(CLI::App& sc)
   sc.add_option("-o,--output-path", output_path, "Write output to a file at <path> [stdout].");
   sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")
     ->check(CLI::NonNegativeNumber);
-  sc.add_option(
-      "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [2].")
-    ->check(CLI::NonNegativeNumber);
   sc.add_flag(
     "--no-filter",
     no_filter,
-    "Report regardless of the statistical significance or match count (overrides --tau) [false].");
+    "Report everything; regardless of the statistical significance, match count, or maximum distance.");
   /* sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing."); */
   sc.callback([&]() {
     if (!output_path.empty()) {
@@ -547,7 +560,9 @@ int main(int argc, char** argv)
 
   IndexMultiple krepp_index(sc_index);
   QueryIndex krepp_place(sc_place);
+  krepp_place.init_sc_place(sc_place);
   QueryIndex krepp_dist(sc_dist);
+  krepp_dist.init_sc_dist(sc_dist);
   InfoIndex krepp_inspect(sc_inspect);
   SketchSingle krepp_sketch(sc_sketch);
   QuerySketch krepp_seek(sc_seek);

@@ -44,7 +44,12 @@ private:
 class IBatch
 {
 public:
-  IBatch(index_sptr_t index, qseq_sptr_t qs, uint32_t hdist_th, uint32_t tau, bool no_filter);
+  IBatch(index_sptr_t index,
+         qseq_sptr_t qs,
+         uint32_t hdist_th,
+         double dist_max,
+         uint32_t tau,
+         bool no_filter);
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void estimate_distances(std::ostream& output_stream);
@@ -57,8 +62,9 @@ private:
   uint32_t h;
   uint32_t m;
   uint32_t hdist_th;
-  uint32_t tau;
+  double dist_max;
   bool no_filter;
+  uint32_t tau;
   tree_sptr_t tree;
   lshf_sptr_t lshf;
   index_sptr_t index;
