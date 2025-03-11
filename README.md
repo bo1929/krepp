@@ -1,5 +1,5 @@
 # krepp
-A k-mer-based maximum likelihood method for estimating distances of reads to genomes and phylogenetic placement.
+A k-mer-based maximum likelihood tool for estimating distances of reads to genomes and phylogenetic placement, see the preprint [here](https://www.biorxiv.org/content/10.1101/2025.01.20.633730v1).
 
 - [Installing krepp or compiling from source.](#installing-krepp-or-compiling-from-source)
 - [Building an index from multiple reference genomes](#building-an-index-from-multiple-reference-genomes)
