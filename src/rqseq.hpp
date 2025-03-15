@@ -6,6 +6,8 @@
 #include "table.hpp"
 
 /* #define CANONICAL */
+#define RBATCH_SIZE 512
+#define DSEQ_LEN 150
 
 class HandlerURL
 {
@@ -20,7 +22,7 @@ protected:
   }
   std::string download_url(std::string url)
   {
-    char tmp_path[FILENAME_MAX] = "/tmp/seq";
+    char tmp_path[FILENAME_MAX] = "/tmp/rseq";
     const char* sx = std::to_string(gp_hash(url)).c_str();
     strcat(tmp_path, sx);
     strcat(tmp_path, ".XXXXXX");
@@ -105,14 +107,15 @@ public:
   uint64_t get_cbatch_size() { return cbatch_size; }
 
 private:
-  uint64_t cbatch_size = 0;
-  uint64_t rbatch_size = 256;
   bool is_url;
   gzFile gfile;
   kseq_t* kseq;
   vec<std::string> seq_batch;
   vec<std::string> identifer_batch;
   std::filesystem::path input_path;
+  uint64_t bpc_limit = RBATCH_SIZE * DSEQ_LEN;
+  uint64_t rbatch_size = RBATCH_SIZE;
+  uint64_t cbatch_size = 0;
 };
 
 #endif

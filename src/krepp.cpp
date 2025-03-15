@@ -575,6 +575,7 @@ int main(int argc, char** argv)
 
   auto tstart = std::chrono::system_clock::now();
   std::time_t tstart_f = std::chrono::system_clock::to_time_t(tstart);
+  std::cerr << "Invocation: " << invocation << "\n";
   std::cerr << std::ctime(&tstart_f);
 
   if (sc_index.parsed()) {

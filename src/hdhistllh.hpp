@@ -1,6 +1,8 @@
 #ifndef _HDHISTLLH_H
 #define _HDHISTLLH_H
 
+#include <cmath>
+
 // TODO: Make this templated.
 namespace optimize {
   class HDistHistLLH

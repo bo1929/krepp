@@ -128,9 +128,6 @@ QSeq::QSeq(std::string input)
     input_path = input;
   }
   gfile = gzopen(input_path.c_str(), "rb");
-  rbatch_size = (std::filesystem::file_size(input_path) / 200) / num_threads;
-  rbatch_size = std::min(rbatch_size, static_cast<uint64_t>(16384));
-  rbatch_size = std::max(rbatch_size, static_cast<uint64_t>(512));
   if (gfile == nullptr) {
     std::cerr << "Failed to open thefile at " << input_path << std::endl;
     exit(1);
@@ -145,8 +142,10 @@ bool QSeq::read_next_batch()
   seq_batch.reserve(rbatch_size);
   identifer_batch.reserve(rbatch_size);
   bool cont_reading = false;
-  uint64_t ix = 0;
-  while ((ix < rbatch_size) && (cont_reading = kseq_read(kseq) >= 0)) {
+  uint64_t ix = 0, bpc = 0;
+  // Alternatively, use (ix < rbatch_size).
+  while ((bpc < bpc_limit) && (cont_reading = kseq_read(kseq) >= 0)) {
+    bpc += kseq->seq.l;
     seq_batch.emplace_back(kseq->seq.s);
     identifer_batch.emplace_back(kseq->name.s);
     ix++;
