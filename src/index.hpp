@@ -41,8 +41,8 @@ private:
   tree_sptr_t tree = nullptr;
   lshf_sptr_t lshf = nullptr;
   std::filesystem::path index_dir;
-  parallel_flat_phmap<uint32_t, flatht_sptr_t> r_to_flatht;
-  parallel_flat_phmap<uint32_t, uint32_t> r_to_numerator;
+  fparallel_flat_phmap<uint32_t, flatht_sptr_t> r_to_flatht;
+  fparallel_flat_phmap<uint32_t, uint32_t> r_to_numerator;
 };
 
 #endif

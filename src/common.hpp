@@ -227,6 +227,12 @@ template<class K, class V>
 using parallel_node_phmap = phmap::parallel_node_hash_map<K, V, EXTRAARGS, std::mutex>;
 
 template<class K, class V>
+using fparallel_flat_phmap = phmap::parallel_flat_hash_map<K, V, EXTRAARGS>;
+
+template<class K, class V>
+using fparallel_node_phmap = phmap::parallel_node_hash_map<K, V, EXTRAARGS>;
+
+template<class K, class V>
 using flat_phmap = phmap::flat_hash_map<K, V>;
 
 template<class K, class V>
