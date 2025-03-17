@@ -47,7 +47,8 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
   if (w > k) {
     ldiff = w - k + 1;
   } else {
-    ldiff = k + 1;
+    ldiff = 1;
+    w = k;
   }
   uint64_t kix = 0;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
@@ -69,37 +70,38 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     }
     lsh_enc_win[kix % ldiff].first = orenc64_bp & mask_bp;
     lsh_enc_win[kix % ldiff].second = orenc64_lr & mask_lr;
-    if (l >= w || (i == len)) {
-      cminimizer =
-        *std::min_element(lsh_enc_win.begin(),
-                          lsh_enc_win.end(),
-                          [](std::pair<uint64_t, uint64_t> lhs, std::pair<uint64_t, uint64_t> rhs) {
-                            return xur64_hash(lhs.second) < xur64_hash(rhs.second);
-                          });
-#ifdef CANONICAL
-      rcenc64_bp = revcomp_bp64(cminimizer.first, k);
-      if (cminimizer.first < rcenc64_bp) {
-        cminimizer.first = rcenc64_bp;
-        cminimizer.second = conv_bp64_lr64(rcenc64_bp);
-      }
-#endif /* CANONICAL */
-      rix = lshf->compute_hash(cminimizer.first);
-      rix_res = rix % m;
-      if (frac ? rix_res <= r : rix_res == r) {
-        rix = frac ? rix / m * (r + 1) + rix_res : rix / m;
-        if constexpr (std::is_same_v<T, mer_t>) {
-          table[rix].emplace_back(lshf->drop_ppos_lr(cminimizer.second), sh);
-        } else {
-          table[rix].push_back(lshf->drop_ppos_lr(cminimizer.second));
-        }
-        wnix++;
-        if (cminimizer.first != pminimizer.first) {
-          wcix++;
-        }
-        pminimizer = cminimizer;
-      }
-    }
     kix++;
+    if ((l < w) && (i != len)) {
+      continue;
+    }
+    cminimizer =
+      *std::min_element(lsh_enc_win.begin(),
+                        lsh_enc_win.end(),
+                        [](std::pair<uint64_t, uint64_t> lhs, std::pair<uint64_t, uint64_t> rhs) {
+                          return xur64_hash(lhs.second) < xur64_hash(rhs.second);
+                        });
+#ifdef CANONICAL
+    rcenc64_bp = revcomp_bp64(cminimizer.first, k);
+    if (cminimizer.first < rcenc64_bp) {
+      cminimizer.first = rcenc64_bp;
+      cminimizer.second = conv_bp64_lr64(rcenc64_bp);
+    }
+#endif /* CANONICAL */
+    rix = lshf->compute_hash(cminimizer.first);
+    rix_res = rix % m;
+    if (frac ? rix_res <= r : rix_res == r) {
+      rix = frac ? rix / m * (r + 1) + rix_res : rix / m;
+      if constexpr (std::is_same_v<T, mer_t>) {
+        table[rix].emplace_back(lshf->drop_ppos_lr(cminimizer.second), sh);
+      } else {
+        table[rix].push_back(lshf->drop_ppos_lr(cminimizer.second));
+      }
+      wnix++;
+      if (cminimizer.first != pminimizer.first) {
+        wcix++;
+      }
+      pminimizer = cminimizer;
+    }
   }
 }
 

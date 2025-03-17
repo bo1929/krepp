@@ -254,8 +254,10 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 void SDynHT::fill_table(uint32_t nrows, rseq_sptr_t rs)
 {
   enc_vvec.resize(nrows);
-  while (rs->read_next_seq() && rs->set_curr_seq()) {
-    rs->extract_mers(enc_vvec);
+  while (rs->read_next_seq()) {
+    if (rs->set_curr_seq()) {
+      rs->extract_mers(enc_vvec);
+    }
   }
   rs->compute_rho();
   sort_columns();
@@ -265,8 +267,10 @@ void SDynHT::fill_table(uint32_t nrows, rseq_sptr_t rs)
 void DynHT::fill_table(sh_t sh, rseq_sptr_t rs)
 {
   mer_vvec.resize(nrows);
-  while (rs->read_next_seq() && rs->set_curr_seq()) {
-    rs->extract_mers(mer_vvec, sh);
+  while (rs->read_next_seq()) {
+    if (rs->set_curr_seq()) {
+      rs->extract_mers(mer_vvec, sh);
+    }
   }
   rs->compute_rho();
   // update_nkmers();

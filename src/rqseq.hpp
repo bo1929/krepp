@@ -67,7 +67,7 @@ public:
     name = kseq->name.s;
     seq = kseq->seq.s;
     len = kseq->seq.l;
-    return len >= k;
+    return len >= w;
   }
   template<typename T>
   void extract_mers(vvec<T>& table, sh_t sh = 0);
