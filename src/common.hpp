@@ -112,8 +112,7 @@ struct mer_t
   mer_t(enc_t encoding, sh_t sh)
     : encoding(encoding)
     , sh(sh)
-  {
-  }
+  {}
 };
 
 static inline uint32_t gp_hash(const std::string& str)
@@ -223,16 +222,12 @@ template<typename Integral>
 constexpr Integral extract_bits(Integral x, Integral mask)
 {
   Integral res = 0;
-  int bb = 1;
-
-  do {
-    Integral lsb = mask & -mask;
-    mask &= ~lsb;
-    bool isset = x & lsb;
-    res |= isset ? bb : 0;
-    bb += bb;
-  } while (mask);
-
+  for (Integral bb = 1; mask != 0; bb += bb) {
+    if (x & mask & -mask) {
+      res |= bb;
+    }
+    mask &= (mask - 1);
+  }
   return res;
 }
 
