@@ -1,11 +1,16 @@
 # compiler options
 #--------------------------------------------
 COMPILER = g++
-WLCURL = 1
+# COMPILER = g++-14
+WLCURL = 0
 WOPENMP = 1
-CSTATIC = 0
+CSTATIC = 1
+x86_64 = 1
 
-CXXFLAGS = -std=c++17 -O3
+CXXFLAGS = -std=c++17 -O3 # -Wall -g
+ifeq ($(x86_64), 1)
+	CXXFLAGS += -mbmi2
+endif
 
 ifeq ($(CSTATIC), 0)
 	LDLIBS = -lstdc++fs -lm -lz -lstdc++

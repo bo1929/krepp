@@ -10,7 +10,7 @@ SFlatHT::SFlatHT(sdynht_sptr_t source)
   inc_t copy_inc;
   inc_t lix = 0;
   for (uint32_t rix = 0; rix < nrows; ++rix) {
-    copy_inc = std::min(limit_inc, source->enc_vvec[rix].size());
+    copy_inc = std::min(limit_inc, static_cast<inc_t>(source->enc_vvec[rix].size()));
     for (inc_t i = 0; i < copy_inc; ++i) {
       enc_v.push_back(source->enc_vvec[rix][i]);
     }
@@ -52,7 +52,7 @@ FlatHT::FlatHT(dynht_sptr_t source)
   inc_t copy_inc;
   inc_t lix = 0;
   for (uint32_t rix = 0; rix < nrows; ++rix) {
-    copy_inc = std::min(limit_inc, source->mer_vvec[rix].size());
+    copy_inc = std::min(limit_inc, static_cast<inc_t>(source->mer_vvec[rix].size()));
     for (inc_t i = 0; i < copy_inc; ++i) {
       cmer_v.emplace_back(source->conv_mer_cmer(source->mer_vvec[rix][i]));
     }

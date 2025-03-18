@@ -25,7 +25,8 @@ public:
     , ch(ch)
     , card(card)
     , nonce(nonce)
-  {}
+  {
+  }
   subset_sptr_t getptr() { return shared_from_this(); }
   static inline sh_t get_singleton_sh(std::string& name)
   {

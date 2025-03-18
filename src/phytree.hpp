@@ -56,7 +56,8 @@ class Node : public std::enable_shared_from_this<Node>
 public:
   Node(tree_sptr_t tree)
     : tree(tree)
-  {}
+  {
+  }
   void print_info();
   void parse(vec<std::string>& n_vec);
   void generate_tree(vec_str_iter name_first, vec_str_iter name_last);

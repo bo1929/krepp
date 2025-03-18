@@ -52,7 +52,7 @@ void LSHF::set_lshf()
   // }
 }
 
-#ifdef __BMI2__
+#if defined(__BMI2__)
 uint32_t LSHF::compute_hash(uint64_t enc64_bp)
 {
   return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_hash_bp));
@@ -70,6 +70,9 @@ uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp)
 #else
 uint32_t LSHF::compute_hash(uint64_t enc64_bp)
 {
+  #if defined(__aarch64__)
+  return static_cast<uint32_t>(extract_bits(enc64_bp, mask_hash_bp));
+  #else
   uint64_t res = 0;
   unsigned int i = 0;
   while (glsh_v[i].first != -1) {
@@ -78,6 +81,7 @@ uint32_t LSHF::compute_hash(uint64_t enc64_bp)
     i++;
   }
   return static_cast<uint32_t>(res);
+  #endif
 }
 
 uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)

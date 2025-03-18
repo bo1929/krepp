@@ -37,7 +37,10 @@
 #if defined(_WLCURL) && _WLCURL == 1
   #include <curl/curl.h>
 #endif
-#include <immintrin.h>
+
+#if defined(__BMI2__)
+  #include <immintrin.h>
+#endif
 
 #define VERSION "v0.4.4"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
@@ -109,7 +112,8 @@ struct mer_t
   mer_t(enc_t encoding, sh_t sh)
     : encoding(encoding)
     , sh(sh)
-  {}
+  {
+  }
 };
 
 static inline uint32_t gp_hash(const std::string& str)

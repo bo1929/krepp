@@ -19,14 +19,17 @@ cd krepp && make
 ```
 and run `./krepp --help`. Then, perhaps, copy it to a directory you have in your `$PATH` (e.g., `cp ./krepp ~/.local/bin`).
 
-You may not have `libcurl`  on your system, and in that case, compilation would fail. You can install it (e.g., `sudo apt install curl`), and try running make again.
-Otherwise, you could simply compile without libcurl by running `make WLCURL=0`.
-Note that, without `libcurl`, you cannot use URLs to retrieve FASTA/FASTQ files directly from FTP servers, and all query/reference files will have to be stored locally.
+### Notes on installation binaries
+- You may have `libcurl` on your system (or you can install it -- e.g., `sudo apt install curl`), this could enable you to use URLs instead of paths and retrieve FASTA/FASTQ files from FTP servers (allowing gzip compressed files as well).
+    If you would like to utilize this feature, simply compile by running `make WLCURL=0`.
+    By default, this is disabled, and all query/reference files will have to be stored locally.
+- If OpenMP is not available on your machine, compile with `make WOPENMP=0`, but you would be not able to use multiple threads. For installing/configuring OpenMP on macOS, you might find [this](https://stackoverflow.com/questions/43555410/enable-openmp-support-in-clang-in-mac-os-x-sierra-mojave) useful.
+- krepp is optimized for x86-64 CPU architecture, but can be still used on ARM CPUs if you compile with `make x86_64=0`.
 
 ### Building an index from multiple reference genomes
 Given a set of reference genomes and a backbone tree, krepp can build an LSH index with colored k-mers by running
 ```bash
-krepp index -o $INDEX_DIR -i $INPUT_FILE -t $BACKBONE_NEWICK --num-threads $NUM_THREADS 
+krepp index -o $INDEX_DIR -i $INPUT_FILE -t $BACKBONE_NEWICK --num-threads $NUM_THREADS
 ```
 where
 * `$NUM_THREADS` is simply the number of threads,

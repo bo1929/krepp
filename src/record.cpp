@@ -90,7 +90,7 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
     });
   if (!(subset1 && subset2)) {
     std::cerr << "Cannot make the subset for the partition: (" << sh1 << ", " << sh2 << ")\n";
-    std::quick_exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
   }
   sh_t sh = sh1 + sh2;
   sh_t nonce = 0;
