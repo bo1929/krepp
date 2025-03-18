@@ -37,8 +37,9 @@
 #if defined(_WLCURL) && _WLCURL == 1
   #include <curl/curl.h>
 #endif
+#include <immintrin.h>
 
-#define VERSION "v0.4.3"
+#define VERSION "v0.4.4"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
@@ -212,6 +213,23 @@ static inline void update_encoding(const char* s1, uint64_t& enc_lr, uint64_t& e
   enc_lr &= 0xFFFFFFFEFFFFFFFE;
   enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
   enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
+}
+
+template<typename Integral>
+constexpr Integral extract_bits(Integral x, Integral mask)
+{
+  Integral res = 0;
+  int bb = 1;
+
+  do {
+    Integral lsb = mask & -mask;
+    mask &= ~lsb;
+    bool isset = x & lsb;
+    res |= isset ? bb : 0;
+    bb += bb;
+  } while (mask);
+
+  return res;
 }
 
 #define assertm(exp, msg) assert(((void)msg, exp))

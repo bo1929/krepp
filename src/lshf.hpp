@@ -31,6 +31,10 @@ private:
   vec<uint8_t> npos_v;
   vec<uint8_t> ppos_v;
   vec<std::pair<int8_t, int8_t>> glsh_v;
+  uint64_t mask_drop_lr = 0;
+  uint64_t mask_drop_bp = 0;
+  uint64_t mask_hash_lr = 0;
+  uint64_t mask_hash_bp = 0;
 };
 
 #endif

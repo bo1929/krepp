@@ -1,4 +1,6 @@
 #include "lshf.hpp"
+#include "common.hpp"
+#include <cstdint>
 
 LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m)
   : k(k)
@@ -36,15 +38,43 @@ void LSHF::set_lshf()
   for (unsigned int i = 0; i < glsh_v.size(); i++) {
     glsh_v[i] = std::make_pair(v[i], g[i]);
   }
+  for (int i = npos_v.size() - 1; i >= 0; --i) {
+    mask_drop_lr += (0x0000000100000001ull << npos_v[i]);
+    mask_drop_bp += (0x0000000000000003ull << (npos_v[i] * 2));
+  }
+  for (int i = ppos_v.size() - 1; i >= 0; --i) {
+    mask_hash_lr += (0x0000000100000001ull << ppos_v[i]);
+    mask_hash_bp += (0x0000000000000003ull << (ppos_v[i] * 2));
+  }
+  // __builtin_cpu_init ();
+  // if (!__builtin_cpu_supports("bmi2")) {
+  //   std::cerr << "BMI2 is not supported, PEXT will not be used.\n";
+  // }
 }
 
-uint32_t LSHF::compute_hash(uint64_t enc_bp)
+#ifdef __BMI2__
+uint32_t LSHF::compute_hash(uint64_t enc64_bp)
+{
+  return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_hash_bp));
+}
+
+uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
+{
+  return static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_lr));
+}
+
+uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp)
+{
+  return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_drop_bp));
+}
+#else
+uint32_t LSHF::compute_hash(uint64_t enc64_bp)
 {
   uint64_t res = 0;
   unsigned int i = 0;
   while (glsh_v[i].first != -1) {
-    enc_bp = enc_bp << glsh_v[i].first;
-    asm("shld %b3, %2, %0" : "=rm"(res) : "0"(res), "r"(enc_bp), "ic"(glsh_v[i].second) : "cc");
+    enc64_bp = enc64_bp << glsh_v[i].first;
+    asm("shld %b3, %2, %0" : "=rm"(res) : "0"(res), "r"(enc64_bp), "ic"(glsh_v[i].second) : "cc");
     i++;
   }
   return static_cast<uint32_t>(res);
@@ -70,6 +100,7 @@ uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp)
   }
   return enc32_bp;
 }
+#endif
 
 uint32_t LSHF::get_npos_diff(uint32_t zc)
 {
