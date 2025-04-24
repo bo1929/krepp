@@ -71,8 +71,9 @@ private:
   uint64_t mask_bp;
   uint64_t mask_lr;
   uint32_t enmers;
-  uint32_t onmers_or;
-  uint32_t onmers_rc;
+  uint32_t onmers;
+  uint32_t wnmers_or;
+  uint32_t wnmers_rc;
   uint64_t batch_size;
   uint64_t bix;
   vec<std::string> seq_batch;

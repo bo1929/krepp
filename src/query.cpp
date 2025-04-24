@@ -34,8 +34,9 @@ IBatch::IBatch(index_sptr_t index,
 void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc)
 {
   enmers = len - k + 1;
-  onmers_or = 0;
-  onmers_rc = 0;
+  onmers = 0;
+  wnmers_or = 0;
+  wnmers_rc = 0;
   uint32_t i, l;
   uint32_t orrix, rcrix;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
@@ -56,30 +57,31 @@ void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, i
     orenc64_bp = orenc64_bp & mask_bp;
     orenc64_lr = orenc64_lr & mask_lr;
     rcenc64_bp = revcomp_bp64(orenc64_bp, k);
+    onmers++; // TODO: Incorporate missing fraction/partial?
 #ifdef CANONICAL
     if (rcenc64_bp < orenc64_bp) {
       orrix = lshf->compute_hash(orenc64_bp);
       if (index->check_partial(orrix)) {
         imers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
-        onmers_or++;
+        wnmers_or++;
       }
     } else {
       rcrix = lshf->compute_hash(rcenc64_bp);
       if (index->check_partial(rcrix)) {
         imers_rc->add_matching_mer(i - k, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
-        onmers_rc++;
+        wnmers_rc++;
       }
     }
 #else
     orrix = lshf->compute_hash(orenc64_bp);
     if (index->check_partial(orrix)) {
       imers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
-      onmers_or++;
+      wnmers_or++;
     }
     rcrix = lshf->compute_hash(rcenc64_bp);
     if (index->check_partial(rcrix)) {
       imers_rc->add_matching_mer(len - i, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
-      onmers_rc++;
+      wnmers_rc++;
     }
 #endif /* CANONICAL */
   }
@@ -93,6 +95,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
   imers_or->hdist_filt = 2 * imers_or->hdist_filt + 1;
   imers_rc->hdist_filt = 2 * imers_rc->hdist_filt + 1;
   for (auto [nd, mi] : imers_or->leaf_to_minfo) {
+    mi->mismatch_count = onmers - mi->match_count;
     // mi->compute_gamma();
     if (mi->hdist_min > imers_or->hdist_filt) {
       continue;
@@ -105,6 +108,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
     node_to_minfo[nd] = mi;
   }
   for (auto [nd, mi] : imers_rc->leaf_to_minfo) {
+    mi->mismatch_count = onmers - mi->match_count;
     // mi->compute_gamma();
     if (mi->hdist_min > imers_rc->hdist_filt) {
       continue;

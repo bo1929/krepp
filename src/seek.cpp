@@ -26,12 +26,15 @@ void SBatch::seek_sequences(std::ostream& output_stream)
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
     enmers = len - k + 1;
+    onmers = 0;
 
     SSummary or_summary(enmers, hdist_th);
     SSummary rc_summary(enmers, hdist_th);
     search_mers(seq, len, or_summary, rc_summary);
 
     if (or_summary.match_count + rc_summary.match_count) {
+      or_summary.mismatch_count = onmers - or_summary.match_count;
+      rc_summary.mismatch_count = onmers - rc_summary.match_count;
       or_summary.optimize_likelihood(llhfunc, rho);
       rc_summary.optimize_likelihood(llhfunc, rho);
       if (or_summary.d_llh < rc_summary.d_llh) {
@@ -69,6 +72,7 @@ void SBatch::search_mers(const char* seq, uint64_t len, SSummary& or_summary, SS
     orenc64_bp = orenc64_bp & mask_bp;
     orenc64_lr = orenc64_lr & mask_lr;
     rcenc64_bp = revcomp_bp64(orenc64_bp, k);
+    onmers++; // TODO: Incorporate missing partial/fraction?
 #ifdef CANONICAL
     if (rcenc64_bp < orenc64_bp) {
       orrix = lshf->compute_hash(orenc64_bp);
