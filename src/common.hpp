@@ -42,7 +42,7 @@
   #include <immintrin.h>
 #endif
 
-#define VERSION "v0.4.4"
+#define VERSION "v0.4.5"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
