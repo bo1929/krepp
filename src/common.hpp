@@ -24,6 +24,7 @@
 #include <queue>
 #include <random>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <sys/types.h>
 #include <type_traits>
@@ -112,7 +113,8 @@ struct mer_t
   mer_t(enc_t encoding, sh_t sh)
     : encoding(encoding)
     , sh(sh)
-  {}
+  {
+  }
 };
 
 static inline uint32_t gp_hash(const std::string& str)
@@ -257,5 +259,17 @@ using btree_phmap = phmap::btree_map<K, V>;
 
 template<class K, class V>
 using node_phmap = phmap::node_hash_map<K, V>;
+
+[[noreturn]] inline void error_exit(const std::string& msg, int code = EXIT_FAILURE);
+inline void warn_msg(const std::string& msg);
+
+// Macro for concise file stream error checks
+#define CHECK_STREAM_OR_EXIT(stream, msg)                                                          \
+  if (!(stream).good())                                                                            \
+  error_exit(msg)
+
+template<typename StreamT>
+inline void
+check_fstream_or_exit(const StreamT& stream, const std::string& msg, const std::string& path = "");
 
 #endif

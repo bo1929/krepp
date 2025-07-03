@@ -20,27 +20,36 @@ protected:
     size_t written = fwrite(ptr, s, nmb, fst);
     return written;
   }
+
   std::string download_url(std::string url)
   {
-    char tmp_path[FILENAME_MAX] = "/tmp/rseq";
-    const char* sx = std::to_string(gp_hash(url)).c_str();
-    strcat(tmp_path, sx);
-    strcat(tmp_path, ".XXXXXX");
-    int tmp_fd = mkstemp(tmp_path);
-    CURL* curl;
-    FILE* fp;
-    CURLcode resb;
-    curl = curl_easy_init();
-    if (curl) {
-      fp = fopen(tmp_path, "wb");
-      curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-      curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-      resb = curl_easy_perform(curl);
-      curl_easy_cleanup(curl);
-      fclose(fp);
+    std::filesystem::path tmp_dir = std::filesystem::temp_directory_path();
+    if (!std::filesystem::exists(tmp_dir) || !std::filesystem::is_directory(tmp_dir)) {
+      error_exit(std::string("Failed to get temp directory: ") + tmp_dir.string());
     }
-    return tmp_path;
+    std::string hash_str = std::to_string(gp_hash(url));
+    std::string tmp_filename = "rseq_" + hash_str + ".tmp";
+    std::filesystem::path tmp_path = tmp_dir / tmp_filename;
+
+    FILE* fp = fopen(tmp_path.string().c_str(), "wb");
+    if (!fp) {
+      error_exit(std::string("Failed to open temp file for writing: ") + tmp_path.string());
+    }
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+      error_exit("Failed to initialize CURL.");
+    }
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    CURLcode resb = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    if (resb != CURLE_OK) {
+      error_exit(std::string("CURL download failed: ") + curl_easy_strerror(resb));
+    }
+    fclose(fp);
+
+    return tmp_path.string();
   }
 #endif
 };

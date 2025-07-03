@@ -16,11 +16,7 @@ void Sketch::load_full_sketch()
   sketch_stream.read(reinterpret_cast<char*>(ppos_v.data()), ppos_v.size() * sizeof(uint8_t));
   sketch_stream.read(reinterpret_cast<char*>(npos_v.data()), npos_v.size() * sizeof(uint8_t));
   sketch_stream.read(reinterpret_cast<char*>(&rho), sizeof(double));
-
-  if (!sketch_stream.good()) {
-    std::cerr << "Failed to read the sketch file!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(sketch_stream, "Failed to read the sketch file!");
   sketch_stream.close();
 
   lshf = std::make_shared<LSHF>(m, ppos_v, npos_v);

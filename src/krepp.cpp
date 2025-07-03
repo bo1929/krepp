@@ -36,8 +36,7 @@ void TargetSketch::load_sketch()
 void TargetIndex::ensure_wbackbone()
 {
   if (!index->check_wbackbone()) {
-    std::cerr << "Given index lacks a backbone tree required for this subcommand..." << std::endl;
-    exit(EXIT_FAILURE);
+    error_exit("Given index lacks a backbone tree required for this subcommand...");
   }
 }
 
@@ -70,8 +69,7 @@ void TargetIndex::load_index()
       index->generate_partial_tree(suffixes[lix]);
       index->load_partial_index(suffixes[lix]);
     } else {
-      std::cerr << "There is a partial index with a missing file!" << std::endl;
-      exit(EXIT_FAILURE);
+      error_exit("There is a partial index with a missing file!");
     }
   }
   index->make_rho_partial();
@@ -92,10 +90,7 @@ void SketchSingle::save_sketch()
   sketch_sflatht->save(sketch_stream);
   save_configuration(sketch_stream);
   sketch_stream.write(reinterpret_cast<char*>(&rho), sizeof(double));
-  if (!sketch_stream.good()) {
-    std::cerr << "Failed to write the sketch!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(sketch_stream, "Failed to write the sketch!");
   sketch_stream.close();
 }
 
@@ -107,15 +102,9 @@ void IndexMultiple::obtain_build_tree()
     tree->generate_tree(names_v);
   } else {
     std::ifstream tree_stream(nwk_path);
-    if (!tree_stream.good()) {
-      std::cerr << "Error opening " << nwk_path << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    CHECK_STREAM_OR_EXIT(tree_stream, (std::string("Error opening ") + nwk_path.string()));
     tree->load(tree_stream);
-    if (!tree_stream.good()) {
-      std::cerr << "Failed to read the backbone tree of the index!" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the backbone tree of the index!");
   }
   tree->reset_traversal();
 }
@@ -123,17 +112,13 @@ void IndexMultiple::obtain_build_tree()
 void IndexMultiple::read_input_file()
 {
   std::ifstream input_stream(input);
-  if (!input_stream.good()) {
-    std::cerr << "Error opening " << input << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(input_stream, (std::string("Error opening ") + input.string()));
   std::string line;
   while (std::getline(input_stream, line)) {
     std::istringstream iss(line);
     std::string input, name;
     if (!(std::getline(iss, name, '\t') && std::getline(iss, input, '\t'))) {
-      std::cerr << "Failed to read the reference name to path/URL mapping!" << std::endl;
-      exit(EXIT_FAILURE);
+      error_exit("Failed to read the reference name to path/URL mapping!");
     }
     name_to_path[name] = input;
     names_v.push_back(name);
@@ -165,23 +150,14 @@ void IndexMultiple::save_index()
   std::ofstream mer_stream(index_dir / ("cmer" + suffix), std::ofstream::binary);
   std::ofstream inc_stream(index_dir / ("inc" + suffix), std::ofstream::binary);
   root_flatht->save(mer_stream, inc_stream);
-  if (!mer_stream.good()) {
-    std::cerr << "Failed to write the k-mer array of the index!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  if (!inc_stream.good()) {
-    std::cerr << "Failed to read the offset array of a partial index!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(mer_stream, "Failed to write the k-mer array of the index!");
+  CHECK_STREAM_OR_EXIT(inc_stream, "Failed to read the offset array of a partial index!");
   inc_stream.close();
   mer_stream.close();
 
   std::ofstream crecord_stream(index_dir / ("crecord" + suffix), std::ofstream::binary);
   root_flatht->get_crecord()->save(crecord_stream);
-  if (!crecord_stream.good()) {
-    std::cerr << "Failed to write the color array of the index!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(crecord_stream, "Failed to write the color array of the index!");
   crecord_stream.close();
 
   if (nwk_path.empty()) {
@@ -189,28 +165,19 @@ void IndexMultiple::save_index()
     std::ofstream reflist_stream(index_dir / ("reflist" + suffix));
     std::ostream_iterator<std::string> reflist_iterator(reflist_stream, "\n");
     std::copy(std::begin(names_v), std::end(names_v), reflist_iterator);
-    if (!reflist_stream.good()) {
-      std::cerr << "Failed to write the reference list of the index!" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    CHECK_STREAM_OR_EXIT(reflist_stream, "Failed to write the reference list of the index!");
     reflist_stream.close();
   } else {
     std::ofstream tree_stream(index_dir / ("tree" + suffix));
     root_flatht->get_tree()->save(tree_stream);
-    if (!tree_stream.good()) {
-      std::cerr << "Failed to write the backbone tree of the index!" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    CHECK_STREAM_OR_EXIT(tree_stream, "Failed to write the backbone tree of the index!");
     tree_stream.close();
   }
 
   std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
   std::ofstream metadata_stream(metadata_path, std::ofstream::binary);
   save_configuration(metadata_stream);
-  if (!metadata_stream.good()) {
-    std::cerr << "Failed to write the metadata of the index!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(metadata_stream, "Failed to write the metadata of the index!");
   metadata_stream.close();
 }
 
@@ -421,7 +388,7 @@ SketchSingle::SketchSingle(CLI::App& sc)
       h = k - 16;
     }
     if (!validate_configuration()) {
-      exit(EXIT_FAILURE);
+      error_exit("Invalid configuration!");
     }
   });
 }
@@ -473,7 +440,7 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
       h = k - 16;
     }
     if (!validate_configuration()) {
-      exit(EXIT_FAILURE);
+      error_exit("Invalid configuration");
     }
     std::filesystem::create_directory(index_dir);
     suffix = "-";
@@ -510,9 +477,10 @@ QueryIndex::QueryIndex(CLI::App& sc)
   sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag(
-    "--no-filter",
-    no_filter,
-    "Report everything; regardless of the statistical significance, match count, or maximum distance.");
+      "--no-filter,!--filter",
+      no_filter,
+      "Report everything; regardless of the statistical significance, match count, or maximum distance.")
+    ->required();
   /* sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing."); */
   sc.callback([&]() {
     if (!output_path.empty()) {

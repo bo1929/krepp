@@ -177,8 +177,8 @@ private:
   uint32_t hdist_min = 0xFFFFFFFF;
   std::vector<double> hdisthist_v;
   double chisq = std::numeric_limits<double>::quiet_NaN();
-  double d_llh = std::numeric_limits<double>::max();
   double v_llh = std::numeric_limits<double>::quiet_NaN();
+  double d_llh = std::numeric_limits<double>::max();
   /* std::vector<match_t> match_v; */
 };
 

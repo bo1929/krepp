@@ -89,8 +89,8 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
       subset2 = v.second;
     });
   if (!(subset1 && subset2)) {
-    std::cerr << "Cannot make the subset for the partition: (" << sh1 << ", " << sh2 << ")\n";
-    exit(EXIT_FAILURE);
+    error_exit("Cannot make the subset for the partition: (" + std::to_string(sh1) + ", " +
+               std::to_string(sh2) + ")");
   }
   sh_t sh = sh1 + sh2;
   sh_t nonce = 0;
@@ -147,8 +147,7 @@ void Record::make_compact()
     if (curr_senum < limit_senum) {
       sh_to_se[nd_curr->get_sh()] = curr_senum++;
     } else {
-      std::cerr << "The current se_t size is too small to fit all nodes!" << std::endl;
-      exit(EXIT_FAILURE);
+      error_exit("The current se_t size is too small to fit all nodes!");
     }
   }
   tree->reset_traversal();
@@ -156,8 +155,7 @@ void Record::make_compact()
     if (curr_senum < limit_senum) {
       curr_senum += static_cast<se_t>(sh_to_se.try_emplace(sh, curr_senum).second);
     } else {
-      std::cerr << "The current se_t size is too small to fit all subsets observed!" << std::endl;
-      exit(EXIT_FAILURE);
+      error_exit("The current se_t size is too small to fit all subsets observed!");
     }
   }
   sh_to_se[0] = 0;

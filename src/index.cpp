@@ -12,8 +12,7 @@ void Index::generate_partial_tree(std::string suffix)
     }
     reflist_file.close();
   } else {
-    std::cerr << "Unable to open reference list file for an index without a tree." << std::endl;
-    exit(EXIT_FAILURE);
+    error_exit("Unable to open reference list file for an index without a tree.");
   }
   tree_sptr_t curr_tree = std::make_shared<Tree>();
   curr_tree->generate_tree(names_v);
@@ -22,8 +21,7 @@ void Index::generate_partial_tree(std::string suffix)
     if (curr_tree->check_compatible(tree)) {
       tree = !tree ? curr_tree : tree;
     } else {
-      std::cerr << "Partial libraries are based on different references." << std::endl;
-      exit(EXIT_FAILURE);
+      error_exit("Partial libraries are based on different references.");
     }
   }
 }
@@ -35,22 +33,17 @@ void Index::load_partial_tree(std::string suffix)
   std::filesystem::path nwk_path = index_dir / ("tree" + suffix);
   std::ifstream tree_stream(nwk_path);
   if (!tree_stream.is_open()) {
-    std::cerr << "Failed to open " << nwk_path << std::endl;
-    exit(EXIT_FAILURE);
+    error_exit(std::string("Failed to open ") + nwk_path.string());
   }
   curr_tree->load(tree_stream);
-  if (!tree_stream.good()) {
-    std::cerr << "Failed to read the backbone tree of a partial index!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the backbone tree of a partial index!");
   tree_stream.close();
 #pragma omp critical
   {
     if (curr_tree->check_compatible(tree)) {
       tree = !tree ? curr_tree : tree;
     } else {
-      std::cerr << "Partial libraries are based on different trees." << std::endl;
-      exit(EXIT_FAILURE);
+      error_exit("Partial libraries are based on different trees!");
     }
   }
 }
@@ -72,10 +65,7 @@ void Index::load_partial_index(std::string suffix)
   vec<uint8_t> ppos_v(h_curr), npos_v(k_curr - h_curr);
   metadata_stream.read(reinterpret_cast<char*>(ppos_v.data()), ppos_v.size() * sizeof(uint8_t));
   metadata_stream.read(reinterpret_cast<char*>(npos_v.data()), npos_v.size() * sizeof(uint8_t));
-  if (!metadata_stream.good()) {
-    std::cerr << "Failed to read the metadata of a partial skecth!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(metadata_stream, "Failed to read the metadata of a partial skecth!");
   metadata_stream.close();
 
   lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_curr, ppos_v, npos_v);
@@ -88,8 +78,7 @@ void Index::load_partial_index(std::string suffix)
       m = m_curr;
       nrows = pow(2, 2 * h);
     } else {
-      std::cerr << "Partial libraries have incompatible hash functions." << std::endl;
-      exit(EXIT_FAILURE);
+      error_exit("Partial libraries have incompatible hash functions!");
     }
   }
 
@@ -104,38 +93,26 @@ void Index::load_partial_index(std::string suffix)
   std::filesystem::path mer_path = index_dir / ("cmer" + suffix);
   std::ifstream mer_stream(mer_path, std::ifstream::binary);
   if (!mer_stream.is_open()) {
-    std::cerr << "Failed to open " << mer_path << std::endl;
-    exit(EXIT_FAILURE);
+    error_exit(std::string("Failed to open ") + mer_path.string());
   }
   std::filesystem::path inc_path = index_dir / ("inc" + suffix);
   std::ifstream inc_stream(inc_path, std::ifstream::binary);
   if (!inc_stream.is_open()) {
-    std::cerr << "Failed to open " << inc_path << std::endl;
-    exit(EXIT_FAILURE);
+    error_exit(std::string("Failed to open ") + inc_path.string());
   }
   curr_flatht->load(mer_stream, inc_stream);
-  if (!mer_stream.good()) {
-    std::cerr << "Failed to read the k-mer vector of a partial index!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(mer_stream, "Failed to read the k-mer vector of a partial index!");
   mer_stream.close();
-  if (!inc_stream.good()) {
-    std::cerr << "Failed to read the offset array of a partial index!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(inc_stream, "Failed to read the offset array of a partial index!");
   inc_stream.close();
 
   std::filesystem::path crecord_path = index_dir / ("crecord" + suffix);
   std::ifstream crecord_stream(crecord_path, std::ifstream::binary);
   if (!crecord_stream.is_open()) {
-    std::cerr << "Failed to open " << crecord_path << std::endl;
-    exit(EXIT_FAILURE);
+    error_exit(std::string("Failed to open ") + crecord_path.string());
   }
   curr_crecord->load(crecord_stream);
-  if (!crecord_stream.good()) {
-    std::cerr << "Failed to read the color array of a partial index!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  CHECK_STREAM_OR_EXIT(crecord_stream, "Failed to read the color array of a partial index!");
   crecord_stream.close();
 
 #pragma omp critical

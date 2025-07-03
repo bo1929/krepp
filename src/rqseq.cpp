@@ -23,8 +23,7 @@ RSeq::RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac
   }
   gfile = gzopen(input_path.c_str(), "rb");
   if (gfile == nullptr) {
-    std::cerr << "Failed to open thefile at " << input_path << std::endl;
-    exit(EXIT_FAILURE);
+    error_exit(std::string("Failed to open thefile at ") + input_path.string());
   }
   kseq = kseq_init(gfile);
 }
@@ -131,8 +130,7 @@ QSeq::QSeq(std::string input)
   }
   gfile = gzopen(input_path.c_str(), "rb");
   if (gfile == nullptr) {
-    std::cerr << "Failed to open thefile at " << input_path << std::endl;
-    exit(EXIT_FAILURE);
+    error_exit(std::string("Failed to open thefile at ") + input_path.string());
   }
   kseq = kseq_init(gfile);
 }

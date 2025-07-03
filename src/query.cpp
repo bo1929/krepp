@@ -158,7 +158,7 @@ void IBatch::report_distances(strstream& batch_stream)
   } else {
     for (auto& [nd, mi] : node_to_minfo) {
       mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
-      if (mi->chisq < CHISQ_THRESHOLD) {
+      if (mi->chisq < CHISQ_THRESHOLD && mi->d_llh < dist_max) {
         batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
       }
     }
@@ -188,6 +188,7 @@ void IBatch::report_placement(strstream& batch_stream)
   batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], ";
   node_sptr_t nd_pp = nullptr;
   minfo_sptr_t mi_pp = nullptr;
+
   if (node_to_minfo.size() > 1) {
     node_sptr_t nd_curr = nullptr;
     minfo_sptr_t mi_curr = nullptr;
@@ -208,7 +209,8 @@ void IBatch::report_placement(strstream& batch_stream)
     */
 
     vec<node_sptr_t> nd_v;
-    while (nd_curr = tree->next_post_order(nd_curr)) {
+    // Traverse tree in post-order, collect candidate placements
+    while ((nd_curr = tree->next_post_order(nd_curr))) {
       if (nd_curr->check_leaf()) {
         if (!node_to_minfo.contains(nd_curr)) {
           node_to_minfo[nd_curr] = std::make_shared<Minfo>(hdist_th, enmers, 0.0);
@@ -240,13 +242,14 @@ void IBatch::report_placement(strstream& batch_stream)
       return;
     }
 
+    // Sort: prefer higher card, then higher d_llh
     std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
-      if (lhs->get_card() == rhs->get_card())
-        return node_to_minfo[lhs]->d_llh > node_to_minfo[rhs]->d_llh;
-      else
-        return lhs->get_card() < rhs->get_card();
+      return (lhs->get_card() == rhs->get_card())
+               ? node_to_minfo[lhs]->d_llh > node_to_minfo[rhs]->d_llh
+               : lhs->get_card() < rhs->get_card();
     });
-    nd_pp = *(nd_v.rbegin());
+
+    nd_pp = nd_v.back();
     mi_pp = node_to_minfo[nd_pp];
 
     // Don't place on top if all matches,
@@ -263,7 +266,7 @@ void IBatch::report_placement(strstream& batch_stream)
       }
       nd_pp = nd_curr;
       mi_pp = mi_curr;
-      if (mi_pp->chisq != mi_pp->chisq) {
+      if (std::isnan(mi_pp->chisq)) {
         mi_pp->optimize_likelihood(llhfunc);
         mi_pp->chisq = mi_closest->likelihood_ratio(mi_pp->d_llh, llhfunc);
       }
