@@ -114,8 +114,10 @@ void MurmurHash3_x86_32(const void* key, int len, uint32_t seed, void* out)
   uint32_t k1 = 0;
 
   switch (len & 3) {
-    case 3: k1 ^= tail[2] << 16;
-    case 2: k1 ^= tail[1] << 8;
+    case 3:
+      k1 ^= tail[2] << 16;
+    case 2:
+      k1 ^= tail[1] << 8;
     case 1:
       k1 ^= tail[0];
       k1 *= c1;
@@ -210,8 +212,10 @@ void MurmurHash3_x86_128(const void* key, const int len, uint32_t seed, void* ou
   uint32_t k4 = 0;
 
   switch (len & 15) {
-    case 15: k4 ^= tail[14] << 16;
-    case 14: k4 ^= tail[13] << 8;
+    case 15:
+      k4 ^= tail[14] << 16;
+    case 14:
+      k4 ^= tail[13] << 8;
     case 13:
       k4 ^= tail[12] << 0;
       k4 *= c4;
@@ -219,9 +223,12 @@ void MurmurHash3_x86_128(const void* key, const int len, uint32_t seed, void* ou
       k4 *= c1;
       h4 ^= k4;
 
-    case 12: k3 ^= tail[11] << 24;
-    case 11: k3 ^= tail[10] << 16;
-    case 10: k3 ^= tail[9] << 8;
+    case 12:
+      k3 ^= tail[11] << 24;
+    case 11:
+      k3 ^= tail[10] << 16;
+    case 10:
+      k3 ^= tail[9] << 8;
     case 9:
       k3 ^= tail[8] << 0;
       k3 *= c3;
@@ -229,9 +236,12 @@ void MurmurHash3_x86_128(const void* key, const int len, uint32_t seed, void* ou
       k3 *= c4;
       h3 ^= k3;
 
-    case 8: k2 ^= tail[7] << 24;
-    case 7: k2 ^= tail[6] << 16;
-    case 6: k2 ^= tail[5] << 8;
+    case 8:
+      k2 ^= tail[7] << 24;
+    case 7:
+      k2 ^= tail[6] << 16;
+    case 6:
+      k2 ^= tail[5] << 8;
     case 5:
       k2 ^= tail[4] << 0;
       k2 *= c2;
@@ -239,9 +249,12 @@ void MurmurHash3_x86_128(const void* key, const int len, uint32_t seed, void* ou
       k2 *= c3;
       h2 ^= k2;
 
-    case 4: k1 ^= tail[3] << 24;
-    case 3: k1 ^= tail[2] << 16;
-    case 2: k1 ^= tail[1] << 8;
+    case 4:
+      k1 ^= tail[3] << 24;
+    case 3:
+      k1 ^= tail[2] << 16;
+    case 2:
+      k1 ^= tail[1] << 8;
     case 1:
       k1 ^= tail[0] << 0;
       k1 *= c1;
@@ -333,12 +346,18 @@ void MurmurHash3_x64_128(const void* key, const int len, const uint32_t seed, vo
   uint64_t k2 = 0;
 
   switch (len & 15) {
-    case 15: k2 ^= ((uint64_t)tail[14]) << 48;
-    case 14: k2 ^= ((uint64_t)tail[13]) << 40;
-    case 13: k2 ^= ((uint64_t)tail[12]) << 32;
-    case 12: k2 ^= ((uint64_t)tail[11]) << 24;
-    case 11: k2 ^= ((uint64_t)tail[10]) << 16;
-    case 10: k2 ^= ((uint64_t)tail[9]) << 8;
+    case 15:
+      k2 ^= ((uint64_t)tail[14]) << 48;
+    case 14:
+      k2 ^= ((uint64_t)tail[13]) << 40;
+    case 13:
+      k2 ^= ((uint64_t)tail[12]) << 32;
+    case 12:
+      k2 ^= ((uint64_t)tail[11]) << 24;
+    case 11:
+      k2 ^= ((uint64_t)tail[10]) << 16;
+    case 10:
+      k2 ^= ((uint64_t)tail[9]) << 8;
     case 9:
       k2 ^= ((uint64_t)tail[8]) << 0;
       k2 *= c2;
@@ -346,13 +365,20 @@ void MurmurHash3_x64_128(const void* key, const int len, const uint32_t seed, vo
       k2 *= c1;
       h2 ^= k2;
 
-    case 8: k1 ^= ((uint64_t)tail[7]) << 56;
-    case 7: k1 ^= ((uint64_t)tail[6]) << 48;
-    case 6: k1 ^= ((uint64_t)tail[5]) << 40;
-    case 5: k1 ^= ((uint64_t)tail[4]) << 32;
-    case 4: k1 ^= ((uint64_t)tail[3]) << 24;
-    case 3: k1 ^= ((uint64_t)tail[2]) << 16;
-    case 2: k1 ^= ((uint64_t)tail[1]) << 8;
+    case 8:
+      k1 ^= ((uint64_t)tail[7]) << 56;
+    case 7:
+      k1 ^= ((uint64_t)tail[6]) << 48;
+    case 6:
+      k1 ^= ((uint64_t)tail[5]) << 40;
+    case 5:
+      k1 ^= ((uint64_t)tail[4]) << 32;
+    case 4:
+      k1 ^= ((uint64_t)tail[3]) << 24;
+    case 3:
+      k1 ^= ((uint64_t)tail[2]) << 16;
+    case 2:
+      k1 ^= ((uint64_t)tail[1]) << 8;
     case 1:
       k1 ^= ((uint64_t)tail[0]) << 0;
       k1 *= c1;

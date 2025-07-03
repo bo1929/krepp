@@ -1,39 +1,14 @@
 # compiler options
 #--------------------------------------------
-COMPILER = g++
-# COMPILER = g++-14
-WLCURL = 0
-WOPENMP = 1
-CSTATIC = 1
-x86_64 = 1
+COMPILER ?= g++ # g++-14
+mode ?= dynamic  # Default to dynamic linking
 
-CXXFLAGS = -std=c++17 -O3 # -Wall -g
-ifeq ($(x86_64), 1)
-	CXXFLAGS += -mbmi2
-endif
-
-ifeq ($(CSTATIC), 0)
-	LDLIBS = -lstdc++fs -lm -lz -lstdc++
-else
-	LDLIBS = --static -lstdc++fs -lm -lz -static-libgcc -static-libstdc++
-endif
-
-ifneq ($(WLCURL), 0)
-	LDLIBS += -lcurl
-endif
-
-ifneq ($(WOPENMP), 0)
-	LDLIBS += -lgomp
-	CXXFLAGS += -fopenmp
-endif
-
-VARDEF= -D _WLCURL=$(WLCURL) -D _WOPENMP=$(WOPENMP)
+CXXFLAGS = -std=c++17 -O3 # -g
+WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas -Wno-undefined-inline # -Wall
 
 INC = -Iexternal/CLI11/include/CLI \
 			-Iexternal/parallel-hashmap \
 			-Iexternal/boost/libs/math/include
-
-WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas
 
 # project files
 #--------------------------------------------
@@ -48,7 +23,52 @@ OBJECTS = build/common.o \
 
 # rules
 #--------------------------------------------
-all: $(PROGRAM)
+.PHONY: all dynamic static clean
+
+all:
+	$(MAKE) mode=dynamic $(PROGRAM)
+
+dynamic:
+	$(MAKE) mode=dynamic $(PROGRAM)
+
+static:
+	$(MAKE) mode=static $(PROGRAM)
+
+# Check for -lcurl and -lgomp
+CURL_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) -lcurl -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
+GOMP_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) -fopenmp -lgomp -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
+
+$(info ===== Build mode: $(mode) =====)
+ifeq ($(mode),dynamic)
+	LDLIBS = -lstdc++fs -lm -lz -lstdc++
+else ifeq ($(mode),static)
+	LDLIBS = --static -lstdc++fs -lm -lz -static-libgcc -static-libstdc++
+	CURL_SUPPORTED = no
+else
+	LDLIBS = -lstdc++fs -lm -lz -lstdc++
+endif
+
+WLCURL = 0
+WOPENMP = 0
+ifneq ($(CURL_SUPPORTED),no)
+	LDLIBS += -lcurl
+	WLCURL = 1
+endif
+ifneq ($(GOMP_SUPPORTED),no)
+	LDLIBS += -lgomp
+	CXXFLAGS += -fopenmp
+	WOPENMP = 1
+endif
+VARDEF= -D _WLCURL=$(WLCURL) -D _WOPENMP=$(WOPENMP)
+
+ARCH := $(shell uname -m)
+# Check for -mbmi2
+BMI2_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) -mbmi2 -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
+ifeq ($(filter $(ARCH),x86_64 i386),$(ARCH))
+	ifneq ($(BMI2_SUPPORTED),no)
+		CXXFLAGS += -mbmi2
+	endif
+endif
 
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp

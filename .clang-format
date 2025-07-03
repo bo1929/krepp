@@ -1,37 +1,39 @@
 ---
-Language: Cpp
+Language:     Cpp
 BasedOnStyle: Mozilla
-ColumnLimit: 100
-IndentPPDirectives: BeforeHash
+ColumnLimit:             100
+MaxEmptyLinesToKeep:     1
+ContinuationIndentWidth: 2
+PenaltyExcessCharacter:  100
 AlignAfterOpenBracket: Align
+IndentPPDirectives:    BeforeHash
+NamespaceIndentation:  All
+PenaltyReturnTypeOnItsOwnLine: 1
+Cpp11BracedListStyle: true
+BreakStringLiterals:  false
+ReflowComments:       false
+SortIncludes:         false
 AllowAllParametersOfDeclarationOnNextLine: false
-AllowShortBlocksOnASingleLine: true
-AllowShortCaseLabelsOnASingleLine: true
-AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine:       false
+AllowShortCaseLabelsOnASingleLine:         false
+AllowShortBlocksOnASingleLine:             false
+AllowShortLoopsOnASingleLine:              false
+AllowShortFunctionsOnASingleLine:     All
 AlwaysBreakAfterDefinitionReturnType: None
-AlwaysBreakAfterReturnType: None
+AlwaysBreakAfterReturnType:           None
 BraceWrapping:
-  AfterClass:            true
-  AfterControlStatement: true
-  AfterEnum:             true
-  AfterFunction:         true
-  AfterNamespace:        true
-  AfterStruct:           true
-  AfterUnion:            true
-  AfterExternBlock:      true
-  BeforeCatch:           true
-  BeforeElse:            true
-  IndentBraces:          true
+  AfterControlStatement: Never
+  AfterFunction:         false
+  AfterClass:            false
+  AfterEnum:             false
+  AfterStruct:           false
+  AfterNamespace:        false
+  BeforeElse: 					 false
+  AfterUnion:            false
+  AfterExternBlock:      false
+  BeforeCatch:           false
+  IndentBraces:          false
   SplitEmptyFunction:    false
   SplitEmptyRecord:      false
   SplitEmptyNamespace:   false
-ContinuationIndentWidth: 2
-Cpp11BracedListStyle: true
-MaxEmptyLinesToKeep: 1
-NamespaceIndentation: All
-PenaltyExcessCharacter: 100
-PenaltyReturnTypeOnItsOwnLine: 1
-ReflowComments: false
-SortIncludes: false
-BreakStringLiterals: false
 ---

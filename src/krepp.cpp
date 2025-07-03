@@ -440,7 +440,7 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
       h = k - 16;
     }
     if (!validate_configuration()) {
-      error_exit("Invalid configuration");
+      error_exit("Invalid configuration!");
     }
     std::filesystem::create_directory(index_dir);
     suffix = "-";
