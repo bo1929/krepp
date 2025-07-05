@@ -51,8 +51,10 @@ endif
 WLCURL = 0
 WOPENMP = 0
 ifneq ($(CURL_SUPPORTED),no)
-	LDLIBS += -lcurl
-	WLCURL = 1
+  ifneq ($(mode),static)
+	  LDLIBS += -lcurl
+	  WLCURL = 1
+  endif
 endif
 ifneq ($(GOMP_SUPPORTED),no)
 	LDLIBS += -lgomp
