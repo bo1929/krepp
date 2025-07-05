@@ -48,11 +48,11 @@ Therefore, these indexes overlap, and you could just pick the one that you can a
 
 * Web of Life - v2 (15,493 archaeal and bacterial genomes, **41G**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv2-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv2.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv2.tsv.gz)
 * Web of Life - v1 (10,576 archaeal and bacterial genomes, **67G**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
-* RefSeq snapshot medium (50,752 archaeal and bacterial genomes, **137GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dedup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dedup-pruned.nwk.gz), [metadata]()
-* RefSeq snapshot large (12,3853 archaeal and bacterial genomes, **184GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dup-pruned.nwk.gz), [metadata]()
+* RefSeq snapshot medium (50,752 archaeal and bacterial genomes, **137GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dedup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dedup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
+* RefSeq snapshot large (12,3853 archaeal and bacterial genomes, **184GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
 
 The genome IDs that will be reported with these indexes themselves may not be informative.
-You can use the provided metadata files to analyze your distance estimates further; perhaps for taxonomic classification or abundance profiling.
+You can use the provided metadata/taxonomy files to analyze your distance estimates further; perhaps for taxonomic classification or abundance profiling.
 Similarly, the backbone tree could be used for UniFrac computation.
 
 We note that memory use increases almost linearly with `$NUM_THREADS` for the `index` subcommand, and hence, you may want to decrease it if you run out of memory.
