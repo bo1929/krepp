@@ -10,7 +10,7 @@ A k-mer-based maximum likelihood tool for estimating distances of reads to genom
 
 ## Quick start
 ### Installing krepp or compiling from source
-Pre-compiled binaries are only available for Linux and x64 architecture, see the [latest release](https://github.com/bo1929/krepp/releases/tag/v0.4.4).
+Pre-compiled binaries are only available, see the [latest release](https://github.com/bo1929/krepp/releases/tag/v0.4.6).
 
 To compile from the source, simply clone the repository with its submodules and compile with
 ```bash
@@ -19,13 +19,12 @@ cd krepp && make
 ```
 and run `./krepp --help`. Then, perhaps, copy it to a directory you have in your `$PATH` (e.g., `cp ./krepp ~/.local/bin`).
 
-### Notes on installation binaries
-- You may have `libcurl` on your system (or you can install it -- e.g., `sudo apt install curl`), this could enable you to use URLs instead of paths and retrieve FASTA/FASTQ files from FTP servers (allowing gzip compressed files as well).
-    If you would like to utilize this feature, simply compile by running `make WLCURL=0`.
-    By default, this is disabled, and all query/reference files will have to be stored locally.
-- If OpenMP is not available on your machine, compile with `make WOPENMP=0`, but you would be not able to use multiple threads.
-    For installing/configuring OpenMP on macOS, you might find [this](https://stackoverflow.com/questions/43555410/enable-openmp-support-in-clang-in-mac-os-x-sierra-mojave) useful.
-- krepp is optimized for x86-64 CPU architecture, but can be still used on ARM CPUs if you compile with `make x86_64=0 CSTATIC=0`.
+### Notes on compilation and binaries
+- You may have `libcurl` on your system (or you can install it -- e.g., `sudo apt install curl`), this enables using URLs instead of paths and retrieve FASTA/FASTQ files from FTP servers (e.g., NCBI, and allowing gzip compressed files as well).
+If you would like to utilize this feature, either simply compile by running `make dynamic`, or download the appropriate binary.
+- If OpenMP is not available on your machine, you won't be able to benefit from parallel processing, but you can still compile krepp. For installing/configuring OpenMP on macOS, you might find [this](https://stackoverflow.com/questions/43555410/enable-openmp-support-in-clang-in-mac-os-x-sierra-mojave) useful.
+- krepp is optimized for x86-64 CPU architecture, but can be still used on ARM CPUs.
+- If you would like to use another compiler which is on your path; specify it via `COMPILER` variable when running `make` (e.g., `make COMPILER=g++-14`).
 
 ### Building an index from multiple reference genomes
 Given a set of reference genomes and a backbone tree, krepp can build an LSH index with colored k-mers by running
@@ -47,8 +46,10 @@ Currently, only two such indexes are available for microbial and archaeal genome
 Note that the smaller index (v1) was built using a reference set which is a subset of the larger one.
 Therefore, these indexes overlap, and you could just pick the one that you can afford in terms of memory available on your machine.
 
-* Web of Life - v2 (15,493 archaeal and bacterial genomes): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv2-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv2.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv2.tsv.gz)
-* Web of Life - v1 (10,576 archaeal and bacterial genomes): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
+* Web of Life - v2 (15,493 archaeal and bacterial genomes, **41G**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv2-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv2.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv2.tsv.gz)
+* Web of Life - v1 (10,576 archaeal and bacterial genomes, **67G**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
+* RefSeq snapshot medium (50,752 archaeal and bacterial genomes, **137GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dedup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dedup-pruned.nwk.gz), [metadata]()
+* RefSeq snapshot large (12,3853 archaeal and bacterial genomes, **184GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dup-pruned.nwk.gz), [metadata]()
 
 The genome IDs that will be reported with these indexes themselves may not be informative.
 You can use the provided metadata files to analyze your distance estimates further; perhaps for taxonomic classification or abundance profiling.
@@ -103,8 +104,8 @@ In addition to distance estimation, one could place reads on the backbone tree g
 krepp place -i $INDEX_DIR -q $QUERY_FILE --num-threads $NUM_THREADS -o ${QUERY_NAME}.jplace
 ```
 where the output is in `jplace` format (version 3) (see the description [here](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0031009)).
-We leave the `p` field empty for sequences without any *k*-mer match.
-Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with empty placement fields (such as [`gappa`](https://github.com/lczech/gappa)), in this case you can simply filter those lines (e.g., by parsing `jplace` as a JSON file in Python or via bash scripting `grep -v "\[ \]" ${QUERY_NAME}.jplace | sed -z "s/},\n\t]/}\n\t]/g" > ${QUERY_NAME}-filtered.jplace`).
+krepp does not report unplaced sequences for compatibility with other common tools. It always places one dummy sequence (named "NaN") at the root with 0 pendant and distal branch lengths as a sanity check.
+Some down-stream analysis tools that takes a `jplace` file as the input may not be compatible with root placements (such as [`gappa`](https://github.com/lczech/gappa)), in this case you can simply remove that placement line (e.g., by parsing `jplace` as a JSON file in Python or via bash scripting `grep -v "NaN" ${QUERY_NAME}.jplace | sed -z "s/},\n\t]/}\n\t]/g" > ${QUERY_NAME}-filtered.jplace`).
 
 ### Practical distance estimation by sketching a file
 

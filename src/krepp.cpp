@@ -291,7 +291,7 @@ void QueryIndex::estimate_distances()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, dist_max, tau, no_filter);
+        IBatch ib(index, qs, hdist_th, dist_max, tau, no_filter, multi);
 #pragma omp task untied
         {
           ib.estimate_distances(*output_stream);
@@ -304,8 +304,17 @@ void QueryIndex::estimate_distances()
 
 void QueryIndex::end_jplace(strstream& jplace_stream)
 {
-  jplace_stream << "\t\t\t{\"n\" : [\"NaN\"], \"p\" : [ ]}\n";
+  jplace_stream << "\t\t\t{\"n\" : [\"NaN\"], \"p\" : [["
+                << index->get_tree()->get_root()->get_se() - 1 << ", 0, 0, 0, 0, 0]]}\n";
   jplace_stream << "\t],\n";
+  jplace_stream << "\t\"metadata\" : {\n"
+                << "\t\t\"software\" : \"krepp\",\n"
+                << "\t\t\"version\" : \"" VERSION "\",\n"
+                << "\t\t\"repository\" : \"https://github.com/bo1929/krepp\",\n"
+                << "\t\t\"num_queries\" : \"" << total_qseq << "\",\n"
+                << "\t\t\"invocation\" : \"";
+  jplace_stream << invocation;
+  jplace_stream << "\"\n\t},\n";
   jplace_stream << "\t\"tree\" : \"";
   index->get_tree()->stream_newick_str(jplace_stream, index->get_tree()->get_root());
   jplace_stream << "\"\n}";
@@ -316,14 +325,7 @@ void QueryIndex::begin_jplace(strstream& jplace_stream)
   // Keep it compatible with jplace standard.
   jplace_stream
     << "{\n\t\"version\" : 3,\n\t"
-       "\"fields\" : [\"edge_num\", \"pendant_length\", \"distal_length\", \"likelihood\", \"like_weight_ratio\", \"placement_distance\"],\n"
-       "\t\"metadata\" : {\n"
-       "\t\t\"software\" : \"krepp\",\n"
-       "\t\t\"version\" : \"" VERSION "\",\n"
-       "\t\t\"repository\" : \"https://github.com/bo1929/krepp\",\n"
-       "\t\t\"invocation\" : \"";
-  jplace_stream << invocation;
-  jplace_stream << "\"\n\t},\n\t\"placements\" :\n\t\t[\n";
+       "\"fields\" : [\"edge_num\", \"pendant_length\", \"distal_length\", \"likelihood\", \"like_weight_ratio\", \"distance\"],\n\t\"placements\" : [\n";
 }
 
 void QueryIndex::place_sequences()
@@ -341,7 +343,7 @@ void QueryIndex::place_sequences()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, dist_max, tau, no_filter);
+        IBatch ib(index, qs, hdist_th, dist_max, tau, no_filter, multi);
 #pragma omp task untied
         {
           ib.place_sequences(*output_stream);
@@ -350,6 +352,8 @@ void QueryIndex::place_sequences()
 #pragma omp taskwait
     }
   }
+  // output_stream->seekp(-1, output_stream->cur);
+  // output_stream->seekp(-1, std::ios_base::end);
   jplace_stream.str("");
   end_jplace(jplace_stream);
   (*output_stream) << jplace_stream.rdbuf();
@@ -454,6 +458,11 @@ void QueryIndex::init_sc_place(CLI::App& sc)
   sc.add_option(
       "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [2].")
     ->check(CLI::NonNegativeNumber);
+  multi = false;
+  sc.add_flag(
+    "--multi",
+    multi,
+    "Output all candidate placements satisfying the filters (not just the largest clade). [false]");
 }
 
 void QueryIndex::init_sc_dist(CLI::App& sc)
@@ -463,6 +472,9 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
       dist_max,
       "Maximum distance to report for matching references, the output may become too large if high [0.2].")
     ->check(CLI::Range(1e-8, 0.33));
+  multi = true;
+  sc.add_flag(
+    "--multi", multi, "Output all distances satisfying the filter (not just the best one). [true]");
 }
 
 QueryIndex::QueryIndex(CLI::App& sc)

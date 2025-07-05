@@ -43,7 +43,7 @@
   #include <immintrin.h>
 #endif
 
-#define VERSION "v0.4.5"
+#define VERSION "v0.4.6"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
@@ -265,8 +265,7 @@ inline void warn_msg(const std::string& msg);
 
 // Macro for concise file stream error checks
 #define CHECK_STREAM_OR_EXIT(stream, msg)                                                          \
-  if (!(stream).good())                                                                            \
-  error_exit(msg)
+  if (!(stream).good()) error_exit(msg)
 
 template<typename StreamT>
 inline void

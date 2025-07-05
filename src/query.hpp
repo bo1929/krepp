@@ -49,7 +49,8 @@ public:
          uint32_t hdist_th,
          double dist_max,
          uint32_t tau,
-         bool no_filter);
+         bool no_filter,
+         bool multi = false);
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void estimate_distances(std::ostream& output_stream);
@@ -81,6 +82,7 @@ private:
   node_sptr_t nd_closest = nullptr;
   minfo_sptr_t mi_closest = nullptr;
   optimize::HDistHistLLH llhfunc;
+  bool multi = false;
 
 protected:
   parallel_flat_phmap<node_sptr_t, minfo_sptr_t> node_to_minfo = {};
@@ -163,6 +165,12 @@ public:
   /* void compute_gamma(); */
   void optimize_likelihood(optimize::HDistHistLLH& llhfunc);
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
+
+#define PLACEMENT_FIELD(nd, mi)                                                                    \
+  "\t\t\t\t[" << (nd->get_se() - 1) << ", 0, " << (nd->get_blen() / 2.0) << ", " << -mi->v_llh     \
+              << ", " << exp(-mi->chisq / 2) << ", " << mi->d_llh << "]"
+
+#define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh
 
 private:
   double nmers = 0;

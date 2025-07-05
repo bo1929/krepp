@@ -14,7 +14,7 @@ BreakStringLiterals:  false
 ReflowComments:       false
 SortIncludes:         false
 AllowAllParametersOfDeclarationOnNextLine: false
-AllowShortIfStatementsOnASingleLine:       false
+AllowShortIfStatementsOnASingleLine:       true
 AllowShortCaseLabelsOnASingleLine:         false
 AllowShortBlocksOnASingleLine:             false
 AllowShortLoopsOnASingleLine:              false

@@ -2,8 +2,7 @@
 
 bool Tree::check_compatible(tree_sptr_t tree)
 {
-  if (!tree)
-    return true;
+  if (!tree) return true;
   bool is_compatible = true;
   node_sptr_t ndx, ndy;
   tree->reset_traversal();
@@ -62,8 +61,7 @@ void Tree::split_nwk(vec<std::string>& nd_v)
   std::string buf = "";
   buf.reserve(nd_v.size());
   for (; i < nwk_str.length(); i++) {
-    if (nwk_str[i] == '\t' || nwk_str[i] == ' ' || nwk_str[i] == ';')
-      continue;
+    if (nwk_str[i] == '\t' || nwk_str[i] == ' ' || nwk_str[i] == ';') continue;
     if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',') {
       if (buf.length() > 0) {
         nd_v.push_back(buf);
@@ -83,8 +81,7 @@ void Tree::split_nwk(vec<std::string>& nd_v)
 void Node::parse(vec<std::string>& nd_v)
 {
   ldepth = parent ? parent->ldepth + 1 : 0;
-  if (tree->atter >= nd_v.size())
-    return;
+  if (tree->atter >= nd_v.size()) return;
   if (nd_v[tree->atter] != "(") {
     if (nd_v[tree->atter] != ":") {
       name = nd_v[tree->atter];
@@ -130,8 +127,7 @@ void Node::parse(vec<std::string>& nd_v)
   }
   if (nd_v[tree->atter] == ")") {
     tree->atter++;
-    if (nd_v[tree->atter] == ")")
-      return;
+    if (nd_v[tree->atter] == ")") return;
   }
   if (nd_v[tree->atter] != ":") {
     name = nd_v[tree->atter];
@@ -199,8 +195,7 @@ void Node::print_info()
 
 node_sptr_t Tree::next_post_order(node_sptr_t nd_curr)
 {
-  if (nd_curr == subtree_root)
-    return nullptr;
+  if (nd_curr == subtree_root) return nullptr;
   if (!nd_curr) {
     nd_curr = subtree_root;
     while (!nd_curr->is_leaf)
@@ -260,8 +255,7 @@ node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
 double Tree::compute_distance(node_sptr_t a, node_sptr_t b)
 {
   double distance = 0;
-  if (!a || !b)
-    return std::numeric_limits<double>::max();
+  if (!a || !b) return std::numeric_limits<double>::max();
   while (a->sh != b->sh) {
     if (a->ldepth < b->ldepth) {
       distance += b->get_blen();

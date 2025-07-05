@@ -10,12 +10,14 @@ IBatch::IBatch(index_sptr_t index,
                uint32_t hdist_th,
                double dist_max,
                uint32_t tau,
-               bool no_filter)
+               bool no_filter,
+               bool multi)
   : index(index)
   , hdist_th(hdist_th)
   , dist_max(dist_max)
   , tau(tau)
   , no_filter(no_filter)
+  , multi(multi)
 {
   lshf = index->get_lshf();
   tree = index->get_tree();
@@ -149,17 +151,17 @@ void IBatch::report_distances(strstream& batch_stream)
 {
   if (node_to_minfo.empty() || (!no_filter && (mi_closest->d_llh > dist_max))) {
     batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
-    return;
-  }
-  if (no_filter) {
+  } else if (!multi) {
+    batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd_closest, mi_closest) << "\n";
+  } else if (no_filter) {
     for (auto& [nd, mi] : node_to_minfo) {
-      batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
+      batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi) << "\n";
     }
   } else {
     for (auto& [nd, mi] : node_to_minfo) {
       mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
       if (mi->chisq < CHISQ_THRESHOLD && mi->d_llh < dist_max) {
-        batch_stream << identifer_batch[bix] << "\t" << nd->get_name() << "\t" << mi->d_llh << "\n";
+        batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi) << "\n";
       }
     }
   }
@@ -185,30 +187,19 @@ void IBatch::place_sequences(std::ostream& output_stream)
 
 void IBatch::report_placement(strstream& batch_stream)
 {
-  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], ";
-  node_sptr_t nd_pp = nullptr;
-  minfo_sptr_t mi_pp = nullptr;
+  if (node_to_minfo.size() == 0 || !(no_filter || mi_closest->get_leq_tau(tau) > 1.0)) {
+    return;
+  }
+
+  node_sptr_t nd_pp = nd_closest;
+  minfo_sptr_t mi_pp = mi_closest;
+  mi_pp->chisq = 0;
+  vec<node_sptr_t> nd_v = {};
 
   if (node_to_minfo.size() > 1) {
     node_sptr_t nd_curr = nullptr;
     minfo_sptr_t mi_curr = nullptr;
 
-    /*
-    // Place on the LCA of all leaves that pass llh-ratio test:
-    mi_curr = std::make_shared<Minfo>(hdist_th);
-    for (auto const& [nd, mi] : node_to_minfo) {
-      mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
-      if (mi->chisq < CHISQ_THRESHOLD && (no_filter || mi->get_leq_tau(tau) > 1.0)) {
-        nd_curr = Tree::compute_lca(nd_curr, nd);
-        mi_curr->join(mi);
-      }
-    }
-    mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
-    nd_pp = nd_curr;
-    mi_pp = mi_curr;
-    */
-
-    vec<node_sptr_t> nd_v;
     // Traverse tree in post-order, collect candidate placements
     while ((nd_curr = tree->next_post_order(nd_curr))) {
       if (nd_curr->check_leaf()) {
@@ -237,54 +228,49 @@ void IBatch::report_placement(strstream& batch_stream)
       }
     }
 
-    if (nd_v.empty()) {
-      batch_stream << "\"p\" : [ ]},\n";
-      return;
-    }
+    if (!multi) {
+      // Sort: prefer higher card, then higher d_llh
+      std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
+        return (lhs->get_card() == rhs->get_card())
+                 ? node_to_minfo[lhs]->d_llh > node_to_minfo[rhs]->d_llh
+                 : lhs->get_card() < rhs->get_card();
+      });
+      nd_pp = nd_v.back();
+      mi_pp = node_to_minfo[nd_pp];
 
-    // Sort: prefer higher card, then higher d_llh
-    std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
-      return (lhs->get_card() == rhs->get_card())
-               ? node_to_minfo[lhs]->d_llh > node_to_minfo[rhs]->d_llh
-               : lhs->get_card() < rhs->get_card();
-    });
-
-    nd_pp = nd_v.back();
-    mi_pp = node_to_minfo[nd_pp];
-
-    // Don't place on top if all matches,
-    // choose either of the children based on the total branch length.
-    // TODO: Do something more elegant for such cases...
-    if ((mi_pp->rcard == mi_pp->rmatch_count) && !nd_pp->check_leaf()) {
-      nd_curr = *std::next(nd_pp->get_children(), 0);
-      mi_curr = node_to_minfo[nd_curr];
-      for (uint32_t nix = 1; nix < nd_pp->get_nchildren(); ++nix) {
-        if (nd_curr->total_blen < (*std::next(nd_pp->get_children(), nix))->total_blen) {
-          nd_curr = *std::next(nd_pp->get_children(), nix);
-          mi_curr = node_to_minfo[nd_curr];
+      // Don't place on top if all matches,
+      // choose either of the children based on the total branch length.
+      // TODO: Do something more elegant for such cases...
+      if ((mi_pp->rcard == mi_pp->rmatch_count) && !nd_pp->check_leaf()) {
+        nd_curr = *std::next(nd_pp->get_children(), 0);
+        mi_curr = node_to_minfo[nd_curr];
+        for (uint32_t nix = 1; nix < nd_pp->get_nchildren(); ++nix) {
+          if (nd_curr->total_blen < (*std::next(nd_pp->get_children(), nix))->total_blen) {
+            nd_curr = *std::next(nd_pp->get_children(), nix);
+            mi_curr = node_to_minfo[nd_curr];
+          }
+        }
+        nd_pp = nd_curr;
+        mi_pp = mi_curr;
+        if (std::isnan(mi_pp->chisq)) {
+          mi_pp->optimize_likelihood(llhfunc);
+          mi_pp->chisq = mi_closest->likelihood_ratio(mi_pp->d_llh, llhfunc);
         }
       }
-      nd_pp = nd_curr;
-      mi_pp = mi_curr;
-      if (std::isnan(mi_pp->chisq)) {
-        mi_pp->optimize_likelihood(llhfunc);
-        mi_pp->chisq = mi_closest->likelihood_ratio(mi_pp->d_llh, llhfunc);
-      }
-    }
-  } else {
-    if (node_to_minfo.size() > 0 && (no_filter || mi_closest->get_leq_tau(tau) > 1.0)) {
-      nd_pp = nd_closest;
-      mi_pp = mi_closest;
-      mi_pp->chisq = 0;
     }
   }
-  if (nd_pp) {
-    batch_stream << "\"p\" : [[" << (nd_pp->get_se() - 1) << ", 0, " << nd_pp->get_blen() / 2.0
-                 << ", " << -mi_pp->v_llh << ", " << mi_pp->chisq << ", " << mi_pp->d_llh
-                 << "]]},\n";
+  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [\n";
+  if (multi) {
+    for (uint32_t i = 0; i < nd_v.size(); ++i) {
+      nd_pp = nd_v[i];
+      mi_pp = node_to_minfo[nd_pp];
+      if (i > 0) batch_stream << ",\n";
+      batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp);
+    }
   } else {
-    batch_stream << "\"p\" : [ ]},\n";
+    batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp);
   }
+  batch_stream << "]\n\t\t\t},\n";
 }
 
 IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
