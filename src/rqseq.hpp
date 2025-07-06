@@ -66,7 +66,13 @@ class RSeq : public HandlerURL
   friend class DynHT;
 
 public:
-  RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac);
+  RSeq(std::string input,
+       lshf_sptr_t lshf,
+       uint8_t w,
+       uint32_t r,
+       bool frac,
+       int sdust_t,
+       int sdust_w);
   ~RSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   double get_rho() { return rho; }
@@ -100,6 +106,8 @@ private:
   uint64_t wcix = 0;
   uint64_t wnix = 0;
   std::filesystem::path input_path = "";
+  int sdust_t;
+  int sdust_w;
 };
 
 class QSeq : public HandlerURL

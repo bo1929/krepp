@@ -41,6 +41,8 @@ public:
     r = 1;
     frac = true;
     nrows = pow(2, 2 * h - 1);
+    sdust_t = 20;
+    sdust_w = 64;
   }
   void set_index_defaults()
   {
@@ -51,6 +53,8 @@ public:
     r = 1;
     frac = true;
     nrows = pow(2, 2 * h - 1);
+    sdust_t = 20;
+    sdust_w = 64;
   }
   bool validate_configuration()
   {
@@ -73,6 +77,9 @@ public:
     if (is_valid = (k - h) > 16) {
       std::cerr << "For compact k-mer encodings, h must be >= k-16." << std::endl;
     }
+    if (sdust_t == 0 || sdust_w == 0) {
+      std::cerr << "Setting --sdust-w or --sdust-t to 0 will disable dustmasker." << std::endl;
+    }
     return !is_valid;
   }
 
@@ -84,6 +91,8 @@ protected:
   uint32_t m;
   uint32_t r;
   uint32_t nrows;
+  uint32_t sdust_t;
+  uint32_t sdust_w;
   lshf_sptr_t lshf = nullptr;
 };
 

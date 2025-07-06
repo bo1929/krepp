@@ -1,10 +1,22 @@
 #include "rqseq.hpp"
+extern "C"
+{
+#include "sdust.h"
+}
 
-RSeq::RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac)
+RSeq::RSeq(std::string input,
+           lshf_sptr_t lshf,
+           uint8_t w,
+           uint32_t r,
+           bool frac,
+           int sdust_t,
+           int sdust_w)
   : w(w)
   , r(r)
   , frac(frac)
   , lshf(lshf)
+  , sdust_t(sdust_t)
+  , sdust_w(sdust_w)
 {
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   k = lshf->get_k();
@@ -53,9 +65,28 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
   std::vector<std::pair<uint64_t, uint64_t>> lsh_enc_win(ldiff);
   std::pair<uint64_t, uint64_t> cminimizer, pminimizer;
+  uint32_t mrs = 0, mre = len;
+  int mn = 0, mi = 0;
+  uint64_t* rgs;
+  if (sdust_t > 0 && sdust_w > 0) rgs = sdust(0, (uint8_t*)seq, -1, sdust_t, sdust_w, &mn);
+  if (mn > 0) {
+    mre = (uint32_t)(rgs[mi]);
+    mrs = (uint32_t)(rgs[mi] >> 32);
+  }
   for (i = l = 0; i < len;) {
     if (seq_nt4_table[seq[i]] >= 4) {
       l = 0, i++;
+      continue;
+    }
+    if ((mi < mn) && ((i + k) >= mrs)) {
+      mi++;
+      i = mre, l = 0;
+      if (mi < mn) {
+        mre = (uint32_t)(rgs[mi]);
+        mrs = (uint32_t)(rgs[mi] >> 32);
+      } else {
+        free(rgs);
+      }
       continue;
     }
     l++, i++;

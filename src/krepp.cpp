@@ -77,7 +77,7 @@ void TargetIndex::load_index()
 
 void SketchSingle::create_sketch()
 {
-  rseq_sptr_t rs = std::make_shared<RSeq>(input, lshf, w, r, frac);
+  rseq_sptr_t rs = std::make_shared<RSeq>(input, lshf, w, r, frac, sdust_t, sdust_w);
   sdynht_sptr_t sdynht = std::make_shared<SDynHT>();
   sdynht->fill_table(nrows, rs);
   sketch_sflatht = std::make_shared<SFlatHT>(sdynht);
@@ -186,7 +186,8 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
   if (nd->check_leaf()) {
     sh_t sh = nd->get_sh();
     if (name_to_path.find(nd->get_name()) != name_to_path.end()) {
-      rseq_sptr_t rs = std::make_shared<RSeq>(name_to_path[nd->get_name()], lshf, w, r, frac);
+      rseq_sptr_t rs =
+        std::make_shared<RSeq>(name_to_path[nd->get_name()], lshf, w, r, frac, sdust_t, sdust_w);
       dynht->fill_table(sh, rs);
       dynht->get_record()->insert_rho(nd->get_sh(), rs->get_rho());
 #pragma omp critical
@@ -386,6 +387,8 @@ SketchSingle::SketchSingle(CLI::App& sc)
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [true].");
+  sc.add_option("--sdust-t", sdust_t, "SDUST threshold [20].")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-w", sdust_w, "SDUST window [64].")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
@@ -438,6 +441,8 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [true].");
+  sc.add_option("--sdust-t", sdust_t, "SDUST threshold [20].")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-w", sdust_w, "SDUST window [64].")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
