@@ -59,16 +59,22 @@ void Tree::split_nwk(vec<std::string>& nd_v)
 {
   int i = 0;
   std::string buf = "";
+  bool is_label = false, quote = false;
   buf.reserve(nd_v.size());
   for (; i < nwk_str.length(); i++) {
-    if (nwk_str[i] == '\t' || nwk_str[i] == ' ' || nwk_str[i] == ';') continue;
-    if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',') {
-      if (buf.length() > 0) {
+    quote = (nwk_str[i] == '\'' || nwk_str[i] == '"');
+    is_label = (is_label != quote);
+    if (is_label && !quote) {
+      buf += nwk_str[i];
+    } else if (quote || nwk_str[i] == '\n' || nwk_str[i] == ';') {
+      continue;
+    } else if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',') {
+      if (nwk_str[i] != '(' && nwk_str[i - 1] != '(') {
+        if (buf.empty()) buf = "''";
         nd_v.push_back(buf);
         buf = "";
       }
       nd_v.push_back(std::string() + nwk_str[i]);
-      continue;
     } else {
       buf += nwk_str[i];
     }
@@ -138,9 +144,9 @@ void Node::parse(vec<std::string>& nd_v)
     tree->total_blen += blen;
     tree->atter += 2;
   }
-  if (!name.empty() && name[name.length() - 1] == '\n') {
-    name.erase(name.length() - 1);
-  }
+  // if (!name.empty() && name[name.length() - 1] == '\n') {
+  //   name.erase(name.length() - 1);
+  // }
   return;
 }
 

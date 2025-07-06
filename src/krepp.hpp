@@ -191,7 +191,7 @@ private:
   uint32_t tau = 2;
   uint32_t hdist_th = 4;
   double dist_max = 0.2;
-  bool no_filter = true;
+  bool no_filter = false;
   bool multi = true;
   uint64_t total_qseq = 0;
 };

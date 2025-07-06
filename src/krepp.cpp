@@ -494,10 +494,9 @@ QueryIndex::QueryIndex(CLI::App& sc)
   sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag(
-      "--no-filter,!--filter",
-      no_filter,
-      "Report everything; regardless of the statistical significance, match count, or maximum distance.")
-    ->required();
+    "--no-filter,!--filter",
+    no_filter,
+    "Report everything; regardless of the statistical significance, match count, or maximum distance.");
   /* sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing."); */
   sc.callback([&]() {
     if (!output_path.empty()) {
