@@ -145,6 +145,37 @@ void IndexMultiple::build_index()
   root_flatht = std::make_shared<FlatHT>(root_dynht);
 }
 
+static std::string vec_to_str(const std::vector<uint8_t>& v)
+{
+  std::ostringstream oss;
+  oss << "[";
+  for (size_t i = 0; i < v.size(); ++i) {
+    if (i > 0) oss << ", ";
+    oss << static_cast<int>(v[i]);
+  }
+  oss << "]";
+  return oss.str();
+}
+
+void IndexMultiple::save_info(std::ofstream& info_stream)
+{
+  info_stream << "krepp version: " << VERSION << "\n";
+  std::time_t t = std::time(nullptr);
+  info_stream << "date: " << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S") << "\n";
+  info_stream << "seed: " << seed << "\n";
+  info_stream << "k: " << static_cast<uint32_t>(k) << "\n";
+  info_stream << "w: " << static_cast<uint32_t>(w) << "\n";
+  info_stream << "h: " << static_cast<uint32_t>(h) << "\n";
+  info_stream << "m: " << m << "\n";
+  info_stream << "frac: " << (frac ? "true" : "false") << "\n";
+  info_stream << "ppos_v: " << vec_to_str(lshf->get_ppos()) << "\n";
+  info_stream << "npos_v: " << vec_to_str(lshf->get_npos()) << "\n";
+  info_stream << "nrows: " << nrows << "\n";
+  info_stream << "total_num_kmers: " << root_flatht->get_nkmers() << "\n";
+  info_stream << "SDUST-T: " << sdust_t << "\n";
+  info_stream << "SDUST-W: " << sdust_w << "\n";
+}
+
 void IndexMultiple::save_index()
 {
   std::ofstream mer_stream(index_dir / ("cmer" + suffix), std::ofstream::binary);
@@ -179,6 +210,12 @@ void IndexMultiple::save_index()
   save_configuration(metadata_stream);
   CHECK_STREAM_OR_EXIT(metadata_stream, "Failed to write the metadata of the index!");
   metadata_stream.close();
+
+  // Save human-readable info
+  std::ofstream info_stream(index_dir / ("metadata" + suffix + ".txt"));
+  save_info(info_stream);
+  CHECK_STREAM_OR_EXIT(info_stream, "Failed to write the text metadata of the index!");
+  info_stream.close();
 }
 
 void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
@@ -524,7 +561,6 @@ int main(int argc, char** argv)
   bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.require_subcommand();
-  uint32_t seed = 0;
   app.add_option(
     "--seed", seed, "Random seed for the LSH and other parts that require randomness [0].");
   app.callback([&]() {

@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <locale>
@@ -54,6 +55,7 @@ extern thread_local std::mt19937 gen;
 extern const unsigned char seq_nt4_table[128];
 extern const uint64_t nt4_lr_table[4];
 extern const uint64_t nt4_bp_table[4];
+extern uint32_t seed;
 
 typedef uint64_t sh_t;
 typedef uint32_t se_t;

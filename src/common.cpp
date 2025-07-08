@@ -5,6 +5,7 @@ std::string leave_out_ref = "";
 std::string invocation = "";
 thread_local std::random_device rd;
 thread_local std::mt19937 gen;
+uint32_t seed = 0;
 
 const unsigned char seq_nt4_table[128] = { // Table to change "ACGTN" to 01234
   4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,

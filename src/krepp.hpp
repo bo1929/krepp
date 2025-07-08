@@ -140,6 +140,7 @@ public:
   void save_index();
   void build_index();
   void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht);
+  void save_info(std::ofstream& info_stream);
 
 private:
   std::string suffix;
