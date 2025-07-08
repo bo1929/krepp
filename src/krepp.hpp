@@ -191,9 +191,10 @@ private:
   uint32_t tau = 2;
   uint32_t hdist_th = 4;
   double dist_max = 0.2;
-  bool no_filter = false;
+  bool no_filter = true;
   bool multi = true;
   uint64_t total_qseq = 0;
+  double chisq_value = 2.706;
 };
 
 class InfoIndex : public TargetIndex

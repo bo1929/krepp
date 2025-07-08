@@ -292,7 +292,7 @@ void QueryIndex::estimate_distances()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, dist_max, tau, no_filter, multi);
+        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi);
 #pragma omp task untied
         {
           ib.estimate_distances(*output_stream);
@@ -344,7 +344,7 @@ void QueryIndex::place_sequences()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, dist_max, tau, no_filter, multi);
+        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi);
 #pragma omp task untied
         {
           ib.place_sequences(*output_stream);
@@ -493,6 +493,11 @@ QueryIndex::QueryIndex(CLI::App& sc)
   sc.add_option("-o,--output-path", output_path, "Write output to a file at <path> [stdout].");
   sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")
     ->check(CLI::NonNegativeNumber);
+  sc.add_option(
+      "--chisq",
+      chisq_value,
+      "Chi-square value for statistical distinguishability test, default correspons to alpha=90% [2.706].")
+    ->check(CLI::PositiveNumber);
   sc.add_flag(
     "--no-filter,!--filter",
     no_filter,

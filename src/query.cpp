@@ -2,18 +2,20 @@
 #include <boost/math/tools/minima.hpp>
 
 /* #define CHISQ_THRESHOLD 3.841 */
-#define CHISQ_THRESHOLD 2.706
+/* #define CHISQ_THRESHOLD 2.706 */
 /* #define CHISQ_THRESHOLD 1.642 */
 
 IBatch::IBatch(index_sptr_t index,
                qseq_sptr_t qs,
                uint32_t hdist_th,
+               double chisq_value,
                double dist_max,
                uint32_t tau,
                bool no_filter,
                bool multi)
   : index(index)
   , hdist_th(hdist_th)
+  , chisq_value(chisq_value)
   , dist_max(dist_max)
   , tau(tau)
   , no_filter(no_filter)
@@ -93,6 +95,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
 {
   nd_closest = tree->get_root();
   mi_closest = std::make_shared<Minfo>(hdist_th);
+  mi_closest->chisq = 0;
   node_to_minfo.clear();
   imers_or->hdist_filt = 2 * imers_or->hdist_filt + 1;
   imers_rc->hdist_filt = 2 * imers_rc->hdist_filt + 1;
@@ -107,7 +110,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
       nd_closest = nd;
       mi_closest = mi;
     }
-    node_to_minfo[nd] = mi;
+    node_to_minfo.emplace(nd, mi);
   }
   for (auto [nd, mi] : imers_rc->leaf_to_minfo) {
     mi->mismatch_count = onmers - mi->match_count;
@@ -154,13 +157,14 @@ void IBatch::report_distances(strstream& batch_stream)
   } else if (!multi) {
     batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd_closest, mi_closest) << "\n";
   } else if (no_filter) {
-    for (auto& [nd, mi] : node_to_minfo) {
+    for (const auto& [nd, mi] : node_to_minfo) {
       batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi) << "\n";
     }
   } else {
     for (auto& [nd, mi] : node_to_minfo) {
+      // TODO: Check the order:
       mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
-      if (mi->chisq < CHISQ_THRESHOLD && mi->d_llh < dist_max) {
+      if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
         batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi) << "\n";
       }
     }
@@ -191,83 +195,62 @@ void IBatch::report_placement(strstream& batch_stream)
     return;
   }
 
+  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [\n";
+  if (node_to_minfo.size() == 1) {
+    batch_stream << PLACEMENT_FIELD(nd_closest, mi_closest);
+    return;
+  }
+
   node_sptr_t nd_pp = nd_closest;
   minfo_sptr_t mi_pp = mi_closest;
-  mi_pp->chisq = 0;
-  vec<node_sptr_t> nd_v = {};
+  vec<node_sptr_t> nd_v;
+  nd_v.reserve(node_to_minfo.size());
+  parallel_flat_phmap<node_sptr_t, minfo_sptr_t> pp_map;
 
-  if (node_to_minfo.size() > 1) {
-    node_sptr_t nd_curr = nullptr;
-    minfo_sptr_t mi_curr = nullptr;
-
-    // Traverse tree in post-order, collect candidate placements
-    while ((nd_curr = tree->next_post_order(nd_curr))) {
-      if (nd_curr->check_leaf()) {
-        if (!node_to_minfo.contains(nd_curr)) {
-          node_to_minfo[nd_curr] = std::make_shared<Minfo>(hdist_th, enmers, 0.0);
-        } else {
-          mi_curr = node_to_minfo[nd_curr];
-          mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
-          if (mi_curr->chisq < CHISQ_THRESHOLD && (no_filter || mi_curr->get_leq_tau(tau) > 1.0)) {
-            nd_v.push_back(nd_curr);
-          }
-        }
-      } else {
-        mi_curr = std::make_shared<Minfo>(hdist_th);
-        for (uint32_t nix = 0; nix < nd_curr->get_nchildren(); ++nix) {
-          mi_curr->join(node_to_minfo[*std::next(nd_curr->get_children(), nix)]);
-        }
-        if (mi_curr->rmatch_count > 1.0 && (no_filter || mi_curr->get_leq_tau(tau) > 1.0)) {
-          mi_curr->optimize_likelihood(llhfunc);
-          mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
-          if (mi_curr->chisq < CHISQ_THRESHOLD) {
-            nd_v.push_back(nd_curr);
-          }
-        }
-        node_to_minfo[nd_curr] = mi_curr;
+  for (auto& [nd_curr, mi_curr] : node_to_minfo) {
+    pp_map[nd_curr] = mi_curr;
+    double denom = 1.0;
+    node_sptr_t nd_parent = nd_curr;
+    while ((nd_parent = nd_parent->get_parent())) {
+      denom /= nd_parent->get_nchildren();
+      if (!pp_map.contains(nd_parent)) {
+        pp_map[nd_parent] = std::make_shared<Minfo>(hdist_th);
       }
-    }
-
-    if (!multi) {
-      // Sort: prefer higher card, then higher d_llh
-      std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
-        return (lhs->get_card() == rhs->get_card())
-                 ? node_to_minfo[lhs]->d_llh > node_to_minfo[rhs]->d_llh
-                 : lhs->get_card() < rhs->get_card();
-      });
-      nd_pp = nd_v.back();
-      mi_pp = node_to_minfo[nd_pp];
-
-      // Don't place on top if all matches,
-      // choose either of the children based on the total branch length.
-      // TODO: Do something more elegant for such cases...
-      if ((mi_pp->rcard == mi_pp->rmatch_count) && !nd_pp->check_leaf()) {
-        nd_curr = *std::next(nd_pp->get_children(), 0);
-        mi_curr = node_to_minfo[nd_curr];
-        for (uint32_t nix = 1; nix < nd_pp->get_nchildren(); ++nix) {
-          if (nd_curr->total_blen < (*std::next(nd_pp->get_children(), nix))->total_blen) {
-            nd_curr = *std::next(nd_pp->get_children(), nix);
-            mi_curr = node_to_minfo[nd_curr];
-          }
-        }
-        nd_pp = nd_curr;
-        mi_pp = mi_curr;
-        if (std::isnan(mi_pp->chisq)) {
-          mi_pp->optimize_likelihood(llhfunc);
-          mi_pp->chisq = mi_closest->likelihood_ratio(mi_pp->d_llh, llhfunc);
-        }
-      }
+      pp_map[nd_parent]->add(mi_curr, denom);
     }
   }
-  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [\n";
+
+  // Collect candidate placements.
+  for (auto& [nd_curr, mi_curr] : pp_map) {
+    bool filter_nd = !((no_filter || mi_curr->get_leq_tau(tau) > 1.0) &&
+                       (nd_curr->check_leaf() || mi_curr->rmatch_count > 1.0));
+    if (filter_nd) {
+      continue;
+    } else if (!nd_curr->check_leaf()) {
+      mi_curr->optimize_likelihood(llhfunc);
+    }
+    // TODO: Check the order:
+    mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
+    if ((mi_curr->chisq < chisq_value)) {
+      nd_v.push_back(nd_curr);
+    }
+  }
+
   if (multi) {
     for (uint32_t i = 0; i < nd_v.size(); ++i) {
       nd_pp = nd_v[i];
-      mi_pp = node_to_minfo[nd_pp];
+      mi_pp = pp_map[nd_pp];
       if (i > 0) batch_stream << ",\n";
       batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp);
     }
   } else {
+    // Sort: prefer higher card, then lower d_llh
+    std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
+      return (lhs->get_card() == rhs->get_card()) ? pp_map[lhs]->d_llh > pp_map[rhs]->d_llh
+                                                  : lhs->get_card() < rhs->get_card();
+    });
+    nd_pp = nd_v.back();
+    mi_pp = pp_map[nd_pp];
     batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp);
   }
   batch_stream << "]\n\t\t\t},\n";

@@ -47,10 +47,11 @@ public:
   IBatch(index_sptr_t index,
          qseq_sptr_t qs,
          uint32_t hdist_th,
+         double chisq_value,
          double dist_max,
          uint32_t tau,
          bool no_filter,
-         bool multi = false);
+         bool multi);
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void estimate_distances(std::ostream& output_stream);
@@ -63,6 +64,7 @@ private:
   uint32_t h;
   uint32_t m;
   uint32_t hdist_th;
+  double chisq_value;
   double dist_max;
   bool no_filter;
   uint32_t tau;
@@ -109,7 +111,6 @@ public:
     : nmers(nmers)
     , rho(rho)
   {
-    rcard++;
     rmatch_count = rho > 0 ? 1 : 0;
     mismatch_count = nmers;
     hdisthist_v.resize(hdist_th + 1, 0);
@@ -127,8 +128,21 @@ public:
     hdist_min = std::min(hdist_min, minfo->hdist_min);
     nmers = std::max(nmers, minfo->nmers);
     rho = std::max(rho, minfo->rho);
-    rcard += minfo->rcard;
     rmatch_count += minfo->rmatch_count;
+  }
+  void add(const minfo_sptr_t& minfo, double denom)
+  {
+    // gamma = gamma + minfo->gamma * denom;
+    mismatch_count = nmers ? mismatch_count : minfo->nmers;
+    match_count += minfo->match_count * denom;
+    mismatch_count -= minfo->match_count * denom;
+    for (uint32_t x = 0; x < hdisthist_v.size(); ++x) {
+      hdisthist_v[x] = hdisthist_v[x] + minfo->hdisthist_v[x] * denom;
+    }
+    hdist_min = std::min(hdist_min, minfo->hdist_min);
+    nmers = std::max(nmers, minfo->nmers);
+    rho = std::max(rho, minfo->rho);
+    rmatch_count++;
   }
   void update_match(enc_t enc_lr, uint32_t pos, uint32_t hdist_curr)
   {
@@ -178,7 +192,6 @@ private:
   double match_count = 0;
   double rho = 0.0;
   /* double gamma = 0.0; */
-  uint32_t rcard = 0;
   uint32_t rmatch_count = 0;
   uint32_t last_pos = 0;
   uint32_t last_hdist = 0xFFFFFFFF;
