@@ -42,6 +42,9 @@ void TargetIndex::ensure_wbackbone()
 
 void TargetIndex::load_index()
 {
+  const std::set<std::string> lall{"cmer", "crecord", "inc", "metadata", "tree", "reflist"};
+  const std::set<std::string> lall_wbackbone{"cmer", "crecord", "inc", "metadata", "tree"};
+  const std::set<std::string> lall_wobackbone{"cmer", "crecord", "inc", "metadata", "reflist"};
   node_phmap<std::string, std::set<std::string>> suffix_to_ltype;
   for (const auto& entry : std::filesystem::directory_iterator(index_dir)) {
     std::string filename, ltype, mrcfg, fracv;
@@ -50,16 +53,16 @@ void TargetIndex::load_index()
     pos1 = filename.find("-", 0);
     pos2 = filename.find("-", pos1 + 1);
     ltype = filename.substr(0, pos1);
-    mrcfg = filename.substr(pos1, pos2 - pos1);
-    fracv = filename.substr(pos2, filename.size() - pos2);
-    suffix_to_ltype[mrcfg + fracv].insert(ltype);
+    if (lall.find(ltype) != lall.end() && entry.path().extension().empty()) {
+      mrcfg = filename.substr(pos1, pos2 - pos1);
+      fracv = filename.substr(pos2, filename.size() - pos2);
+      suffix_to_ltype[mrcfg + fracv].insert(ltype);
+    }
   }
   std::vector<std::string> suffixes;
   for (auto const& [suffix, ltypes] : suffix_to_ltype) {
     suffixes.push_back(suffix);
   }
-  std::set<std::string> lall_wbackbone{"cmer", "crecord", "inc", "metadata", "tree"};
-  std::set<std::string> lall_wobackbone{"cmer", "crecord", "inc", "metadata", "reflist"};
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
     if (suffix_to_ltype[suffixes[lix]] == lall_wbackbone) {

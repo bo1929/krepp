@@ -1,5 +1,4 @@
 #include "record.hpp"
-#include "common.hpp"
 
 Record::Record(tree_sptr_t tree)
   : tree(tree)
@@ -89,8 +88,7 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
       subset2 = v.second;
     });
   if (!(subset1 && subset2)) {
-    error_exit("Cannot make the subset for the partition: (" + std::to_string(sh1) + ", " +
-               std::to_string(sh2) + ")");
+    error_exit("Failed forpartition: (" + std::to_string(sh1) + ", " + std::to_string(sh2) + ")");
   }
   sh_t sh = sh1 + sh2;
   sh_t nonce = 0;

@@ -95,7 +95,6 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
 {
   nd_closest = tree->get_root();
   mi_closest = std::make_shared<Minfo>(hdist_th);
-  mi_closest->chisq = 0;
   node_to_minfo.clear();
   imers_or->hdist_filt = 2 * imers_or->hdist_filt + 1;
   imers_rc->hdist_filt = 2 * imers_rc->hdist_filt + 1;
@@ -162,7 +161,6 @@ void IBatch::report_distances(strstream& batch_stream)
     }
   } else {
     for (auto& [nd, mi] : node_to_minfo) {
-      // TODO: Check the order:
       mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
       if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
         batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi) << "\n";
@@ -195,14 +193,16 @@ void IBatch::report_placement(strstream& batch_stream)
     return;
   }
 
+  node_sptr_t nd_pp = nd_closest;
+  minfo_sptr_t mi_pp = mi_closest;
+  mi_pp->chisq = 0;
+
   batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [\n";
   if (node_to_minfo.size() == 1) {
-    batch_stream << PLACEMENT_FIELD(nd_closest, mi_closest);
+    batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]\n\t\t\t},\n";
     return;
   }
 
-  node_sptr_t nd_pp = nd_closest;
-  minfo_sptr_t mi_pp = mi_closest;
   vec<node_sptr_t> nd_v;
   nd_v.reserve(node_to_minfo.size());
   parallel_flat_phmap<node_sptr_t, minfo_sptr_t> pp_map;
@@ -229,7 +229,6 @@ void IBatch::report_placement(strstream& batch_stream)
     } else if (!nd_curr->check_leaf()) {
       mi_curr->optimize_likelihood(llhfunc);
     }
-    // TODO: Check the order:
     mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
     if ((mi_curr->chisq < chisq_value)) {
       nd_v.push_back(nd_curr);
@@ -276,10 +275,10 @@ IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
 void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
 {
   se_t se;
+  pse_t pse;
   node_sptr_t nd;
   uint32_t hdist_curr;
   std::queue<se_t> se_q;
-  std::pair<se_t, se_t> pse;
   std::pair<vec_cmer_it, vec_cmer_it> indices = index->bucket_indices(rix);
   crecord_sptr_t crecord = index->get_crecord(rix);
   for (; indices.first < indices.second; ++indices.first) {
@@ -345,7 +344,7 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
 /* } */
 
 double Minfo::likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc)
-{ // TODO: What about testing this the other way around?
+{
   llhfunc.set_parameters(hdisthist_v.data(), mismatch_count, rho);
   return 2 * (llhfunc(d) - v_llh);
 }

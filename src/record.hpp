@@ -106,6 +106,7 @@ public:
 private:
   se_t nnodes = 0;
   se_t nsubsets = 0;
+  // Remove tree from this completely or make it a star tree.
   tree_sptr_t tree = nullptr;
   std::vector<pse_t> se_to_pse = {};
   std::vector<double> se_to_rho = {};
