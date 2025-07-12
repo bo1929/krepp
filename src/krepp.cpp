@@ -33,10 +33,20 @@ void TargetSketch::load_sketch()
   sketch->load_full_sketch();
   sketch->make_rho_partial();
 }
-void TargetIndex::ensure_wbackbone()
+void TargetIndex::ensure_backbone()
 {
-  if (!index->check_wbackbone()) {
-    error_exit("Given index lacks a backbone tree required for this subcommand...");
+  if (!nwk_path.empty()) {
+    qtree = std::make_shared<Tree>();
+    std::ifstream tree_stream(nwk_path);
+    CHECK_STREAM_OR_EXIT(tree_stream, (std::string("Error opening ") + nwk_path.string()));
+    qtree->load(tree_stream);
+    CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the backbone tree of the index!");
+    qtree->reset_traversal();
+    index->get_tree()->map_to_qtree(qtree);
+  } else if (index->check_wbackbone()) {
+    qtree = index->get_tree();
+  } else {
+    error_exit("Given index lacks a tree and no backbone tree is provided...");
   }
 }
 
@@ -345,8 +355,8 @@ void QueryIndex::estimate_distances()
 
 void QueryIndex::end_jplace(strstream& jplace_stream)
 {
-  jplace_stream << "\t\t\t{\"n\" : [\"NaN\"], \"p\" : [["
-                << index->get_tree()->get_root()->get_se() - 1 << ", 0, 0, 0, 0, 0]]}\n";
+  jplace_stream << "\t\t\t{\"n\" : [\"NaN\"], \"p\" : [[" << qtree->get_root()->get_se() - 1
+                << ", 0, 0, 0, 0, 0]]}\n";
   jplace_stream << "\t],\n";
   jplace_stream << "\t\"metadata\" : {\n"
                 << "\t\t\"software\" : \"krepp\",\n"
@@ -357,7 +367,7 @@ void QueryIndex::end_jplace(strstream& jplace_stream)
   jplace_stream << invocation;
   jplace_stream << "\"\n\t},\n";
   jplace_stream << "\t\"tree\" : \"";
-  index->get_tree()->stream_newick_str(jplace_stream, index->get_tree()->get_root());
+  qtree->stream_newick_str(jplace_stream, qtree->get_root());
   jplace_stream << "\"\n}";
 }
 
@@ -471,7 +481,7 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
   sc.add_option("-o,--index-dir", index_dir, "Directory <path> in which the index will be stored.")
     ->required();
   sc.add_option(
-      "-t,--nwk-file", nwk_path, "Path to the Newick file for the reference tree (must be rooted).")
+      "-t,--nwk-file", nwk_path, "Path to the Newick file for the guide tree (must be rooted).")
     ->check(CLI::ExistingFile);
   sc.add_option("-k,--kmer-len", k, "Length of k-mers [29].")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+6].");
@@ -500,6 +510,11 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
 
 void QueryIndex::init_sc_place(CLI::App& sc)
 {
+  sc.add_option(
+      "-t,--nwk-file",
+      nwk_path,
+      "Path to the Newick file for the (rooted) placement tree (overrides if the index has a backbone tree).")
+    ->check(CLI::ExistingFile);
   sc.add_option(
       "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [2].")
     ->check(CLI::NonNegativeNumber);
@@ -624,7 +639,7 @@ int main(int argc, char** argv)
   if (sc_place.parsed()) {
     std::cerr << "Loading the index and the backbone tree..." << std::endl;
     krepp_place.load_index();
-    krepp_place.ensure_wbackbone();
+    krepp_place.ensure_backbone();
     std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
     std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
     krepp_place.place_sequences();

@@ -183,8 +183,10 @@ void IBatch::place_sequences(std::ostream& output_stream)
     summarize_matches(imers_or, imers_rc);
     report_placement(batch_stream);
   }
+  if (batch_stream.tellp() != std::streampos(0)) {
 #pragma omp critical
-  output_stream << batch_stream.rdbuf();
+    output_stream << batch_stream.rdbuf();
+  }
 }
 
 void IBatch::report_placement(strstream& batch_stream)
@@ -293,23 +295,21 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
     while (!se_q.empty()) {
       se = se_q.front();
       se_q.pop();
-      if (!tree->check_node(se)) {
-        pse = crecord->get_pse(se);
-        se_q.push(pse.first);
-        se_q.push(pse.second);
-        continue;
-      }
-      nd = tree->get_node(se);
-      if (nd->check_leaf()) {
-        if (!leaf_to_minfo.contains(nd)) {
-          leaf_to_minfo[nd] = std::make_shared<Minfo>(hdist_th, enmers, crecord->get_rho(se));
-        }
-        leaf_to_minfo[nd]->update_match(indices.first->first, pos, hdist_curr);
-      } else {
-        for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
-          se_q.push((*std::next(nd->get_children(), i))->get_se());
+      if (tree->check_node(se)) {
+        if (!(nd = tree->get_node(se))) {
+          continue;
+        } else if (nd->check_leaf()) {
+          if (!leaf_to_minfo.contains(nd)) {
+            leaf_to_minfo[nd] = std::make_shared<Minfo>(hdist_th, enmers);
+          }
+          leaf_to_minfo[nd]->update_match(
+            indices.first->first, pos, hdist_curr, crecord->get_rho(se));
+          continue;
         }
       }
+      pse = crecord->get_pse(se);
+      se_q.push(pse.first);
+      se_q.push(pse.second);
     }
   }
   onmers++;

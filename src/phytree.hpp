@@ -22,6 +22,7 @@ public:
   void save(std::ofstream& tree_stream);
   void load(std::ifstream& tree_stream);
   void generate_tree(vec<std::string>& names_v);
+  void map_to_qtree(tree_sptr_t qtree);
   static double compute_distance(node_sptr_t a, node_sptr_t b);
   static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
   void stream_newick_str(std::stringstream& nwk_strstream, node_sptr_t nd);
@@ -30,6 +31,7 @@ public:
   bool check_node(se_t se) const { return se <= nnodes; }
   tree_sptr_t getptr() { return shared_from_this(); }
   node_sptr_t get_root() { return root; }
+  node_sptr_t get_subtree() { return subtree_root; }
   tuint_t get_nnodes() { return nnodes; }
   void reset_traversal()
   {

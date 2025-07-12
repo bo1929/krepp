@@ -198,7 +198,6 @@ void CRecord::print_info()
 CRecord::CRecord(tree_sptr_t tree)
   : tree(tree)
 {
-  node_sptr_t nd_curr;
   se_t curr_senum = 1;
   tree->reset_traversal();
   nnodes = tree->get_nnodes() + 1;
@@ -263,7 +262,6 @@ void CRecord::decode_se(se_t se, vec<node_sptr_t>& subset_v)
 
 void CRecord::display_info(uint32_t r, vec<uint64_t>& se_to_count)
 {
-  std::cout << r << "\tNUM_NODES\t" << nnodes << "\n";
   std::cout << r << "\tNUM_COLORS\t" << nsubsets << "\n";
   vec<uint64_t> se_to_outdegree(se_to_pse.size());
   for (int ix = 1; ix < se_to_pse.size(); ++ix) {
@@ -281,15 +279,6 @@ void CRecord::display_info(uint32_t r, vec<uint64_t>& se_to_count)
   }
   for (auto const& [key, val] : outdegree_hist) {
     std::cout << r << "\tOUTDEGREE_COUNT\t" << key << "\t" << val << "\n";
-  }
-  node_sptr_t nd;
-  for (uint64_t ix = 1; ix < nnodes; ++ix) {
-    nd = tree->get_node(ix);
-    if (nd->check_leaf()) {
-      continue;
-    }
-    std::cout << r << "\tNODE_INFO\t" << nd->get_name() << "\t" << nd->get_card() << "\t"
-              << se_to_outdegree[ix] << "\t" << se_to_count[ix] << "\n";
   }
   // std::queue<se_t> se_q;
   // uint64_t se;

@@ -307,3 +307,28 @@ void Tree::compute_bdepth()
     }
   }
 }
+
+void Tree::map_to_qtree(tree_sptr_t qtree)
+{
+  parallel_flat_phmap<std::string, se_t> name_to_se;
+  reset_traversal();
+  while (curr = next_post_order()) {
+    if (curr->check_leaf()) {
+      name_to_se[curr->get_name()] = curr->get_se();
+      se_to_node[curr->get_se()] = nullptr;
+    }
+  }
+  root = qtree->get_root();
+  subtree_root = qtree->get_subtree();
+  reset_traversal();
+  while (curr = next_post_order()) {
+    if (curr->check_leaf()) {
+      if (name_to_se.contains(curr->get_name())) {
+        se_to_node[name_to_se[curr->get_name()]] = curr;
+      } else {
+        error_exit("Given placement tree contains a reference that does not appear in the index.");
+      }
+    }
+  }
+  reset_traversal();
+}

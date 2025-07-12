@@ -110,10 +110,12 @@ class TargetIndex
 {
 public:
   void load_index();
-  void ensure_wbackbone();
+  void ensure_backbone();
 
 protected:
+  std::filesystem::path nwk_path;
   index_sptr_t index = nullptr;
+  tree_sptr_t qtree = nullptr;
   std::filesystem::path index_dir;
 };
 
