@@ -107,7 +107,7 @@ class Minfo
   // };
 
 public:
-  Minfo(uint32_t hdist_th, uint32_t nmers)
+  Minfo(uint32_t hdist_th, uint32_t nmers, double rho)
     : nmers(nmers)
     , rho(rho)
   {
@@ -144,7 +144,7 @@ public:
     rho = std::max(rho, minfo->rho);
     rmatch_count++;
   }
-  void update_match(enc_t enc_lr, uint32_t pos, uint32_t hdist_curr, double rho_curr)
+  void update_match(enc_t enc_lr, uint32_t pos, uint32_t hdist_curr)
   {
     /* if (match_v.empty() || ((match_v.back()).pos != pos)) { */
     if (last_hdist == 0xFFFFFFFF || last_pos != pos) {
@@ -167,7 +167,6 @@ public:
     if (hdist_curr < hdist_min) {
       hdist_min = hdist_curr;
     }
-    rho += (rho_curr - rho) / match_count;
   }
   double get_leq_tau(uint32_t tau)
   {
@@ -182,8 +181,8 @@ public:
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
 #define PLACEMENT_FIELD(nd, mi)                                                                    \
-  "\t\t\t\t[" << (nd->get_se() - 1) << ", 0, " << (nd->get_blen() / 2.0) << ", " << -mi->v_llh     \
-              << ", " << exp(-mi->chisq / 2) << ", " << mi->d_llh << "]"
+  "[" << (nd->get_se() - 1) << ", 0, " << (nd->get_blen() / 2.0) << ", " << -mi->v_llh << ", "     \
+      << exp(-mi->chisq / 2) << ", " << mi->d_llh << "]"
 
 #define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh
 

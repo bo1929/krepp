@@ -430,15 +430,15 @@ SketchSingle::SketchSingle(CLI::App& sc)
   sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")
     ->required();
   sc.add_option("-k,--kmer-len", k, "Length of k-mers [26].")->check(CLI::Range(19, 31));
-  sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k) [k+6].");
-  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [k-16].");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")
+  sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k). [k+6]");
+  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space. [5]")
     ->check(CLI::PositiveNumber);
-  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")
+  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
-  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [true].");
-  sc.add_option("--sdust-t", sdust_t, "SDUST threshold [20].")->check(CLI::NonNegativeNumber);
-  sc.add_option("--sdust-w", sdust_w, "SDUST window [64].")->check(CLI::NonNegativeNumber);
+  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m. [true]");
+  sc.add_option("--sdust-t", sdust_t, "SDUST threshold. [20]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-w", sdust_w, "SDUST window. [64]")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
@@ -458,8 +458,8 @@ QuerySketch::QuerySketch(CLI::App& sc)
   sc.add_option("-i,--sketch-path", sketch_path, "Sketch file at <path> to query.")
     ->required()
     ->check(CLI::ExistingFile);
-  sc.add_option("-o,--output-path", output_path, "Write output to a file at <path> [stdout].");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")
+  sc.add_option("-o,--output-path", output_path, "Write output to a file at <path>. [stdout]");
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")
     ->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!output_path.empty()) {
@@ -484,15 +484,15 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
       "-t,--nwk-file", nwk_path, "Path to the Newick file for the guide tree (must be rooted).")
     ->check(CLI::ExistingFile);
   sc.add_option("-k,--kmer-len", k, "Length of k-mers [29].")->check(CLI::Range(19, 31));
-  sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k) [k+6].");
-  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH [k-16].");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space [5].")
+  sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k). [k+6]");
+  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space. [5]")
     ->check(CLI::PositiveNumber);
-  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m [1].")
+  sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
-  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m [true].");
-  sc.add_option("--sdust-t", sdust_t, "SDUST threshold [20].")->check(CLI::NonNegativeNumber);
-  sc.add_option("--sdust-w", sdust_w, "SDUST window [64].")->check(CLI::NonNegativeNumber);
+  sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m. [true]");
+  sc.add_option("--sdust-t", sdust_t, "SDUST threshold. [20]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-w", sdust_w, "SDUST window. [64]")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
@@ -516,13 +516,17 @@ void QueryIndex::init_sc_place(CLI::App& sc)
       "Path to the Newick file for the (rooted) placement tree (overrides if the index has a backbone tree).")
     ->check(CLI::ExistingFile);
   sc.add_option(
-      "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax) [2].")
+      "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax). [2]")
     ->check(CLI::NonNegativeNumber);
   multi = false;
   sc.add_flag(
     "--multi",
     multi,
     "Output all candidate placements satisfying the filters (not just the largest clade). [false]");
+  no_filter = false;
+  sc.add_flag("--no-filter,!--filter",
+              no_filter,
+              "Report all placements; even when there is not enough match below tau. [false]");
 }
 
 void QueryIndex::init_sc_dist(CLI::App& sc)
@@ -530,11 +534,16 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
   sc.add_option(
       "--dist-max",
       dist_max,
-      "Maximum distance to report for matching references, the output may become too large if high [0.2].")
+      "Maximum distance to report for matching references, the output may become too large if high. [0.2]")
     ->check(CLI::Range(1e-8, 0.33));
   multi = true;
   sc.add_flag(
     "--multi", multi, "Output all distances satisfying the filter (not just the best one). [true]");
+  no_filter = true;
+  sc.add_flag(
+    "--no-filter,!--filter",
+    no_filter,
+    "Report all matching references; regardless of the statistical significance or maximum distance. [true]");
 }
 
 QueryIndex::QueryIndex(CLI::App& sc)
@@ -545,18 +554,14 @@ QueryIndex::QueryIndex(CLI::App& sc)
   sc.add_option("-i,--index-dir", index_dir, "Directory <path> containing the reference index.")
     ->required()
     ->check(CLI::ExistingDirectory);
-  sc.add_option("-o,--output-path", output_path, "Write output to a file at <path> [stdout].");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match [4].")
+  sc.add_option("-o,--output-path", output_path, "Write output to a file at <path>. [stdout]");
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")
     ->check(CLI::NonNegativeNumber);
   sc.add_option(
       "--chisq",
       chisq_value,
-      "Chi-square value for statistical distinguishability test, default correspons to alpha=90% [2.706].")
+      "Chi-square value for statistical distinguishability test, default correspons to alpha=90%. [2.706]")
     ->check(CLI::PositiveNumber);
-  sc.add_flag(
-    "--no-filter,!--filter",
-    no_filter,
-    "Report everything; regardless of the statistical significance, match count, or maximum distance.");
   /* sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing."); */
   sc.callback([&]() {
     if (!output_path.empty()) {
@@ -580,14 +585,14 @@ int main(int argc, char** argv)
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.require_subcommand();
   app.add_option(
-    "--seed", seed, "Random seed for the LSH and other parts that require randomness [0].");
+    "--seed", seed, "Random seed for the LSH and other parts that require randomness. [0]");
   app.callback([&]() {
     if (app.count("--seed")) {
       gen.seed(seed);
     }
   });
   app.add_option(
-    "--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism [1].");
+    "--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism. [1]");
 
   auto& sc_index = *app.add_subcommand("index", "Build an index from k-mers of reference genomes.");
   auto& sc_place =

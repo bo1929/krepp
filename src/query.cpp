@@ -124,9 +124,14 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
     }
     node_to_minfo[nd] = mi;
     // If both in reverse-complement and the original sequence, decide:
-    if ((imers_or->leaf_to_minfo).contains(nd) &&
-        mi->d_llh > (imers_or->leaf_to_minfo)[nd]->d_llh) {
-      node_to_minfo[nd] = (imers_or->leaf_to_minfo)[nd];
+    if ((imers_or->leaf_to_minfo).contains(nd)) {
+      minfo_sptr_t mi_or = (imers_or->leaf_to_minfo)[nd];
+      if ((mi->d_llh > mi_or->d_llh) ||
+          ((mi->d_llh == mi_or->d_llh) &&
+           (mi->get_leq_tau(hdist_th) < mi_or->get_leq_tau(hdist_th)))) {
+        node_to_minfo[nd] = mi_or;
+        if (nd_closest == nd) mi_closest = mi_or;
+      }
     }
   }
 }
@@ -194,14 +199,13 @@ void IBatch::report_placement(strstream& batch_stream)
   if (node_to_minfo.size() == 0 || !(no_filter || mi_closest->get_leq_tau(tau) > 1.0)) {
     return;
   }
-
   node_sptr_t nd_pp = nd_closest;
   minfo_sptr_t mi_pp = mi_closest;
   mi_pp->chisq = 0;
 
-  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [\n";
+  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [";
   if (node_to_minfo.size() == 1) {
-    batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]\n\t\t\t},\n";
+    batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
     return;
   }
 
@@ -213,6 +217,7 @@ void IBatch::report_placement(strstream& batch_stream)
     pp_map[nd_curr] = mi_curr;
     double denom = 1.0;
     node_sptr_t nd_parent = nd_curr;
+    // assert(!(std::isnan(mi_curr->d_llh) || std::isnan(mi_curr->v_llh)));
     while ((nd_parent = nd_parent->get_parent())) {
       denom /= nd_parent->get_nchildren();
       if (!pp_map.contains(nd_parent)) {
@@ -224,37 +229,39 @@ void IBatch::report_placement(strstream& batch_stream)
 
   // Collect candidate placements.
   for (auto& [nd_curr, mi_curr] : pp_map) {
-    bool filter_nd = !((no_filter || mi_curr->get_leq_tau(tau) > 1.0) &&
-                       (nd_curr->check_leaf() || mi_curr->rmatch_count > 1.0));
-    if (filter_nd) {
-      continue;
-    } else if (!nd_curr->check_leaf()) {
-      mi_curr->optimize_likelihood(llhfunc);
-    }
-    mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
-    if ((mi_curr->chisq < chisq_value)) {
-      nd_v.push_back(nd_curr);
+    if ((no_filter || mi_curr->get_leq_tau(tau) > 1.0) &&
+        (nd_curr->check_leaf() || mi_curr->rmatch_count > 1.0)) {
+      if (!nd_curr->check_leaf()) {
+        mi_curr->optimize_likelihood(llhfunc);
+      }
+      mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
+      if ((mi_curr->chisq < chisq_value) && nd_curr->get_parent()) {
+        nd_v.push_back(nd_curr);
+      }
     }
   }
+  // assertm(nd_v.size() > 0, identifer_batch[bix]);
 
   if (multi) {
     for (uint32_t i = 0; i < nd_v.size(); ++i) {
       nd_pp = nd_v[i];
       mi_pp = pp_map[nd_pp];
-      if (i > 0) batch_stream << ",\n";
-      batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp);
+      if (i > 0) batch_stream << ",";
+      batch_stream << "\n\t\t\t\t" << PLACEMENT_FIELD(nd_pp, mi_pp);
     }
+    batch_stream << "]\n\t\t\t},\n";
   } else {
-    // Sort: prefer higher card, then lower d_llh
-    std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
-      return (lhs->get_card() == rhs->get_card()) ? pp_map[lhs]->d_llh > pp_map[rhs]->d_llh
-                                                  : lhs->get_card() < rhs->get_card();
-    });
+    if (nd_v.size() > 1) {
+      // Sort: prefer higher card, then lower d_llh
+      std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
+        return (lhs->get_card() == rhs->get_card()) ? pp_map[lhs]->d_llh > pp_map[rhs]->d_llh
+                                                    : lhs->get_card() < rhs->get_card();
+      });
+    }
     nd_pp = nd_v.back();
     mi_pp = pp_map[nd_pp];
-    batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp);
+    batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
   }
-  batch_stream << "]\n\t\t\t},\n";
 }
 
 IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
@@ -300,10 +307,9 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
           continue;
         } else if (nd->check_leaf()) {
           if (!leaf_to_minfo.contains(nd)) {
-            leaf_to_minfo[nd] = std::make_shared<Minfo>(hdist_th, enmers);
+            leaf_to_minfo[nd] = std::make_shared<Minfo>(hdist_th, enmers, crecord->get_rho(se));
           }
-          leaf_to_minfo[nd]->update_match(
-            indices.first->first, pos, hdist_curr, crecord->get_rho(se));
+          leaf_to_minfo[nd]->update_match(indices.first->first, pos, hdist_curr);
           continue;
         }
       }
@@ -353,7 +359,7 @@ void Minfo::optimize_likelihood(optimize::HDistHistLLH& llhfunc)
 {
   llhfunc.set_parameters(hdisthist_v.data(), mismatch_count, rho);
   // Locating Function Minima using Brent's algorithm, depends on boost::math.
-  std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.5, 16);
+  std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.33, 15);
   d_llh = sol_r.first;
   v_llh = sol_r.second;
 }

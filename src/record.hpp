@@ -102,10 +102,12 @@ public:
   pse_t get_pse(se_t se) const { return se_to_pse[se]; }
   double get_rho(se_t se) const { return se_to_rho[se]; }
   void display_info(uint32_t r, vec<uint64_t>& se_to_count);
+  // TODO: void merge(crecord_sptr_t rhs);
 
 private:
   se_t nnodes = 0;
   se_t nsubsets = 0;
+  uint32_t num_partials = 1;
   // Remove tree from this completely or make it a star tree.
   tree_sptr_t tree = nullptr;
   std::vector<pse_t> se_to_pse = {};

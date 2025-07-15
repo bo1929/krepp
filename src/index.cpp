@@ -49,7 +49,7 @@ void Index::load_partial_tree(std::string suffix)
 }
 
 void Index::load_partial_index(std::string suffix)
-{
+{ // TODO: Split for each file (e.g, metadata, crecord etc.)
   std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
   std::ifstream metadata_stream(metadata_path, std::ifstream::binary);
   uint8_t k_curr, w, h_curr;
