@@ -105,7 +105,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
       continue;
     }
     mi->optimize_likelihood(llhfunc);
-    if (mi->d_llh < mi_closest->d_llh) {
+    if (mi->d_llh <= mi_closest->d_llh) {
       nd_closest = nd;
       mi_closest = mi;
     }
@@ -118,7 +118,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
       continue;
     }
     mi->optimize_likelihood(llhfunc);
-    if (mi->d_llh < mi_closest->d_llh) {
+    if (mi->d_llh <= mi_closest->d_llh) {
       nd_closest = nd;
       mi_closest = mi;
     }
@@ -127,12 +127,13 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
     if ((imers_or->leaf_to_minfo).contains(nd)) {
       minfo_sptr_t mi_or = (imers_or->leaf_to_minfo)[nd];
       if ((mi->d_llh > mi_or->d_llh) ||
-          ((mi->d_llh == mi_or->d_llh) &&
-           (mi->get_leq_tau(hdist_th) < mi_or->get_leq_tau(hdist_th)))) {
+          ((mi->d_llh == mi_or->d_llh) && (mi->match_count < mi_or->match_count))) {
         node_to_minfo[nd] = mi_or;
-        if (nd_closest == nd) mi_closest = mi_or;
       }
     }
+  }
+  if (nd_closest != tree->get_root()) {
+    node_to_minfo[nd_closest] = mi_closest;
   }
 }
 
@@ -196,7 +197,7 @@ void IBatch::place_sequences(std::ostream& output_stream)
 
 void IBatch::report_placement(strstream& batch_stream)
 {
-  if (node_to_minfo.size() == 0 || !(no_filter || mi_closest->get_leq_tau(tau) > 1.0)) {
+  if (node_to_minfo.size() == 0 || !(no_filter || (mi_closest->get_leq_tau(tau) > 1.0))) {
     return;
   }
   node_sptr_t nd_pp = nd_closest;
@@ -229,8 +230,7 @@ void IBatch::report_placement(strstream& batch_stream)
 
   // Collect candidate placements.
   for (auto& [nd_curr, mi_curr] : pp_map) {
-    if ((no_filter || mi_curr->get_leq_tau(tau) > 1.0) &&
-        (nd_curr->check_leaf() || mi_curr->rmatch_count > 1.0)) {
+    if (no_filter || (mi_curr->get_leq_tau(tau) > 1.0)) {
       if (!nd_curr->check_leaf()) {
         mi_curr->optimize_likelihood(llhfunc);
       }
@@ -240,7 +240,7 @@ void IBatch::report_placement(strstream& batch_stream)
       }
     }
   }
-  // assertm(nd_v.size() > 0, identifer_batch[bix]);
+  // assert(nd_v.size() > 0);
 
   if (multi) {
     for (uint32_t i = 0; i < nd_v.size(); ++i) {
