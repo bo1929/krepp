@@ -3,7 +3,7 @@
 COMPILER ?= g++ # g++-14
 mode ?= dynamic  # Default to dynamic linking
 
-CXXFLAGS = -std=c++17 -O3 # -g
+CXXFLAGS = -std=c++17 -O3 #-g
 WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas -Wno-undefined-inline # -Wall
 
 INC = -Iexternal/CLI11/include/CLI \
