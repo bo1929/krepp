@@ -13,7 +13,7 @@ class Index
 {
 public:
   Index(std::filesystem::path index_dir)
-    : index_dir(index_dir) {};
+    : index_dir(index_dir){};
   void load_partial_index(std::string suffix);
   void load_partial_tree(std::string suffix);
   void generate_partial_tree(std::string suffix);

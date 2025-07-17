@@ -40,10 +40,18 @@ void LSHF::set_lshf()
     mask_drop_lr += (0x0000000100000001ull << npos_v[i]);
     mask_drop_bp += (0x0000000000000003ull << (npos_v[i] * 2));
   }
+  for (uint32_t i = 2 * (k - h) + 1; i < 32; ++i) {
+    mask_drop_lr += (0x0000000000000001ull << i);
+  }
   for (int i = ppos_v.size() - 1; i >= 0; --i) {
     mask_hash_lr += (0x0000000100000001ull << ppos_v[i]);
     mask_hash_bp += (0x0000000000000003ull << (ppos_v[i] * 2));
   }
+  for (uint32_t i = 2 * h + 1; i < 32; ++i) {
+    mask_hash_lr += (0x0000000000000001ull << i);
+  }
+  mask_drop_l = (mask_drop_lr & 0xffffffff00000000ull);
+  mask_drop_r = (mask_drop_lr & 0x00000000ffffffffull);
   // __builtin_cpu_init ();
   // if (!__builtin_cpu_supports("bmi2")) {
   //   std::cerr << "BMI2 is not supported, PEXT will not be used.\n";
@@ -58,6 +66,9 @@ uint32_t LSHF::compute_hash(uint64_t enc64_bp)
 
 uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
 {
+
+  /* return (static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_l)) << 16) + */
+  /*        static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_r)); */
   return static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_lr));
 }
 

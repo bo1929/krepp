@@ -34,6 +34,8 @@ private:
   uint64_t mask_drop_lr = 0;
   uint64_t mask_drop_bp = 0;
   uint64_t mask_hash_lr = 0;
+  uint64_t mask_drop_l = 0;
+  uint64_t mask_drop_r = 0;
   uint64_t mask_hash_bp = 0;
 };
 
