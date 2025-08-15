@@ -429,10 +429,10 @@ SketchSingle::SketchSingle(CLI::App& sc)
     ->check(url_validator | CLI::ExistingFile);
   sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")
     ->required();
-  sc.add_option("-k,--kmer-len", k, "Length of k-mers [26].")->check(CLI::Range(19, 31));
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers. [26]")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k). [k+6]");
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space. [5]")
+  sc.add_option("-m,--modulo-lsh", m, "Modulo value to partition LSH space. [5]")
     ->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
@@ -483,7 +483,7 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
   sc.add_option(
       "-t,--nwk-file", nwk_path, "Path to the Newick file for the guide tree (must be rooted).")
     ->check(CLI::ExistingFile);
-  sc.add_option("-k,--kmer-len", k, "Length of k-mers [29].")->check(CLI::Range(19, 31));
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers. [29]")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k). [k+6]");
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
   sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space. [5]")
@@ -534,7 +534,7 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
   sc.add_option(
       "--dist-max",
       dist_max,
-      "Maximum distance to report for matching references, the output may become too large if high. [0.2]")
+      "Maximum distance to report for matching references, the output may become too large if high. [0.25]")
     ->check(CLI::Range(1e-8, 0.33));
   multi = true;
   sc.add_flag(

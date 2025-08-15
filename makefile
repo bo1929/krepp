@@ -1,10 +1,10 @@
 # compiler options
 #--------------------------------------------
-COMPILER ?= g++ # g++-14
+COMPILER ?= g++
 mode ?= dynamic  # Default to dynamic linking
 
-CXXFLAGS = -std=c++17 -O3 #-g
-WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas -Wno-undefined-inline # -Wall
+CXXFLAGS += -std=c++17 -O3 #-g
+WFLAGS += -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas -Wno-undefined-inline # -Wall
 
 INC = -Iexternal/CLI11/include/CLI \
 			-Iexternal/parallel-hashmap \
@@ -34,18 +34,28 @@ dynamic:
 static:
 	$(MAKE) mode=static $(PROGRAM)
 
+OS := $(shell uname -s)
+ifneq ($(OS),Darwin)
+	LDLIBS += -lstdc++fs
+	LDOMP += -lgomp
+else
+	OMPFLAGS = -Xclang
+	LDOMP += -lomp
+endif
+OMPFLAGS += -fopenmp
+
 # Check for -lcurl and -lgomp
 CURL_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) -lcurl -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
-GOMP_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) -fopenmp -lgomp -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
+GOMP_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) $(LDFLAGS) $(CXXFLAGS) $(OMPFLAGS) $(LDOMP) -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
 
 $(info ===== Build mode: $(mode) =====)
 ifeq ($(mode),dynamic)
-	LDLIBS = -lstdc++fs -lm -lz -lstdc++
+	LDLIBS = -lstdc++ -lm -lz
 else ifeq ($(mode),static)
-	LDLIBS = --static -lstdc++fs -lm -lz -static-libgcc -static-libstdc++
+	LDLIBS = --static -static-libgcc -static-libstdc++ -lm -lz
 	CURL_SUPPORTED = no
 else
-	LDLIBS = -lstdc++fs -lm -lz -lstdc++
+	LDLIBS = -lm -lz -lstdc++
 endif
 
 WLCURL = 0
@@ -57,8 +67,8 @@ ifneq ($(CURL_SUPPORTED),no)
   endif
 endif
 ifneq ($(GOMP_SUPPORTED),no)
-	LDLIBS += -lgomp
-	CXXFLAGS += -fopenmp
+	LDLIBS += $(LDOMP)
+	CXXFLAGS += $(OMPFLAGS)
 	WOPENMP = 1
 endif
 VARDEF= -D _WLCURL=$(WLCURL) -D _WOPENMP=$(WOPENMP)
