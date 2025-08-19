@@ -11,7 +11,7 @@ A k-mer-based maximum likelihood tool for estimating distances of reads to genom
 ## Quick start
 ### Installing krepp or compiling from source
 #### Using `conda` (recommended)
-The easis way to install krepp is by using [conda](https://anaconda.org/bioconda/krepp)
+The easist way to install krepp is by using [conda](https://anaconda.org/bioconda/krepp)
 ```bash
 conda install bioconda::krepp 
 ```
