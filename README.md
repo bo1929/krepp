@@ -192,3 +192,22 @@ grep -v "\[ \]" placements_toy.jplace | sed -z "s/},\n\t]/}\n\t]/g" > placements
 # generating a colored tree based on placement densities across the backbone tree
 gappa examine heat-tree --jplace-path placements_toy-filtered.jplace --write-svg-tree
 ```
+
+# Citation
+```bibtex
+@misc{sapci_k-mer-based_2025,
+	title = {A k-mer-based maximum likelihood method for estimating distances of reads to genomes enables genome-wide phylogenetic placement.},
+	copyright = {2025, Posted by Cold Spring Harbor Laboratory. The copyright holder for this pre-print is the author. All rights reserved. The material may not be redistributed, re-used or adapted without the author's permission.},
+	url = {https://www.biorxiv.org/content/10.1101/2025.01.20.633730v1},
+	doi = {10.1101/2025.01.20.633730},
+	language = {en},
+	urldate = {2025-01-27},
+	publisher = {bioRxiv},
+	author = {Sapci, Ali Osman Berk and Mirarab, Siavash},
+	month = jan,
+	year = {2025},
+	note = {Pages: 2025.01.20.633730
+Section: New Results},
+}
+
+```
