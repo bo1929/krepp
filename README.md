@@ -49,14 +49,16 @@ If you don't have a tree and if you are mainly interested in estimating distance
 An index constructed without a backbone cannot be used for phylogenetic placement, but distance estimates stay the same.
 
 Instead of building an index from scratch, you could use one of the public ones.
-Currently, only two such indexes are available for microbial and archaeal genomes; both allow phylogenetic placement.
-Note that the smaller index (v1) was built using a reference set which is a subset of the larger one.
+Currently, only two such datasets are available for microbial and archaeal genomes; both allow phylogenetic placement.
+Note that the smaller indexes (v1 and medium) were built using a reference set which is a subset of the larger corresponding ones (v2 and large).
 Therefore, these indexes overlap, and you could just pick the one that you can afford in terms of memory available on your machine.
 
-* Web of Life - v2 (15,493 archaeal and bacterial genomes, **41G**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv2-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv2.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv2.tsv.gz)
-* Web of Life - v1 (10,576 archaeal and bacterial genomes, **67G**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
-* RefSeq snapshot medium (50,752 archaeal and bacterial genomes, **137GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dedup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dedup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
-* RefSeq snapshot large (12,3853 archaeal and bacterial genomes, **184GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
+* Web of Life - v2 (15,493 archaeal and bacterial genomes, download size: **67GB**, memory requirement: **88 GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv2-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv2.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv2.tsv.gz)
+* Web of Life - v1 (10,576 archaeal and bacterial genomes, download size: **41GB**, memory requirement: **55 GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
+* RefSeq snapshot medium (50,752 archaeal and bacterial genomes, download size: **137GB**, memory requirement: **166GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dedup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dedup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
+* RefSeq snapshot large (12,3853 archaeal and bacterial genomes, download size: **184GB**, memory requirement: **220GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
+
+Once you download a pre-computed index, you have to untar it and decompress (e.g., `tar -xzvf $INDEX_TAR`). Then, you can directly use it via `krepp dist` or `krepp place` (e.g., `krepp dist -i $INDEX_DIR -q $QUERY_FILE`).
 
 The genome IDs that will be reported with these indexes themselves may not be informative.
 You can use the provided metadata/taxonomy files to analyze your distance estimates further; perhaps for taxonomic classification or abundance profiling.
