@@ -157,6 +157,17 @@ void IBatch::estimate_distances(std::ostream& output_stream)
 
 void IBatch::report_distances(strstream& batch_stream)
 {
+  // If matches are requested, report them.
+  if (matches) {
+        if (node_to_minfo.empty()) {
+            batch_stream << identifer_batch[bix] << "\tNaN\n";
+        } else {
+            for (const auto& [nd, mi] : node_to_minfo) {
+                batch_stream << identifer_batch[bix] << "\t" << MATCH_FIELD(nd, mi) << "\n";
+            }
+        }
+        return; // Do not report distances.
+    }
   if (node_to_minfo.empty() || (!no_filter && (mi_closest->d_llh > dist_max))) {
     batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
   } else if (!multi) {
