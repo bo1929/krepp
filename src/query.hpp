@@ -51,7 +51,8 @@ public:
          double dist_max,
          uint32_t tau,
          bool no_filter,
-         bool multi);
+         bool multi,
+         bool matches);
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void estimate_distances(std::ostream& output_stream);
@@ -168,6 +169,18 @@ public:
       hdist_min = hdist_curr;
     }
   }
+
+  std::string to_match_string() const {
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < hdisthist_v.size(); ++i) { //Already contains hdist_th values?
+      if (i > 0) oss << ",";
+      oss << hdisthist_v[i];
+    }
+    oss << "]";
+    return oss.str();
+  }
+
   double get_leq_tau(uint32_t tau)
   {
     double total_leq_tau = 0.0;
@@ -185,6 +198,8 @@ public:
       << exp(-mi->chisq / 2) << ", " << mi->d_llh << "]"
 
 #define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh
+#define MATCH_FIELD(nd, mi) nd->get_name() << "\t" << mi->to_match_string()
+
 
 private:
   double nmers = 0;

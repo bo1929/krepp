@@ -342,7 +342,7 @@ void QueryIndex::estimate_distances()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi);
+        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, matches);
 #pragma omp task untied
         {
           ib.estimate_distances(*output_stream);
@@ -544,6 +544,11 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
     "--no-filter,!--filter",
     no_filter,
     "Report all matching references; regardless of the statistical significance or maximum distance. [true]");
+  matches = false;
+  sc.add_flag(
+    "--matches,!--no-matches",
+    matches,
+    "Report counts of matches for each hamming distance as a list [false]");
 }
 
 QueryIndex::QueryIndex(CLI::App& sc)
