@@ -182,7 +182,7 @@ public:
 
 #define PLACEMENT_FIELD(nd, mi)                                                                    \
   "[" << (nd->get_se() - 1) << ", 0, " << (nd->get_blen() / 2.0) << ", " << -mi->v_llh << ", "     \
-      << exp(-mi->chisq / 2) << ", " << mi->d_llh << "]"
+      << mi->lwr << ", " << mi->d_llh << "]"
 
 #define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh
 
@@ -198,6 +198,7 @@ private:
   uint32_t hdist_min = 0xFFFFFFFF;
   std::vector<double> hdisthist_v;
   double chisq = std::numeric_limits<double>::quiet_NaN();
+  double lwr = std::numeric_limits<double>::quiet_NaN();
   double v_llh = std::numeric_limits<double>::quiet_NaN();
   double d_llh = std::numeric_limits<double>::max();
   /* std::vector<match_t> match_v; */

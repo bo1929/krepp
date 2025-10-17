@@ -1,5 +1,7 @@
 #include "record.hpp"
 
+#define MAXNTRY 10
+
 Record::Record(tree_sptr_t tree)
   : tree(tree)
 {
@@ -17,9 +19,14 @@ Record::Record(tree_sptr_t tree)
       std::make_shared<Subset>(nd_curr->get_sh(), ch, nd_curr->get_card());
   }
   tree->reset_traversal();
+  uint32_t ntry = 0;
   while (check_tree_collision()) {
     std::cerr << "Rehashing the tree to resolve collisions..." << std::endl;
     rehash_tree();
+    ntry++;
+    if (ntry > MAXNTRY) {
+      error_exit("Failed the rehash the tree; perhaps there is a ghost node (w/ outdegree 1)?");
+    }
   }
   sh_to_subset[0] = std::make_shared<Subset>(0, 0, 0);
 }
@@ -88,7 +95,7 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
       subset2 = v.second;
     });
   if (!(subset1 && subset2)) {
-    error_exit("Failed forpartition: (" + std::to_string(sh1) + ", " + std::to_string(sh2) + ")");
+    error_exit("Failed for partition: (" + std::to_string(sh1) + ", " + std::to_string(sh2) + ")");
   }
   sh_t sh = sh1 + sh2;
   sh_t nonce = 0;

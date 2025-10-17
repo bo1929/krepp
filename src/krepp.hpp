@@ -37,7 +37,7 @@ public:
     k = 26;
     w = k + 6;
     h = 10;
-    m = 5;
+    m = 4;
     r = 1;
     frac = true;
     nrows = pow(2, 2 * h - 1);
@@ -49,7 +49,7 @@ public:
     k = 29;
     w = k + 6;
     h = 13;
-    m = 5;
+    m = 4;
     r = 1;
     frac = true;
     nrows = pow(2, 2 * h - 1);

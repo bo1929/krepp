@@ -432,7 +432,7 @@ SketchSingle::SketchSingle(CLI::App& sc)
   sc.add_option("-k,--kmer-len", k, "Length of k-mers. [26]")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k). [k+6]");
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
-  sc.add_option("-m,--modulo-lsh", m, "Modulo value to partition LSH space. [5]")
+  sc.add_option("-m,--modulo-lsh", m, "Modulo value to partition LSH space. [4]")
     ->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
@@ -486,7 +486,7 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
   sc.add_option("-k,--kmer-len", k, "Length of k-mers. [29]")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k). [k+6]");
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space. [5]")
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space. [4]")
     ->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
@@ -518,15 +518,24 @@ void QueryIndex::init_sc_place(CLI::App& sc)
   sc.add_option(
       "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax). [2]")
     ->check(CLI::NonNegativeNumber);
-  multi = false;
+  multi = true;
   sc.add_flag(
-    "--multi",
+    "--multi,!--no-multi",
     multi,
-    "Output all candidate placements satisfying the filters (not just the largest clade). [false]");
-  no_filter = false;
-  sc.add_flag("--no-filter,!--filter",
-              no_filter,
-              "Report all placements; even when there is not enough match below tau. [false]");
+    "Output all candidate placements satisfying the filters (not just the largest clade). [true]");
+  bool filter = true;
+  sc.add_flag(
+    "--filter,!--no-filter",
+    filter,
+    "Filter a placement when there is not enough k-mer matches below threshold tau. [true]");
+  sc.callback([&]() {
+    no_filter = !filter;
+    if (!output_path.empty()) {
+      output_file.open(output_path);
+      output_stream = &output_file;
+    }
+    index = std::make_shared<Index>(index_dir);
+  });
 }
 
 void QueryIndex::init_sc_dist(CLI::App& sc)
@@ -534,16 +543,30 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
   sc.add_option(
       "--dist-max",
       dist_max,
-      "Maximum distance to report for matching references, the output may become too large if high. [0.25]")
+      "Maximum distance to report for matching references, overrides --filter if given. [0.25]")
     ->check(CLI::Range(1e-8, 0.33));
   multi = true;
   sc.add_flag(
-    "--multi", multi, "Output all distances satisfying the filter (not just the best one). [true]");
-  no_filter = true;
+    "--multi,!--no-multi",
+    multi,
+    "Output all distances satisfying the filters (not just the closest reference). [true]");
+  bool filter = false;
   sc.add_flag(
-    "--no-filter,!--filter",
-    no_filter,
-    "Report all matching references; regardless of the statistical significance or maximum distance. [true]");
+    "--filter,!--no-filter",
+    filter,
+    "Filter a hit if its distance is too high compared to the best hit (based on the statistical significance). [false]");
+  sc.callback([&]() {
+    if (sc.count("--dist-max")) {
+      no_filter = true;
+    } else {
+      no_filter = !filter;
+    }
+    if (!output_path.empty()) {
+      output_file.open(output_path);
+      output_stream = &output_file;
+    }
+    index = std::make_shared<Index>(index_dir);
+  });
 }
 
 QueryIndex::QueryIndex(CLI::App& sc)
@@ -563,13 +586,6 @@ QueryIndex::QueryIndex(CLI::App& sc)
       "Chi-square value for statistical distinguishability test, default correspons to alpha=90%. [2.706]")
     ->check(CLI::PositiveNumber);
   /* sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing."); */
-  sc.callback([&]() {
-    if (!output_path.empty()) {
-      output_file.open(output_path);
-      output_stream = &output_file;
-    }
-    index = std::make_shared<Index>(index_dir);
-  });
 }
 
 int main(int argc, char** argv)

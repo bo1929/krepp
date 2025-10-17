@@ -242,10 +242,19 @@ void IBatch::report_placement(strstream& batch_stream)
   }
   // assert(nd_v.size() > 0);
 
+  double total_lwr = 0;
+  for (uint32_t i = 0; i < nd_v.size(); ++i) {
+    nd_pp = nd_v[i];
+    mi_pp = pp_map[nd_pp];
+    mi_pp->lwr = exp(-mi_pp->chisq / 2);
+    total_lwr = total_lwr + mi_pp->lwr;
+  }
+
   if (multi) {
     for (uint32_t i = 0; i < nd_v.size(); ++i) {
       nd_pp = nd_v[i];
       mi_pp = pp_map[nd_pp];
+      mi_pp->lwr = mi_pp->lwr / total_lwr;
       if (i > 0) batch_stream << ",";
       batch_stream << "\n\t\t\t\t" << PLACEMENT_FIELD(nd_pp, mi_pp);
     }
@@ -260,6 +269,7 @@ void IBatch::report_placement(strstream& batch_stream)
     }
     nd_pp = nd_v.back();
     mi_pp = pp_map[nd_pp];
+    mi_pp->lwr = mi_pp->lwr / total_lwr;
     batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
   }
 }
