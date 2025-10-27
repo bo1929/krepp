@@ -57,24 +57,26 @@ Therefore, these indexes overlap, and you could just pick the one that you can a
 * Web of Life - v1 (10,576 archaeal and bacterial genomes, download size: **41GB**, memory requirement: **55 GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_WoLv1-k29w35-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-WoLv1.nwk.gz), [metadata](https://ter-trees.ucsd.edu/data/krepp/misc/metadata-WoLv1.tsv.gz)
 * RefSeq snapshot medium (50,752 archaeal and bacterial genomes, download size: **137GB**, memory requirement: **166GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dedup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dedup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
 * RefSeq snapshot large (12,3853 archaeal and bacterial genomes, download size: **184GB**, memory requirement: **220GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
+* All RefSeq mitogenomes (download size: **1.8 GB**) -- no backbone tree: [index]([s3://kreppref/index_mitochondrion-RefSeq20240913.tar](https://kreppref.s3.us-west-1.amazonaws.com/index_mitochondrion-RefSeq20240913.tar)
+* GTDB reference phylogeny release 226 (download size: **201.7 GB**) -- no backbone tree: [index]([s3://kreppref/index_prok-GTDB_R09_RS220-k29w43-h13.tar](https://kreppref.s3.us-west-1.amazonaws.com/index_prok-GTDB_R09_RS220-k29w43-h13.tar))
 
-Once you download a pre-computed index, you have to untar it and decompress (e.g., `tar -xzvf $INDEX_TAR`). Then, you can directly use it via `krepp dist` or `krepp place` (e.g., `krepp dist -i $INDEX_DIR -q $QUERY_FILE`).
+Once you download a pre-computed index, you have to untar it (e.g., `tar -xvf $INDEX_DIR.tar`), and decompress it if compressed (e.g., `tar -xvf $INDEX_DIR.tar.gz`). Then, you can directly use it via `krepp dist` or `krepp place` (e.g., `krepp dist -i $INDEX_DIR -q $QUERY_FILE`).
 
 The genome IDs that will be reported with these indexes themselves may not be informative.
 You can use the provided metadata/taxonomy files to analyze your distance estimates further; perhaps for taxonomic classification or abundance profiling.
 Similarly, the backbone tree could be used for UniFrac computation.
 
 We note that memory use increases almost linearly with `$NUM_THREADS` for the `index` subcommand, and hence, you may want to decrease it if you run out of memory.
-This is not the case for `dist`, `place`, and `seek` commands, feel free to use all cores available during the query time.
+This is not the case for `dist`, `place`, and `seek` commands; feel free to use all cores available during the query time.
 
 Another way of making the index smaller is increasing the minimizer window size (`-w`) with respect to `-k`.
 This may cost you some accuracy as fewer *k*-mers will be indexed, but shouldn't be an issue as long as it is not too aggressive (e.g., `w-k>9`).
 
-The peak memory usage during the index construction could be also reduced to the memory level available by partitioning the index into smaller pieces.
+The peak memory usage during the index construction could also be reduced to the memory level available by partitioning the index into smaller pieces.
 This is done by a variation of FracMinHash, controlled by options `-m` and `-r`.
 `krepp` partitions the index into `-m` (more or less) equally sized pieces, and these partitions could be built independently, but one can query them together.
 The `-r` option determines the partition that is going to be constructed: if `--no-frac` is given only the `-r`th partition, otherwise all partitions from 0th to `-r`th, will be constructed and saved (see `krank index --help` for details).
-You don't need to construct all partitions, `krepp` will search in whatever is available, and these partitions can be distributed independently.
+You don't need to construct all partitions; `krepp` will search in whatever is available, and these partitions can be distributed independently.
 The default is `-m 5 -r 1 --frac`, so 40% (0th and 1st of 5 partitions) of the minimized *k*-mers will be indexed.
 The only requirement is keeping the `-m` value (and of course `-i` and `-t`) fixed across all partitions.
 For instance, one can index 3% percent of the reference *k*-mers and construct a lightweight index by running:
