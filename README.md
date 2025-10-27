@@ -58,7 +58,7 @@ Therefore, these indexes overlap, and you could just pick the one that you can a
 * RefSeq snapshot medium (50,752 archaeal and bacterial genomes, download size: **137GB**, memory requirement: **166GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dedup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dedup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
 * RefSeq snapshot large (12,3853 archaeal and bacterial genomes, download size: **184GB**, memory requirement: **220GB**): [index](https://ter-trees.ucsd.edu/data/krepp/index_CAMI2dup-k30w37-h14.tar.gz), [tree](https://ter-trees.ucsd.edu/data/krepp/misc/backbone_tree-CAMI2_dup-pruned.nwk.gz), [taxonomy](https://ter-trees.ucsd.edu/data/krepp/misc/ncbi_taxonomy-CAMI2.tar.gz)
 * All RefSeq mitogenomes (download size: **1.8 GB**) -- no backbone tree: [index]([s3://kreppref/index_mitochondrion-RefSeq20240913.tar](https://kreppref.s3.us-west-1.amazonaws.com/index_mitochondrion-RefSeq20240913.tar)
-* GTDB reference phylogeny release 226 (download size: **201.7 GB**) -- no backbone tree: [index]([s3://kreppref/index_prok-GTDB_R09_RS220-k29w43-h13.tar](https://kreppref.s3.us-west-1.amazonaws.com/index_prok-GTDB_R09_RS220-k29w43-h13.tar))
+* GTDB reference phylogeny release 226 (download size: **201.7 GB**) -- no backbone tree: [index](https://kreppref.s3.us-west-1.amazonaws.com/index_prok-GTDB_R09_RS220-k29w43-h13.tar)
 
 Once you download a pre-computed index, you have to untar it (e.g., `tar -xvf $INDEX_DIR.tar`), and decompress it if compressed (e.g., `tar -xvf $INDEX_DIR.tar.gz`). Then, you can directly use it via `krepp dist` or `krepp place` (e.g., `krepp dist -i $INDEX_DIR -q $QUERY_FILE`).
 
@@ -136,7 +136,7 @@ The output is in a tab-separated format with two columns: *i)* the sequence ID a
 ### A toy example for testing
 
 #### Constructing a small index
-You can build it from scratch consisting of only 25 genomes provided in `test/` to make yourself familiar with `krepp`.
+You can build it from scratch, consisting of only 25 genomes provided in `test/` to make yourself familiar with `krepp`.
 ```bash
 cd test/
 tar -xvf references_toy.tar.gz && xz -d references_toy/*
