@@ -4,6 +4,7 @@
 /* #define CHISQ_THRESHOLD 3.841 */
 /* #define CHISQ_THRESHOLD 2.706 */
 /* #define CHISQ_THRESHOLD 1.642 */
+#define STRSTREAM_PRECISION 5
 
 IBatch::IBatch(index_sptr_t index,
                qseq_sptr_t qs,
@@ -12,7 +13,8 @@ IBatch::IBatch(index_sptr_t index,
                double dist_max,
                uint32_t tau,
                bool no_filter,
-               bool multi)
+               bool multi,
+               bool summarize)
   : index(index)
   , hdist_th(hdist_th)
   , chisq_value(chisq_value)
@@ -20,6 +22,7 @@ IBatch::IBatch(index_sptr_t index,
   , tau(tau)
   , no_filter(no_filter)
   , multi(multi)
+  , summarize(summarize)
 {
   lshf = index->get_lshf();
   tree = index->get_tree();
@@ -137,9 +140,8 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
   }
 }
 
-void IBatch::estimate_distances(std::ostream& output_stream)
+void IBatch::estimate_distances(strstream& batch_stream)
 {
-  strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
@@ -149,35 +151,51 @@ void IBatch::estimate_distances(std::ostream& output_stream)
 
     search_mers(seq, len, imers_or, imers_rc);
     summarize_matches(imers_or, imers_rc);
+    batch_stream.precision(STRSTREAM_PRECISION);
+    batch_stream << std::fixed;
     report_distances(batch_stream);
   }
-#pragma omp critical
-  output_stream << batch_stream.rdbuf();
 }
 
 void IBatch::report_distances(strstream& batch_stream)
 {
-  if (node_to_minfo.empty() || (!no_filter && (mi_closest->d_llh > dist_max))) {
-    batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
-  } else if (!multi) {
-    batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd_closest, mi_closest) << "\n";
-  } else if (no_filter) {
-    for (const auto& [nd, mi] : node_to_minfo) {
-      batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi) << "\n";
+  double inv_count = 0;
+  vec<std::string> names_v;
+  names_v.reserve(node_to_minfo.size());
+  if (summarize || (multi && !no_filter)) {
+    if (!summarize) {
+      for (auto& [nd, mi] : node_to_minfo) {
+        mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
+        if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
+          batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi);
+        }
+      }
+    } else {
+      for (auto& [nd, mi] : node_to_minfo) {
+        mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
+        if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
+          names_v.push_back(nd->get_name());
+        }
+      }
+      for (std::string& name : names_v) {
+        name_to_wcount[name] += 1.0 / names_v.size();
+      }
     }
   } else {
-    for (auto& [nd, mi] : node_to_minfo) {
-      mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
-      if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
-        batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi) << "\n";
+    if (node_to_minfo.empty() || (!no_filter && (mi_closest->d_llh > dist_max))) {
+      batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
+    } else if (!multi) {
+      batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd_closest, mi_closest);
+    } else if (no_filter) {
+      for (const auto& [nd, mi] : node_to_minfo) {
+        batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi);
       }
     }
   }
 }
 
-void IBatch::place_sequences(std::ostream& output_stream)
+void IBatch::place_sequences(strstream& batch_stream)
 {
-  strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
@@ -187,11 +205,9 @@ void IBatch::place_sequences(std::ostream& output_stream)
 
     search_mers(seq, len, imers_or, imers_rc);
     summarize_matches(imers_or, imers_rc);
+    batch_stream.precision(STRSTREAM_PRECISION);
+    batch_stream << std::fixed;
     report_placement(batch_stream);
-  }
-  if (batch_stream.tellp() != std::streampos(0)) {
-#pragma omp critical
-    output_stream << batch_stream.rdbuf();
   }
 }
 
@@ -206,7 +222,11 @@ void IBatch::report_placement(strstream& batch_stream)
 
   batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [";
   if (node_to_minfo.size() == 1) {
-    batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
+    if (summarize) {
+      name_to_wcount[nd_pp->get_name()] += 1.0;
+    } else {
+      batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
+    }
     return;
   }
 
@@ -255,10 +275,16 @@ void IBatch::report_placement(strstream& batch_stream)
       nd_pp = nd_v[i];
       mi_pp = pp_map[nd_pp];
       mi_pp->lwr = mi_pp->lwr / total_lwr;
-      if (i > 0) batch_stream << ",";
-      batch_stream << "\n\t\t\t\t" << PLACEMENT_FIELD(nd_pp, mi_pp);
+      if (summarize) {
+        name_to_wcount[nd_pp->get_name()] += 1.0 / nd_v.size();
+      } else {
+        if (i > 0) batch_stream << ",";
+        batch_stream << "\n\t\t\t\t" << PLACEMENT_FIELD(nd_pp, mi_pp);
+      }
     }
-    batch_stream << "]\n\t\t\t},\n";
+    if (!summarize) {
+      batch_stream << "]\n\t\t\t},\n";
+    }
   } else {
     if (nd_v.size() > 1) {
       // Sort: prefer higher card, then lower d_llh
@@ -270,7 +296,11 @@ void IBatch::report_placement(strstream& batch_stream)
     nd_pp = nd_v.back();
     mi_pp = pp_map[nd_pp];
     mi_pp->lwr = mi_pp->lwr / total_lwr;
-    batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
+    if (summarize) {
+      name_to_wcount[nd_pp->get_name()] += 1.0;
+    } else {
+      batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
+    }
   }
 }
 
@@ -369,7 +399,7 @@ void Minfo::optimize_likelihood(optimize::HDistHistLLH& llhfunc)
 {
   llhfunc.set_parameters(hdisthist_v.data(), mismatch_count, rho);
   // Locating Function Minima using Brent's algorithm, depends on boost::math.
-  std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.33, 15);
+  std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.33, 13);
   d_llh = sol_r.first;
   v_llh = sol_r.second;
 }

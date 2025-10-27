@@ -292,14 +292,18 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
 
 void QuerySketch::header_dreport(strstream& dreport_stream)
 {
-  dreport_stream << "#software: krepp\t#version: " VERSION "\t#invocation :" + invocation;
+  dreport_stream << "# software: krepp\tversion: " VERSION "\tinvocation :" + invocation;
   dreport_stream << "\nSEQ_ID\tDIST\n";
 }
 
 void QueryIndex::header_dreport(strstream& dreport_stream)
 {
-  dreport_stream << "#software: krepp\t#version: " VERSION "\t#invocation :" + invocation;
-  dreport_stream << "\nSEQ_ID\tREFERENCE_NAME\tDIST\n";
+  dreport_stream << "# software: krepp\tversion: " VERSION "\tinvocation :" + invocation;
+  if (summarize) {
+    dreport_stream << "\nREFERENCE_NAME\tWEIGHTED_COUNT\tSEQUENCE_ABUNDANCE\n";
+  } else {
+    dreport_stream << "\nSEQ_ID\tREFERENCE_NAME\tDIST\n";
+  }
 }
 
 void QuerySketch::seek_sequences()
@@ -329,6 +333,8 @@ void QuerySketch::seek_sequences()
 
 void QueryIndex::estimate_distances()
 {
+  parallel_flat_phmap<std::string, double> name_to_wcount = {};
+  double total_wcount = 0;
   strstream dreport_stream;
   header_dreport(dreport_stream);
   (*output_stream) << dreport_stream.rdbuf();
@@ -342,14 +348,44 @@ void QueryIndex::estimate_distances()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi);
+        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
 #pragma omp task untied
         {
-          ib.estimate_distances(*output_stream);
+          strstream batch_stream;
+          ib.estimate_distances(batch_stream);
+#pragma omp critical
+          {
+            if (summarize) {
+              for (auto& [name, wcount] : ib.get_summary()) {
+                total_wcount += wcount;
+                name_to_wcount[name] += wcount;
+              }
+            } else {
+              (*output_stream) << batch_stream.rdbuf();
+            }
+          }
         }
       }
 #pragma omp taskwait
     }
+  }
+  if (summarize) {
+    for (auto& [name, wcount] : name_to_wcount) {
+      dreport_stream << name << "\t" << wcount << "\t" << wcount / total_wcount << "\n";
+    }
+    (*output_stream) << dreport_stream.rdbuf();
+  }
+}
+
+void QueryIndex::header_preport(strstream& dreport_stream)
+{
+  dreport_stream << "# software: krepp\tversion: " VERSION "\tinvocation :" + invocation;
+  dreport_stream << "\n# ";
+  qtree->stream_newick_str(dreport_stream, qtree->get_root());
+  if (summarize) {
+    dreport_stream << "\nREFERENCE_NAME\tWEIGHTED_COUNT\tSEQUENCE_ABUNDANCE\n";
+  } else {
+    (void)0; // TODO: Perhaps introduce an alternative placement report format.
   }
 }
 
@@ -381,9 +417,16 @@ void QueryIndex::begin_jplace(strstream& jplace_stream)
 
 void QueryIndex::place_sequences()
 {
-  strstream jplace_stream;
-  begin_jplace(jplace_stream);
-  (*output_stream) << jplace_stream.rdbuf();
+  parallel_flat_phmap<std::string, double> name_to_wcount = {};
+  double total_wcount = 0;
+  strstream preport_stream;
+  if (summarize) {
+    header_preport(preport_stream);
+    (*output_stream) << preport_stream.rdbuf();
+  } else {
+    begin_jplace(preport_stream);
+    (*output_stream) << preport_stream.rdbuf();
+  }
 #if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
 #endif
@@ -394,20 +437,41 @@ void QueryIndex::place_sequences()
     {
       while (qs->read_next_batch() || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi);
+        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
 #pragma omp task untied
         {
-          ib.place_sequences(*output_stream);
+          strstream batch_stream;
+          ib.place_sequences(batch_stream);
+#pragma omp critical
+          {
+            if (summarize) {
+              for (auto& [name, wcount] : ib.get_summary()) {
+                total_wcount += wcount;
+                name_to_wcount[name] += wcount;
+              }
+            } else {
+              if (batch_stream.tellp() != std::streampos(0)) {
+                (*output_stream) << batch_stream.rdbuf();
+              }
+            }
+          }
         }
       }
 #pragma omp taskwait
     }
   }
   // output_stream->seekp(-1, output_stream->cur);
-  // output_stream->seekp(-1, std::ios_base::end);
-  jplace_stream.str("");
-  end_jplace(jplace_stream);
-  (*output_stream) << jplace_stream.rdbuf();
+  //output_stream->seekp(-1, std::ios_base::end);
+  if (summarize) {
+    for (auto& [name, wcount] : name_to_wcount) {
+      preport_stream << name << "\t" << wcount << "\t" << wcount / total_wcount << "\n";
+    }
+    (*output_stream) << preport_stream.rdbuf();
+  } else {
+    preport_stream.str("");
+    end_jplace(preport_stream);
+    (*output_stream) << preport_stream.rdbuf();
+  }
 }
 
 void InfoIndex::display_info() { index->display_info(); }
@@ -523,7 +587,7 @@ void QueryIndex::init_sc_place(CLI::App& sc)
     "--multi,!--no-multi",
     multi,
     "Output all candidate placements satisfying the filters (not just the largest clade). [true]");
-  bool filter = true;
+  filter = true;
   sc.add_flag(
     "--filter,!--no-filter",
     filter,
@@ -535,6 +599,9 @@ void QueryIndex::init_sc_place(CLI::App& sc)
       output_stream = &output_file;
     }
     index = std::make_shared<Index>(index_dir);
+    if (!validate_configuration_place()) {
+      error_exit("Invalid configuration!");
+    }
   });
 }
 
@@ -550,14 +617,14 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
     "--multi,!--no-multi",
     multi,
     "Output all distances satisfying the filters (not just the closest reference). [true]");
-  bool filter = false;
+  filter = false;
   sc.add_flag(
     "--filter,!--no-filter",
     filter,
     "Filter a hit if its distance is too high compared to the best hit (based on the statistical significance). [false]");
   sc.callback([&]() {
     if (sc.count("--dist-max")) {
-      no_filter = true;
+      no_filter = false;
     } else {
       no_filter = !filter;
     }
@@ -566,6 +633,9 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
       output_stream = &output_file;
     }
     index = std::make_shared<Index>(index_dir);
+    if (!validate_configuration_dist()) {
+      error_exit("Invalid configuration!");
+    }
   });
 }
 
@@ -585,6 +655,10 @@ QueryIndex::QueryIndex(CLI::App& sc)
       chisq_value,
       "Chi-square value for statistical distinguishability test, default correspons to alpha=90%. [2.706]")
     ->check(CLI::PositiveNumber);
+  sc.add_flag(
+    "--summarize,!--no-summarize",
+    summarize,
+    "Summarize results into a table of read counts. If a read is mapped/placed to n references/edges, each gets 1/n. Overrides --no-multi and --no-filter. [false]");
   /* sc.add_option("--leave-out-ref", leave_out_ref, "Reference ID to exclude, useful for testing."); */
 }
 

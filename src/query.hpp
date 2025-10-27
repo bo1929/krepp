@@ -51,13 +51,15 @@ public:
          double dist_max,
          uint32_t tau,
          bool no_filter,
-         bool multi);
+         bool multi,
+         bool summarize);
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
-  void estimate_distances(std::ostream& output_stream);
-  void place_sequences(std::ostream& output_stream);
+  void estimate_distances(strstream& batch_stream);
+  void place_sequences(strstream& batch_stream);
   void report_distances(strstream& batch_stream);
   void report_placement(strstream& batch_stream);
+  const parallel_flat_phmap<std::string, double>& get_summary() { return name_to_wcount; }
 
 private:
   uint32_t k;
@@ -67,6 +69,7 @@ private:
   double chisq_value;
   double dist_max;
   bool no_filter;
+  bool summarize;
   uint32_t tau;
   tree_sptr_t tree;
   lshf_sptr_t lshf;
@@ -88,6 +91,7 @@ private:
 
 protected:
   parallel_flat_phmap<node_sptr_t, minfo_sptr_t> node_to_minfo = {};
+  parallel_flat_phmap<std::string, double> name_to_wcount = {};
 };
 
 class Minfo
@@ -184,7 +188,7 @@ public:
   "[" << (nd->get_se() - 1) << ", 0, " << (nd->get_blen() / 2.0) << ", " << -mi->v_llh << ", "     \
       << mi->lwr << ", " << mi->d_llh << "]"
 
-#define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh
+#define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
 
 private:
   double nmers = 0;
@@ -198,7 +202,7 @@ private:
   uint32_t hdist_min = 0xFFFFFFFF;
   std::vector<double> hdisthist_v;
   double chisq = std::numeric_limits<double>::quiet_NaN();
-  double lwr = std::numeric_limits<double>::quiet_NaN();
+  double lwr = 1; // std::numeric_limits<double>::quiet_NaN();
   double v_llh = std::numeric_limits<double>::quiet_NaN();
   double d_llh = std::numeric_limits<double>::max();
   /* std::vector<match_t> match_v; */

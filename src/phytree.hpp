@@ -73,7 +73,14 @@ public:
   double get_bdepth() { return bdepth; }
   double get_blen() { return blen; }
   double get_ldepth() { return ldepth; }
-  std::string get_name() { return name; }
+  std::string get_name()
+  {
+    if (name.empty()) {
+      return std::to_string(se - 1);
+    } else {
+      return name;
+    }
+  }
   tuint_t get_card() { return card; }
   sh_t get_sh() { return sh; }
   se_t get_se() { return se; }
