@@ -318,7 +318,8 @@ void QuerySketch::seek_sequences()
   {
 #pragma omp single
     {
-      while (qs->read_next_batch() || !qs->is_batch_finished()) {
+      bool cont_reading = false;
+      while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
         SBatch sb(sketch, qs, hdist_th);
 #pragma omp task untied
@@ -346,7 +347,8 @@ void QueryIndex::estimate_distances()
   {
 #pragma omp single
     {
-      while (qs->read_next_batch() || !qs->is_batch_finished()) {
+      bool cont_reading = false;
+      while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
         IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
 #pragma omp task untied
@@ -391,9 +393,7 @@ void QueryIndex::header_preport(strstream& dreport_stream)
 
 void QueryIndex::end_jplace(strstream& jplace_stream)
 {
-  jplace_stream << "\t\t\t{\"n\" : [\"NaN\"], \"p\" : [[" << qtree->get_root()->get_se() - 1
-                << ", 0, 0, 0, 0, 0]]}\n";
-  jplace_stream << "\t],\n";
+  jplace_stream << "],\n";
   jplace_stream << "\t\"metadata\" : {\n"
                 << "\t\t\"software\" : \"krepp\",\n"
                 << "\t\t\"version\" : \"" VERSION "\",\n"
@@ -435,13 +435,20 @@ void QueryIndex::place_sequences()
   {
 #pragma omp single
     {
-      while (qs->read_next_batch() || !qs->is_batch_finished()) {
+      bool cont_reading = false;
+      while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
         IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
 #pragma omp task untied
         {
           strstream batch_stream;
           ib.place_sequences(batch_stream);
+          if (!summarize && !cont_reading) {
+#pragma omp task
+            {
+#pragma omp taskwait
+            }
+          }
 #pragma omp critical
           {
             if (summarize) {
@@ -450,7 +457,12 @@ void QueryIndex::place_sequences()
                 name_to_wcount[name] += wcount;
               }
             } else {
-              if (batch_stream.tellp() != std::streampos(0)) {
+              // if (batch_stream.tellp() != std::streampos(0)) {
+              if (cont_reading) {
+                (*output_stream) << batch_stream.rdbuf();
+              } else {
+                batch_stream.seekp(-2, std::ios_base::end);
+                batch_stream << "\n\t";
                 (*output_stream) << batch_stream.rdbuf();
               }
             }
