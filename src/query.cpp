@@ -1,4 +1,5 @@
 #include "query.hpp"
+#include "common.hpp"
 #include <boost/math/tools/minima.hpp>
 
 /* #define CHISQ_THRESHOLD 3.841 */
@@ -128,8 +129,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
     // If both in reverse-complement and the original sequence, decide:
     if ((imers_or->leaf_to_minfo).contains(nd)) {
       minfo_sptr_t mi_or = (imers_or->leaf_to_minfo)[nd];
-      if ((mi->d_llh > mi_or->d_llh) ||
-          ((mi->d_llh == mi_or->d_llh) && (mi->match_count < mi_or->match_count))) {
+      if ((mi->d_llh > mi_or->d_llh) || ((mi->d_llh == mi_or->d_llh) && (mi->match_count < mi_or->match_count))) {
         node_to_minfo[nd] = mi_or;
       }
     }
@@ -159,8 +159,8 @@ void IBatch::estimate_distances(strstream& batch_stream)
 void IBatch::report_distances(strstream& batch_stream)
 {
   double inv_count = 0;
-  vec<std::string> names_v;
-  names_v.reserve(node_to_minfo.size());
+  vec<node_sptr_t> nd_v;
+  nd_v.reserve(node_to_minfo.size());
   if (summarize || (multi && !no_filter)) {
     if (!summarize) {
       for (auto& [nd, mi] : node_to_minfo) {
@@ -173,11 +173,11 @@ void IBatch::report_distances(strstream& batch_stream)
       for (auto& [nd, mi] : node_to_minfo) {
         mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
         if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
-          names_v.push_back(nd->get_name());
+          nd_v.push_back(nd);
         }
       }
-      for (std::string& name : names_v) {
-        name_to_wcount[name] += 1.0 / names_v.size();
+      for (node_sptr_t& nd : nd_v) {
+        node_to_wcount[nd] += 1.0 / nd_v.size();
       }
     }
   } else {
@@ -222,7 +222,7 @@ void IBatch::report_placement(strstream& batch_stream)
   batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [";
   if (node_to_minfo.size() == 1) {
     if (summarize) {
-      name_to_wcount[nd_pp->get_name()] += 1.0;
+      node_to_wcount[nd_pp] += 1.0;
     } else {
       batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
     }
@@ -275,7 +275,7 @@ void IBatch::report_placement(strstream& batch_stream)
       mi_pp = pp_map[nd_pp];
       mi_pp->lwr = mi_pp->lwr / total_lwr;
       if (summarize) {
-        name_to_wcount[nd_pp->get_name()] += 1.0 / nd_v.size();
+        node_to_wcount[nd_pp] += 1.0 / nd_v.size();
       } else {
         if (i > 0) batch_stream << ",";
         batch_stream << "\n\t\t\t\t" << PLACEMENT_FIELD(nd_pp, mi_pp);
@@ -296,7 +296,7 @@ void IBatch::report_placement(strstream& batch_stream)
     mi_pp = pp_map[nd_pp];
     mi_pp->lwr = mi_pp->lwr / total_lwr;
     if (summarize) {
-      name_to_wcount[nd_pp->get_name()] += 1.0;
+      node_to_wcount[nd_pp] += 1.0;
     } else {
       batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
     }

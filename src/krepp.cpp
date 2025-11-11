@@ -236,16 +236,14 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
   if (nd->check_leaf()) {
     sh_t sh = nd->get_sh();
     if (name_to_path.find(nd->get_name()) != name_to_path.end()) {
-      rseq_sptr_t rs =
-        std::make_shared<RSeq>(name_to_path[nd->get_name()], lshf, w, r, frac, sdust_t, sdust_w);
+      rseq_sptr_t rs = std::make_shared<RSeq>(name_to_path[nd->get_name()], lshf, w, r, frac, sdust_t, sdust_w);
       dynht->fill_table(sh, rs);
       dynht->get_record()->insert_rho(nd->get_sh(), rs->get_rho());
 #pragma omp critical
       {
         std::cerr << "\33[2K\r" << std::flush;
         std::cerr << "Leaf node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
-                  << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
-                  << std::flush;
+                  << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r" << std::flush;
       }
     } else {
 #pragma omp critical
@@ -284,8 +282,7 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
     {
       std::cerr << "\33[2K\r" << std::flush;
       std::cerr << "Internal node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
-                << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r"
-                << std::flush;
+                << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r" << std::flush;
     }
   }
 }
@@ -334,8 +331,8 @@ void QuerySketch::seek_sequences()
 
 void QueryIndex::estimate_distances()
 {
-  parallel_flat_phmap<std::string, double> name_to_wcount = {};
-  double total_wcount = 0;
+  parallel_flat_phmap<node_sptr_t, double> node_to_wcount = {};
+  double twcount = 0;
   strstream dreport_stream;
   dreport_stream.precision(STRSTREAM_PRECISION);
   dreport_stream << std::fixed;
@@ -360,9 +357,9 @@ void QueryIndex::estimate_distances()
 #pragma omp critical
           {
             if (summarize) {
-              for (auto& [name, wcount] : ib.get_summary()) {
-                total_wcount += wcount;
-                name_to_wcount[name] += wcount;
+              for (auto& [nd, wcount] : ib.get_summary()) {
+                twcount += wcount;
+                node_to_wcount[nd] += wcount;
               }
             } else {
               (*output_stream) << batch_stream.rdbuf();
@@ -374,8 +371,8 @@ void QueryIndex::estimate_distances()
     }
   }
   if (summarize) {
-    for (auto& [name, wcount] : name_to_wcount) {
-      dreport_stream << name << "\t" << wcount << "\t" << wcount / total_wcount << "\n";
+    for (auto& [nd, wcount] : node_to_wcount) {
+      dreport_stream << nd->get_name() << "\t" << wcount << "\t" << wcount / twcount << "\n";
     }
     (*output_stream) << dreport_stream.rdbuf();
   }
@@ -387,7 +384,7 @@ void QueryIndex::header_preport(strstream& dreport_stream)
   dreport_stream << "\n# ";
   qtree->stream_nwk_jplace(dreport_stream, qtree->get_root());
   if (summarize) {
-    dreport_stream << "\nREFERENCE_NAME\tWEIGHTED_COUNT\tSEQUENCE_ABUNDANCE\n";
+    dreport_stream << "\nDISTAL_NODE\tEDGE_NUM\tWEIGHTED_COUNT\tSEQUENCE_ABUNDANCE\n";
   } else {
     (void)0; // TODO: Perhaps introduce an alternative placement report format.
   }
@@ -419,8 +416,8 @@ void QueryIndex::begin_jplace(strstream& jplace_stream)
 
 void QueryIndex::place_sequences()
 {
-  parallel_flat_phmap<std::string, double> name_to_wcount = {};
-  double total_wcount = 0;
+  parallel_flat_phmap<node_sptr_t, double> node_to_wcount = {};
+  double twcount = 0;
   strstream preport_stream;
   preport_stream.precision(STRSTREAM_PRECISION);
   preport_stream << std::fixed;
@@ -456,9 +453,9 @@ void QueryIndex::place_sequences()
 #pragma omp critical
           {
             if (summarize) {
-              for (auto& [name, wcount] : ib.get_summary()) {
-                total_wcount += wcount;
-                name_to_wcount[name] += wcount;
+              for (auto& [nd, wcount] : ib.get_summary()) {
+                twcount += wcount;
+                node_to_wcount[nd] += wcount;
               }
             } else {
               // if (batch_stream.tellp() != std::streampos(0)) {
@@ -479,8 +476,8 @@ void QueryIndex::place_sequences()
   // output_stream->seekp(-1, output_stream->cur);
   //output_stream->seekp(-1, std::ios_base::end);
   if (summarize) {
-    for (auto& [name, wcount] : name_to_wcount) {
-      preport_stream << name << "\t" << wcount << "\t" << wcount / total_wcount << "\n";
+    for (auto& [nd, wcount] : node_to_wcount) {
+      preport_stream << nd->get_name(true) << "\t" << nd->get_en() << "\t" << wcount << "\t" << wcount / twcount << "\n";
     }
     (*output_stream) << preport_stream.rdbuf();
   } else {
@@ -503,17 +500,14 @@ InfoIndex::InfoIndex(CLI::App& sc)
 SketchSingle::SketchSingle(CLI::App& sc)
 {
   set_sketch_defaults();
-  sc.add_option(
-      "-i,--input-file", input, "Input FASTA/FASTQ file <path> (or URL) (gzip compatible).")
+  sc.add_option("-i,--input-file", input, "Input FASTA/FASTQ file <path> (or URL) (gzip compatible).")
     ->required()
     ->check(url_validator | CLI::ExistingFile);
-  sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")
-    ->required();
+  sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")->required();
   sc.add_option("-k,--kmer-len", k, "Length of k-mers. [26]")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k). [k+6]");
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
-  sc.add_option("-m,--modulo-lsh", m, "Modulo value to partition LSH space. [4]")
-    ->check(CLI::PositiveNumber);
+  sc.add_option("-m,--modulo-lsh", m, "Modulo value to partition LSH space. [4]")->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m. [true]");
@@ -535,12 +529,9 @@ QuerySketch::QuerySketch(CLI::App& sc)
   sc.add_option("-q,--query", query, "Query FASTA/FASTQ file <path> (or URL) (gzip compatible).")
     ->required()
     ->check(url_validator | CLI::ExistingFile);
-  sc.add_option("-i,--sketch-path", sketch_path, "Sketch file at <path> to query.")
-    ->required()
-    ->check(CLI::ExistingFile);
+  sc.add_option("-i,--sketch-path", sketch_path, "Sketch file at <path> to query.")->required()->check(CLI::ExistingFile);
   sc.add_option("-o,--output-path", output_path, "Write output to a file at <path>. [stdout]");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")
-    ->check(CLI::NonNegativeNumber);
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!output_path.empty()) {
       output_file.open(output_path);
@@ -553,21 +544,16 @@ QuerySketch::QuerySketch(CLI::App& sc)
 IndexMultiple::IndexMultiple(CLI::App& sc)
 {
   set_index_defaults();
-  sc.add_option("-i,--input-file",
-                input,
-                "TSV file <path> mapping reference IDs to (gzip compatible) paths/URLs.")
+  sc.add_option("-i,--input-file", input, "TSV file <path> mapping reference IDs to (gzip compatible) paths/URLs.")
     ->required()
     ->check(CLI::ExistingFile);
-  sc.add_option("-o,--index-dir", index_dir, "Directory <path> in which the index will be stored.")
-    ->required();
-  sc.add_option(
-      "-t,--nwk-file", nwk_path, "Path to the Newick file for the guide tree (must be rooted).")
+  sc.add_option("-o,--index-dir", index_dir, "Directory <path> in which the index will be stored.")->required();
+  sc.add_option("-t,--nwk-file", nwk_path, "Path to the Newick file for the guide tree (must be rooted).")
     ->check(CLI::ExistingFile);
   sc.add_option("-k,--kmer-len", k, "Length of k-mers. [29]")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>k). [k+6]");
   sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
-  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space. [4]")
-    ->check(CLI::PositiveNumber);
+  sc.add_option("-m,--modulo-lsh", m, "Mudulo value to partition LSH space. [4]")->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m. [true]");
@@ -590,24 +576,20 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
 
 void QueryIndex::init_sc_place(CLI::App& sc)
 {
-  sc.add_option(
-      "-t,--nwk-file",
-      nwk_path,
-      "Path to the Newick file for the (rooted) placement tree (overrides if the index has a backbone tree).")
+  sc.add_option("-t,--nwk-file",
+                nwk_path,
+                "Path to the Newick file for the (rooted) placement tree (overrides if the index has a backbone tree).")
     ->check(CLI::ExistingFile);
-  sc.add_option(
-      "--tau", tau, "Highest Hamming distance for placement threshold (increase to relax). [2]")
+  sc.add_option("--tau", tau, "Highest Hamming distance for placement threshold (increase to relax). [2]")
     ->check(CLI::NonNegativeNumber);
   multi = true;
-  sc.add_flag(
-    "--multi,!--no-multi",
-    multi,
-    "Output all candidate placements satisfying the filters (not just the largest clade). [true]");
+  sc.add_flag("--multi,!--no-multi",
+              multi,
+              "Output all candidate placements satisfying the filters (not just the largest clade). [true]");
   filter = true;
-  sc.add_flag(
-    "--filter,!--no-filter",
-    filter,
-    "Filter a placement when there is not enough k-mer matches below threshold tau. [true]");
+  sc.add_flag("--filter,!--no-filter",
+              filter,
+              "Filter a placement when there is not enough k-mer matches below threshold tau. [true]");
   sc.callback([&]() {
     no_filter = !filter;
     if (!output_path.empty()) {
@@ -624,15 +606,11 @@ void QueryIndex::init_sc_place(CLI::App& sc)
 void QueryIndex::init_sc_dist(CLI::App& sc)
 {
   sc.add_option(
-      "--dist-max",
-      dist_max,
-      "Maximum distance to report for matching references, overrides --filter if given. [0.25]")
+      "--dist-max", dist_max, "Maximum distance to report for matching references, overrides --filter if given. [0.25]")
     ->check(CLI::Range(1e-8, 0.33));
   multi = true;
   sc.add_flag(
-    "--multi,!--no-multi",
-    multi,
-    "Output all distances satisfying the filters (not just the closest reference). [true]");
+    "--multi,!--no-multi", multi, "Output all distances satisfying the filters (not just the closest reference). [true]");
   filter = false;
   sc.add_flag(
     "--filter,!--no-filter",
@@ -664,12 +642,10 @@ QueryIndex::QueryIndex(CLI::App& sc)
     ->required()
     ->check(CLI::ExistingDirectory);
   sc.add_option("-o,--output-path", output_path, "Write output to a file at <path>. [stdout]");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")
-    ->check(CLI::NonNegativeNumber);
-  sc.add_option(
-      "--chisq",
-      chisq_value,
-      "Chi-square value for statistical distinguishability test, default correspons to alpha=90%. [2.706]")
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--chisq",
+                chisq_value,
+                "Chi-square value for statistical distinguishability test, default correspons to alpha=90%. [2.706]")
     ->check(CLI::PositiveNumber);
   sc.add_flag(
     "--summarize,!--no-summarize",
@@ -682,35 +658,27 @@ int main(int argc, char** argv)
 {
   PRINT_VERSION
   std::ios::sync_with_stdio(false);
-  CLI::App app{
-    "krepp: a tool for k-mer-based search, distance estimation & phylogenetic placement."};
+  CLI::App app{"krepp: a tool for k-mer-based search, distance estimation & phylogenetic placement."};
   app.set_help_flag("--help");
   app.fallthrough();
 
   bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.require_subcommand();
-  app.add_option(
-    "--seed", seed, "Random seed for the LSH and other parts that require randomness. [0]");
+  app.add_option("--seed", seed, "Random seed for the LSH and other parts that require randomness. [0]");
   app.callback([&]() {
     if (app.count("--seed")) {
       gen.seed(seed);
     }
   });
-  app.add_option(
-    "--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism. [1]");
+  app.add_option("--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism. [1]");
 
   auto& sc_index = *app.add_subcommand("index", "Build an index from k-mers of reference genomes.");
-  auto& sc_place =
-    *app.add_subcommand("place", "Place queries on a tree with respect to an index.");
-  auto& sc_dist =
-    *app.add_subcommand("dist", "Estimate distances of queries to genomes in an index.");
-  auto& sc_inspect =
-    *app.add_subcommand("inspect", "Display statistics and information for a given index.");
-  auto& sc_sketch =
-    *app.add_subcommand("sketch", "Create a sketch from k-mers in a single FASTA/FASTQ file.");
-  auto& sc_seek =
-    *app.add_subcommand("seek", "Seek query sequences in a sketch and estimate distances.");
+  auto& sc_place = *app.add_subcommand("place", "Place queries on a tree with respect to an index.");
+  auto& sc_dist = *app.add_subcommand("dist", "Estimate distances of queries to genomes in an index.");
+  auto& sc_inspect = *app.add_subcommand("inspect", "Display statistics and information for a given index.");
+  auto& sc_sketch = *app.add_subcommand("sketch", "Create a sketch from k-mers in a single FASTA/FASTQ file.");
+  auto& sc_seek = *app.add_subcommand("seek", "Seek query sequences in a sketch and estimate distances.");
 
   IndexMultiple krepp_index(sc_index);
   QueryIndex krepp_place(sc_place);

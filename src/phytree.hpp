@@ -75,12 +75,16 @@ public:
   double get_blen() { return blen; }
   double get_midpoint_pendant() { return blen / 2.0; }
   double get_ldepth() { return ldepth; }
-  std::string const get_name()
+  std::string const get_name(bool return_na = false)
   {
-    if (name.empty()) {
-      return std::to_string(se - 1);
-    } else {
+    if (!name.empty()) {
       return name;
+    } else {
+      if (return_na) {
+        return "NA";
+      } else {
+        return std::to_string(se - 1);
+      }
     }
   }
   void stream_nwk_entry(strstream& nwk_strstream)

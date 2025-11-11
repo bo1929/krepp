@@ -59,7 +59,7 @@ public:
   void place_sequences(strstream& batch_stream);
   void report_distances(strstream& batch_stream);
   void report_placement(strstream& batch_stream);
-  const parallel_flat_phmap<std::string, double>& get_summary() { return name_to_wcount; }
+  const parallel_flat_phmap<node_sptr_t, double>& get_summary() { return node_to_wcount; }
 
 private:
   uint32_t k;
@@ -91,7 +91,7 @@ private:
 
 protected:
   parallel_flat_phmap<node_sptr_t, minfo_sptr_t> node_to_minfo = {};
-  parallel_flat_phmap<std::string, double> name_to_wcount = {};
+  parallel_flat_phmap<node_sptr_t, double> node_to_wcount = {};
 };
 
 class Minfo
