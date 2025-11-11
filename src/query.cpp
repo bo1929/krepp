@@ -4,7 +4,6 @@
 /* #define CHISQ_THRESHOLD 3.841 */
 /* #define CHISQ_THRESHOLD 2.706 */
 /* #define CHISQ_THRESHOLD 1.642 */
-#define STRSTREAM_PRECISION 5
 
 IBatch::IBatch(index_sptr_t index,
                qseq_sptr_t qs,

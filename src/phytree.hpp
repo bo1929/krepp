@@ -25,7 +25,8 @@ public:
   void map_to_qtree(tree_sptr_t qtree);
   static double compute_distance(node_sptr_t a, node_sptr_t b);
   static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
-  void stream_newick_str(std::stringstream& nwk_strstream, node_sptr_t nd);
+  void stream_nwk_basic(std::stringstream& nwk_strstream, node_sptr_t nd);
+  void stream_nwk_jplace(std::stringstream& nwk_strstream, node_sptr_t nd);
   void set_subtree(node_sptr_t source) { subtree_root = source; }
   node_sptr_t get_node(se_t se) const { return se_to_node[se]; }
   bool check_node(se_t se) const { return se <= nnodes; }
@@ -72,8 +73,9 @@ public:
   tree_sptr_t get_tree() { return tree; }
   double get_bdepth() { return bdepth; }
   double get_blen() { return blen; }
+  double get_midpoint_pendant() { return blen / 2.0; }
   double get_ldepth() { return ldepth; }
-  std::string get_name()
+  std::string const get_name()
   {
     if (name.empty()) {
       return std::to_string(se - 1);
@@ -81,10 +83,20 @@ public:
       return name;
     }
   }
+  void stream_nwk_entry(strstream& nwk_strstream)
+  {
+    if (std::isnan(blen)) {
+      nwk_strstream << name;
+    } else {
+      nwk_strstream << name << ":" << blen;
+    }
+  }
   tuint_t get_card() { return card; }
   sh_t get_sh() { return sh; }
   se_t get_se() { return se; }
+  se_t get_en() { return se - 1; }
   bool check_leaf() { return is_leaf; }
+  bool is_labeled() { return !name.empty(); }
   sh_t sum_children_sh()
   {
     sh_t sh = 0;

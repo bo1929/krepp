@@ -185,7 +185,7 @@ public:
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
 #define PLACEMENT_FIELD(nd, mi)                                                                    \
-  "[" << (nd->get_se() - 1) << ", 0, " << (nd->get_blen() / 2.0) << ", " << -mi->v_llh << ", "     \
+  "[" << nd->get_en() << ", 0, " << nd->get_midpoint_pendant() << ", " << -mi->v_llh << ", "       \
       << mi->lwr << ", " << mi->d_llh << "]"
 
 #define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"

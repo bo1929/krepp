@@ -337,6 +337,8 @@ void QueryIndex::estimate_distances()
   parallel_flat_phmap<std::string, double> name_to_wcount = {};
   double total_wcount = 0;
   strstream dreport_stream;
+  dreport_stream.precision(STRSTREAM_PRECISION);
+  dreport_stream << std::fixed;
   header_dreport(dreport_stream);
   (*output_stream) << dreport_stream.rdbuf();
 #if defined(_OPENMP) && _WOPENMP == 1
@@ -383,7 +385,7 @@ void QueryIndex::header_preport(strstream& dreport_stream)
 {
   dreport_stream << "# software: krepp\tversion: " VERSION "\tinvocation :" + invocation;
   dreport_stream << "\n# ";
-  qtree->stream_newick_str(dreport_stream, qtree->get_root());
+  qtree->stream_nwk_jplace(dreport_stream, qtree->get_root());
   if (summarize) {
     dreport_stream << "\nREFERENCE_NAME\tWEIGHTED_COUNT\tSEQUENCE_ABUNDANCE\n";
   } else {
@@ -403,7 +405,7 @@ void QueryIndex::end_jplace(strstream& jplace_stream)
   jplace_stream << invocation;
   jplace_stream << "\"\n\t},\n";
   jplace_stream << "\t\"tree\" : \"";
-  qtree->stream_newick_str(jplace_stream, qtree->get_root());
+  qtree->stream_nwk_jplace(jplace_stream, qtree->get_root());
   jplace_stream << "\"\n}";
 }
 
@@ -420,6 +422,8 @@ void QueryIndex::place_sequences()
   parallel_flat_phmap<std::string, double> name_to_wcount = {};
   double total_wcount = 0;
   strstream preport_stream;
+  preport_stream.precision(STRSTREAM_PRECISION);
+  preport_stream << std::fixed;
   if (summarize) {
     header_preport(preport_stream);
     (*output_stream) << preport_stream.rdbuf();

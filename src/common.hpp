@@ -44,6 +44,8 @@
   #include <immintrin.h>
 #endif
 
+#define STRSTREAM_PRECISION 6
+
 #define VERSION "v0.6.0"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 

@@ -1,4 +1,5 @@
 #include "phytree.hpp"
+#include "common.hpp"
 
 bool is_number(const std::string& s)
 {
@@ -41,35 +42,54 @@ void Tree::generate_tree(vec<std::string>& names_v)
   root->generate_tree(names_v.begin(), names_v.end());
   se_to_node.push_back(root);
   subtree_root = root;
-  compute_bdepth();
+  // compute_bdepth();
 }
 
-void Tree::stream_newick_str(strstream& nwk_strstream, node_sptr_t nd)
+void Tree::stream_nwk_jplace(strstream& nwk_strstream, node_sptr_t nd)
 {
   if (!nd->check_leaf()) {
     nwk_strstream << "(";
     for (uint32_t nix = 0; nix < nd->get_nchildren(); ++nix) {
-      stream_newick_str(nwk_strstream, *std::next(nd->get_children(), nix));
+      stream_nwk_jplace(nwk_strstream, *std::next(nd->get_children(), nix));
       if (nix < (nd->get_nchildren() - 1)) {
         nwk_strstream << ",";
       }
     }
     nwk_strstream << ")";
   }
-  nwk_strstream << nd->get_name() << ":" << nd->get_blen() << "{" << nd->get_se() - 1 << "}";
+  nd->stream_nwk_entry(nwk_strstream);
+  nwk_strstream << "{" << nd->get_en() << "}";
   if (nd == get_root()) {
     nwk_strstream << ";";
   }
 }
 
-void Tree::split_nwk(vec<std::string>& nd_v)
+void Tree::stream_nwk_basic(strstream& nwk_strstream, node_sptr_t nd)
 {
+  if (!nd->check_leaf()) {
+    nwk_strstream << "(";
+    for (uint32_t nix = 0; nix < nd->get_nchildren(); ++nix) {
+      stream_nwk_basic(nwk_strstream, *std::next(nd->get_children(), nix));
+      if (nix < (nd->get_nchildren() - 1)) {
+        nwk_strstream << ",";
+      }
+    }
+    nwk_strstream << ")";
+  }
+  nd->stream_nwk_entry(nwk_strstream);
+  if (nd == get_root()) {
+    nwk_strstream << ";";
+  }
+}
+
+void Tree::split_nwk(vec<std::string>& el_v)
+{ // TODO: This doesn't parse The Rich Newick format. Mention in the docs.
   std::string buf = "";
   bool is_quoted = false, quote = false, quote_p = false, is_comment = false;
   if (!nwk_str.empty()) {
     nwk_str.pop_back();
   }
-  buf.reserve(nd_v.size());
+  buf.reserve(el_v.size());
   if (nwk_str.back() != ';') {
     error_exit("Given Newick tree ends with a character other than ';'.");
   }
@@ -95,11 +115,11 @@ void Tree::split_nwk(vec<std::string>& nd_v)
       }
     } else if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',') {
       if (nwk_str[i] != '(' && nwk_str[i - 1] != '(') {
-        if (buf.empty()) buf = "''";
-        nd_v.push_back(buf);
+        if (buf.empty()) buf = "";
+        el_v.push_back(buf);
         buf = "";
       }
-      nd_v.push_back(std::string() + nwk_str[i]);
+      el_v.push_back(std::string() + nwk_str[i]);
     } else {
       if (nwk_str[i] == '[' || nwk_str[i] == ']') {
         error_exit("Given Newick tree contains an unquoted label or length with '[' or ']'.");
@@ -118,23 +138,71 @@ void Tree::split_nwk(vec<std::string>& nd_v)
     }
   }
   if (buf.length() > 0) {
-    nd_v.push_back(buf);
+    el_v.push_back(buf);
   }
 }
 
-void Node::parse(vec<std::string>& nd_v)
+void Node::parse(vec<std::string>& el_v)
 {
   ldepth = parent ? parent->ldepth + 1 : 0;
-  if (tree->atter >= nd_v.size()) return;
-  if (nd_v[tree->atter] != "(") {
-    if (nd_v[tree->atter] != ":") {
-      name = nd_v[tree->atter];
+  if (tree->atter >= el_v.size()) return;
+  if (el_v[tree->atter] == "(") {
+    while (true) {
       tree->atter++;
+      children.emplace_back(std::make_shared<Node>(tree));
+      (children.back())->set_parent(getptr());
+      (children.back())->ix_child = nchildren;
+      (children.back())->parse(el_v);
+      card += (children.back())->card;
+      sh += (children.back())->sh;
+      total_blen += (children.back())->blen;
+      total_blen += (children.back())->total_blen;
+      nchildren++;
+      if (el_v[tree->atter] == ",")
+        continue;
+      else
+        break;
     }
-    if (nd_v[tree->atter] == ":") {
-      blen = std::atof(nd_v[tree->atter + 1].c_str());
-      tree->total_blen += blen;
-      tree->atter += 2;
+    if (nchildren == 1) {
+      error_exit("A node has a single child in the backbone tree! Please suppress unifurcations.");
+    }
+    is_leaf = false;
+    tree->nnodes++;
+    se = tree->nnodes;
+    tree->se_to_node.push_back(getptr());
+    if (el_v[tree->atter] == ")") {
+      tree->atter++;
+      if (el_v[tree->atter] == ")") return;
+    }
+    name = "";
+    blen = std::numeric_limits<double>::quiet_NaN(); // No branch length...
+    if (el_v[tree->atter] != ",") {
+      if (el_v[tree->atter] != ":") {
+        name = el_v[tree->atter];
+        tree->atter++;
+      }
+      if (el_v[tree->atter] == ":") {
+        blen = std::atof(el_v[tree->atter + 1].c_str());
+        tree->total_blen += blen;
+        tree->atter += 2;
+      }
+    }
+    // if (!name.empty() && name[name.length() - 1] == '\n') {
+    //   name.erase(name.length() - 1);
+    // }
+  } else {
+    name = "";
+    blen = std::numeric_limits<double>::quiet_NaN(); // No branch length...
+    if (el_v[tree->atter] != ",") {
+      if (el_v[tree->atter] != ":") {
+        name = el_v[tree->atter];
+        tree->atter++;
+      }
+      if (el_v[tree->atter] == ":") {
+        blen = std::atof(el_v[tree->atter + 1].c_str());
+        tree->total_blen += blen;
+        tree->atter += 2;
+      }
     }
     is_leaf = true;
     card = 1;
@@ -145,47 +213,7 @@ void Node::parse(vec<std::string>& nd_v)
     tree->nnodes++;
     se = tree->nnodes;
     tree->se_to_node.push_back(getptr());
-    return;
   }
-  if (nd_v[tree->atter] == "(") {
-    while (1) {
-      tree->atter++;
-      children.emplace_back(std::make_shared<Node>(tree));
-      (children.back())->set_parent(getptr());
-      (children.back())->ix_child = nchildren;
-      (children.back())->parse(nd_v);
-      card += (children.back())->card;
-      sh += (children.back())->sh;
-      total_blen += (children.back())->blen;
-      total_blen += (children.back())->total_blen;
-      nchildren++;
-      if (nd_v[tree->atter] == ",")
-        continue;
-      else
-        break;
-    }
-    is_leaf = false;
-    tree->nnodes++;
-    se = tree->nnodes;
-    tree->se_to_node.push_back(getptr());
-  }
-  if (nd_v[tree->atter] == ")") {
-    tree->atter++;
-    if (nd_v[tree->atter] == ")") return;
-  }
-  if (nd_v[tree->atter] != ":") {
-    name = nd_v[tree->atter];
-    tree->atter++;
-  }
-  if (nd_v[tree->atter] == ":") {
-    blen = std::atof(nd_v[tree->atter + 1].c_str());
-    tree->total_blen += blen;
-    tree->atter += 2;
-  }
-  // if (!name.empty() && name[name.length() - 1] == '\n') {
-  //   name.erase(name.length() - 1);
-  // }
-  return;
 }
 
 void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
@@ -225,7 +253,8 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
     is_leaf = false;
     tree->nnodes++;
     se = tree->nnodes;
-    name = "N" + std::to_string(se);
+    // name = "N" + std::to_string(se - 1);
+    name = "";
     tree->se_to_node.push_back(getptr());
     tree->total_blen += blen;
   }
@@ -278,7 +307,7 @@ node_sptr_t Tree::next_post_order()
 
 void Tree::print_info()
 {
-  std::cout << "The tree rooted at : " << root->name << std::endl;
+  std::cout << "The tree rooted at : " << root->get_name() << std::endl;
   std::cout << "\tNumber of nodes : " << nnodes << std::endl;
   std::cout << "\tTotal branch length : " << total_blen << std::endl;
 }
@@ -322,13 +351,13 @@ void Tree::load(std::ifstream& tree_stream)
 {
   nwk_str =
     std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
-  vec<std::string> nd_v;
-  split_nwk(nd_v);
+  vec<std::string> el_v;
+  split_nwk(el_v);
   root = std::make_shared<Node>(getptr());
   atter = 0, nnodes = 0, total_blen = 0;
-  root->parse(nd_v);
+  root->parse(el_v);
   subtree_root = root;
-  compute_bdepth();
+  // compute_bdepth();
 }
 
 void Tree::compute_bdepth()
@@ -360,13 +389,14 @@ void Tree::map_to_qtree(tree_sptr_t qtree)
   subtree_root = qtree->get_subtree();
   reset_traversal();
   while (curr = next_post_order()) {
-    if (curr->check_leaf()) {
+    if (curr->check_leaf() && curr->is_labeled()) {
       if (name_to_se.contains(curr->get_name())) {
         se_to_node[name_to_se[curr->get_name()]] = curr;
       } else {
         strstream parsed_tree;
-        stream_newick_str(parsed_tree, root);
+        stream_nwk_basic(parsed_tree, root);
         std::cerr << "Parsed tree: " << parsed_tree.rdbuf() << "\n";
+        std::cerr << "Unexpected leaf: " << curr->get_name() << "\n";
         error_exit("Given placement tree contains a reference that does not appear in the index.");
       }
     }
