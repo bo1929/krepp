@@ -59,10 +59,7 @@ void LSHF::set_lshf()
 }
 
 #if defined(__BMI2__)
-uint32_t LSHF::compute_hash(uint64_t enc64_bp)
-{
-  return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_hash_bp));
-}
+uint32_t LSHF::compute_hash(uint64_t enc64_bp) { return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_hash_bp)); }
 
 uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
 {
@@ -72,10 +69,7 @@ uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
   return static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_lr));
 }
 
-uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp)
-{
-  return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_drop_bp));
-}
+uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp) { return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_drop_bp)); }
 #else
 uint32_t LSHF::compute_hash(uint64_t enc64_bp)
 {
@@ -168,24 +162,18 @@ LSHF::LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v)
 bool LSHF::check_compatible(lshf_sptr_t lshf)
 {
   if (!lshf) return true;
-  if (!((lshf->m == m) && (lshf->h == h) && (lshf->k == k) && (lshf->npos_v == npos_v) &&
-        (lshf->ppos_v == ppos_v))) {
-    std::cout << "m: " << static_cast<uint32_t>(m) << "/" << static_cast<uint32_t>(lshf->m)
-              << std::endl;
-    std::cout << "h: " << static_cast<uint32_t>(h) << "/" << static_cast<uint32_t>(lshf->h)
-              << std::endl;
-    std::cout << "k: " << static_cast<uint32_t>(k) << "/" << static_cast<uint32_t>(lshf->k)
-              << std::endl;
+  if (!((lshf->m == m) && (lshf->h == h) && (lshf->k == k) && (lshf->npos_v == npos_v) && (lshf->ppos_v == ppos_v))) {
+    std::cout << "m: " << static_cast<uint32_t>(m) << "/" << static_cast<uint32_t>(lshf->m) << std::endl;
+    std::cout << "h: " << static_cast<uint32_t>(h) << "/" << static_cast<uint32_t>(lshf->h) << std::endl;
+    std::cout << "k: " << static_cast<uint32_t>(k) << "/" << static_cast<uint32_t>(lshf->k) << std::endl;
     std::cout << "ppos_v:";
     for (uint8_t i = 0; i < h; ++i) {
-      std::cout << " " << static_cast<uint32_t>(ppos_v[i]) << "/"
-                << static_cast<uint32_t>(lshf->ppos_v[i]);
+      std::cout << " " << static_cast<uint32_t>(ppos_v[i]) << "/" << static_cast<uint32_t>(lshf->ppos_v[i]);
     }
     std::cout << std::endl;
     std::cout << "npos_v:";
     for (uint8_t i = 0; i < k - h; ++i) {
-      std::cout << " " << static_cast<uint32_t>(npos_v[i]) << "/"
-                << static_cast<uint32_t>(lshf->npos_v[i]);
+      std::cout << " " << static_cast<uint32_t>(npos_v[i]) << "/" << static_cast<uint32_t>(lshf->npos_v[i]);
     }
     std::cout << std::endl;
     return false;

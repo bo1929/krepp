@@ -54,14 +54,8 @@ public:
   void set_record(record_sptr_t source) { record = source; }
   void union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v);
   cmer_t conv_mer_cmer(mer_t x) { return std::make_pair(x.encoding, record->map_compact(x.sh)); }
-  static bool comp_encoding(const mer_t& left, const mer_t& right)
-  {
-    return left.encoding < right.encoding;
-  }
-  static bool eq_encoding(const mer_t& left, const mer_t& right)
-  {
-    return left.encoding == right.encoding;
-  }
+  static bool comp_encoding(const mer_t& left, const mer_t& right) { return left.encoding < right.encoding; }
+  static bool eq_encoding(const mer_t& left, const mer_t& right) { return left.encoding == right.encoding; }
 
 private:
   uint64_t nkmers = 0;

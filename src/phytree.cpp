@@ -349,8 +349,7 @@ void Tree::save(std::ofstream& tree_stream)
 
 void Tree::load(std::ifstream& tree_stream)
 {
-  nwk_str =
-    std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
+  nwk_str = std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
   vec<std::string> el_v;
   split_nwk(el_v);
   root = std::make_shared<Node>(getptr());

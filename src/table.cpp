@@ -119,8 +119,7 @@ void DynHT::sort_columns()
 void DynHT::ensure_sorted_columns()
 {
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
-    if ((!mer_vvec[i].empty()) &&
-        !std::is_sorted(mer_vvec[i].begin(), mer_vvec[i].end(), comp_encoding)) {
+    if ((!mer_vvec[i].empty()) && !std::is_sorted(mer_vvec[i].begin(), mer_vvec[i].end(), comp_encoding)) {
       std::sort(mer_vvec[i].begin(), mer_vvec[i].end(), comp_encoding);
     }
   }
@@ -160,8 +159,7 @@ void DynHT::make_unique()
   nkmers = 0;
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
     if (!mer_vvec[i].empty()) {
-      mer_vvec[i].erase(std::unique(mer_vvec[i].begin(), mer_vvec[i].end(), eq_encoding),
-                        mer_vvec[i].end());
+      mer_vvec[i].erase(std::unique(mer_vvec[i].begin(), mer_vvec[i].end(), eq_encoding), mer_vvec[i].end());
     }
     nkmers += mer_vvec[i].size();
   }

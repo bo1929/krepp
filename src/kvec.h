@@ -51,20 +51,13 @@ int main() {
 #include <stdlib.h>
 #include "kalloc.h"
 
-#define kv_roundup32(x)                                                                            \
-  (--(x),                                                                                          \
-   (x) |= (x) >> 1,                                                                                \
-   (x) |= (x) >> 2,                                                                                \
-   (x) |= (x) >> 4,                                                                                \
-   (x) |= (x) >> 8,                                                                                \
-   (x) |= (x) >> 16,                                                                               \
-   ++(x))
+#define kv_roundup32(x) (--(x), (x) |= (x) >> 1, (x) |= (x) >> 2, (x) |= (x) >> 4, (x) |= (x) >> 8, (x) |= (x) >> 16, ++(x))
 
-#define kvec_t(type)                                                                               \
-  struct                                                                                           \
-  {                                                                                                \
-    size_t n, m;                                                                                   \
-    type* a;                                                                                       \
+#define kvec_t(type)                                                                                                        \
+  struct                                                                                                                    \
+  {                                                                                                                         \
+    size_t n, m;                                                                                                            \
+    type* a;                                                                                                                \
   }
 #define kv_init(v) ((v).n = (v).m = 0, (v).a = 0)
 #define kv_destroy(v) free((v).a)
@@ -73,51 +66,51 @@ int main() {
 #define kv_size(v) ((v).n)
 #define kv_max(v) ((v).m)
 
-#define kv_resize(type, km, v, s)                                                                  \
-  do {                                                                                             \
-    if ((v).m < (s)) {                                                                             \
-      (v).m = (s);                                                                                 \
-      kv_roundup32((v).m);                                                                         \
-      (v).a = (type*)krealloc((km), (v).a, sizeof(type) * (v).m);                                  \
-    }                                                                                              \
+#define kv_resize(type, km, v, s)                                                                                           \
+  do {                                                                                                                      \
+    if ((v).m < (s)) {                                                                                                      \
+      (v).m = (s);                                                                                                          \
+      kv_roundup32((v).m);                                                                                                  \
+      (v).a = (type*)krealloc((km), (v).a, sizeof(type) * (v).m);                                                           \
+    }                                                                                                                       \
   } while (0)
 
-#define kv_copy(type, km, v1, v0)                                                                  \
-  do {                                                                                             \
-    if ((v1).m < (v0).n) kv_resize(type, (km), (v1), (v0).n);                                      \
-    (v1).n = (v0).n;                                                                               \
-    memcpy((v1).a, (v0).a, sizeof(type) * (v0).n);                                                 \
+#define kv_copy(type, km, v1, v0)                                                                                           \
+  do {                                                                                                                      \
+    if ((v1).m < (v0).n) kv_resize(type, (km), (v1), (v0).n);                                                               \
+    (v1).n = (v0).n;                                                                                                        \
+    memcpy((v1).a, (v0).a, sizeof(type) * (v0).n);                                                                          \
   } while (0)
 
-#define kv_push(type, km, v, x)                                                                    \
-  do {                                                                                             \
-    if ((v).n == (v).m) {                                                                          \
-      (v).m = (v).m ? (v).m << 1 : 2;                                                              \
-      (v).a = (type*)krealloc((km), (v).a, sizeof(type) * (v).m);                                  \
-    }                                                                                              \
-    (v).a[(v).n++] = (x);                                                                          \
+#define kv_push(type, km, v, x)                                                                                             \
+  do {                                                                                                                      \
+    if ((v).n == (v).m) {                                                                                                   \
+      (v).m = (v).m ? (v).m << 1 : 2;                                                                                       \
+      (v).a = (type*)krealloc((km), (v).a, sizeof(type) * (v).m);                                                           \
+    }                                                                                                                       \
+    (v).a[(v).n++] = (x);                                                                                                   \
   } while (0)
 
-#define kv_pushp(type, km, v, p)                                                                   \
-  do {                                                                                             \
-    if ((v).n == (v).m) {                                                                          \
-      (v).m = (v).m ? (v).m << 1 : 2;                                                              \
-      (v).a = (type*)krealloc((km), (v).a, sizeof(type) * (v).m);                                  \
-    }                                                                                              \
-    *(p) = &(v).a[(v).n++];                                                                        \
+#define kv_pushp(type, km, v, p)                                                                                            \
+  do {                                                                                                                      \
+    if ((v).n == (v).m) {                                                                                                   \
+      (v).m = (v).m ? (v).m << 1 : 2;                                                                                       \
+      (v).a = (type*)krealloc((km), (v).a, sizeof(type) * (v).m);                                                           \
+    }                                                                                                                       \
+    *(p) = &(v).a[(v).n++];                                                                                                 \
   } while (0)
 
-#define kv_reverse(type, v, start)                                                                 \
-  do {                                                                                             \
-    if ((v).m > 0 && (v).n > (start)) {                                                            \
-      size_t __i, __end = (v).n - (start);                                                         \
-      type* __a = (v).a + (start);                                                                 \
-      for (__i = 0; __i < __end >> 1; ++__i) {                                                     \
-        type __t = __a[__end - 1 - __i];                                                           \
-        __a[__end - 1 - __i] = __a[__i];                                                           \
-        __a[__i] = __t;                                                                            \
-      }                                                                                            \
-    }                                                                                              \
+#define kv_reverse(type, v, start)                                                                                          \
+  do {                                                                                                                      \
+    if ((v).m > 0 && (v).n > (start)) {                                                                                     \
+      size_t __i, __end = (v).n - (start);                                                                                  \
+      type* __a = (v).a + (start);                                                                                          \
+      for (__i = 0; __i < __end >> 1; ++__i) {                                                                              \
+        type __t = __a[__end - 1 - __i];                                                                                    \
+        __a[__end - 1 - __i] = __a[__i];                                                                                    \
+        __a[__i] = __t;                                                                                                     \
+      }                                                                                                                     \
+    }                                                                                                                       \
   } while (0)
 
 #endif

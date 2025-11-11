@@ -136,8 +136,7 @@ std::pair<vec_cmer_it, vec_cmer_it> Index::bucket_indices(uint32_t rix)
   if (r_to_numerator[rix_res] > 1) {
     offset = offset * r_to_numerator[rix_res] + rix_res;
   }
-  return std::make_pair(r_to_flatht[rix_res]->bucket_start(offset),
-                        r_to_flatht[rix_res]->bucket_next(offset));
+  return std::make_pair(r_to_flatht[rix_res]->bucket_start(offset), r_to_flatht[rix_res]->bucket_next(offset));
 }
 
 crecord_sptr_t Index::get_crecord(uint32_t rix) { return r_to_flatht[rix % m]->get_crecord(); }

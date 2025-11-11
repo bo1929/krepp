@@ -15,8 +15,7 @@ Record::Record(tree_sptr_t tree)
     } else {
       ch = (*nd_curr->get_children())->get_sh();
     }
-    sh_to_subset[nd_curr->get_sh()] =
-      std::make_shared<Subset>(nd_curr->get_sh(), ch, nd_curr->get_card());
+    sh_to_subset[nd_curr->get_sh()] = std::make_shared<Subset>(nd_curr->get_sh(), ch, nd_curr->get_card());
   }
   tree->reset_traversal();
   uint32_t ntry = 0;
@@ -35,8 +34,7 @@ Record::Record(record_sptr_t source1, record_sptr_t source2)
 {
   union_record(source1);
   union_record(source2);
-  node_sptr_t root =
-    Tree::compute_lca(source1->get_tree()->get_root(), source2->get_tree()->get_root());
+  node_sptr_t root = Tree::compute_lca(source1->get_tree()->get_root(), source2->get_tree()->get_root());
   tree = root->get_tree();
 }
 
@@ -76,8 +74,7 @@ void Record::rehash_tree()
     } else {
       ch = (*nd_curr->get_children())->get_sh();
     }
-    sh_to_subset[nd_curr->get_sh()] =
-      std::make_shared<Subset>(nd_curr->get_sh(), ch, nd_curr->get_card());
+    sh_to_subset[nd_curr->get_sh()] = std::make_shared<Subset>(nd_curr->get_sh(), ch, nd_curr->get_card());
   }
   tree->reset_traversal();
 }
@@ -86,35 +83,25 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
 {
   subset_sptr_t subset1 = nullptr;
   sh_to_subset.if_contains(
-    sh1, [&subset1](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) {
-      subset1 = v.second;
-    });
+    sh1, [&subset1](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) { subset1 = v.second; });
   subset_sptr_t subset2 = nullptr;
   sh_to_subset.if_contains(
-    sh2, [&subset2](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) {
-      subset2 = v.second;
-    });
+    sh2, [&subset2](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) { subset2 = v.second; });
   if (!(subset1 && subset2)) {
     error_exit("Failed for partition: (" + std::to_string(sh1) + ", " + std::to_string(sh2) + ")");
   }
   sh_t sh = sh1 + sh2;
   sh_t nonce = 0;
   subset_sptr_t subset = nullptr;
-  while (sh_to_subset.if_contains(
-           sh + nonce,
-           [&subset](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) {
-             subset = v.second;
-           }) &&
-         check_subset_collision(subset, subset1, subset2)) {
+  while (sh_to_subset.if_contains(sh + nonce, [&subset](const parallel_flat_phmap<sh_t, subset_sptr_t>::value_type& v) {
+    subset = v.second;
+  }) && check_subset_collision(subset, subset1, subset2)) {
     nonce = Subset::rehash(nonce++ * sh1 * sh2);
   }
   sh += nonce;
   if (!subset) {
-    sh_to_subset[sh] =
-      std::make_shared<Subset>(sh,
-                               subset1->card > subset2->card ? subset1->sh : subset2->sh,
-                               subset1->card + subset2->card,
-                               nonce);
+    sh_to_subset[sh] = std::make_shared<Subset>(
+      sh, subset1->card > subset2->card ? subset1->sh : subset2->sh, subset1->card + subset2->card, nonce);
   }
   return sh;
 }
@@ -182,8 +169,8 @@ CRecord::CRecord(record_sptr_t record)
   }
   tree->reset_traversal();
   for (auto& [sh, subset] : record->sh_to_subset) {
-    se_to_pse[record->sh_to_se[sh]] = std::make_pair(
-      record->sh_to_se[subset->ch], record->sh_to_se[sh - subset->ch - subset->nonce]);
+    se_to_pse[record->sh_to_se[sh]] =
+      std::make_pair(record->sh_to_se[subset->ch], record->sh_to_se[sh - subset->ch - subset->nonce]);
   }
   se_to_pse[0] = std::make_pair(0, 0);
 }

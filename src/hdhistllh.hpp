@@ -30,10 +30,7 @@ namespace optimize {
       return static_cast<double>(binom_coef_hnk[x]) / static_cast<double>(binom_coef_k[x]);
     }
 
-    double prob_mutate(const double d, const uint32_t x)
-    {
-      return pow((1.0 - d), (k - x)) * pow(d, x) * binom_coef_k[x];
-    }
+    double prob_mutate(const double d, const uint32_t x) { return pow((1.0 - d), (k - x)) * pow(d, x) * binom_coef_k[x]; }
 
     double prob_miss(const double d)
     {
@@ -47,10 +44,7 @@ namespace optimize {
       return rho * p + 1.0 - rho;
     }
 
-    double prob_hit(const double d, const uint32_t x)
-    {
-      return rho * prob_collide(x) * prob_mutate(d, x);
-    }
+    double prob_hit(const double d, const uint32_t x) { return rho * prob_collide(x) * prob_mutate(d, x); }
 
     HDistHistLLH() {}
 

@@ -4,13 +4,7 @@ extern "C"
 #include "sdust.h"
 }
 
-RSeq::RSeq(std::string input,
-           lshf_sptr_t lshf,
-           uint8_t w,
-           uint32_t r,
-           bool frac,
-           int sdust_t,
-           int sdust_w)
+RSeq::RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac, int sdust_t, int sdust_w)
   : w(w)
   , r(r)
   , frac(frac)
@@ -104,12 +98,10 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     if ((l < w) && (i != len)) {
       continue;
     }
-    cminimizer =
-      *std::min_element(lsh_enc_win.begin(),
-                        lsh_enc_win.end(),
-                        [](std::pair<uint64_t, uint64_t> lhs, std::pair<uint64_t, uint64_t> rhs) {
-                          return xur64_hash(lhs.second) < xur64_hash(rhs.second);
-                        });
+    cminimizer = *std::min_element(
+      lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint64_t, uint64_t> lhs, std::pair<uint64_t, uint64_t> rhs) {
+        return xur64_hash(lhs.second) < xur64_hash(rhs.second);
+      });
 #ifdef CANONICAL
     rcenc64_bp = revcomp_bp64(cminimizer.first, k);
     if (cminimizer.first < rcenc64_bp) {
