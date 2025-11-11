@@ -1,5 +1,12 @@
 #include "phytree.hpp"
 
+bool is_number(const std::string& s)
+{
+  std::istringstream iss(s);
+  double d;
+  return iss >> std::noskipws >> d && iss.eof();
+}
+
 bool Tree::check_compatible(tree_sptr_t tree)
 {
   if (!tree) return true;
@@ -57,17 +64,35 @@ void Tree::stream_newick_str(strstream& nwk_strstream, node_sptr_t nd)
 
 void Tree::split_nwk(vec<std::string>& nd_v)
 {
-  int i = 0;
   std::string buf = "";
-  bool is_label = false, quote = false;
+  bool is_quoted = false, quote = false, quote_p = false, is_comment = false;
+  if (!nwk_str.empty()) {
+    nwk_str.pop_back();
+  }
   buf.reserve(nd_v.size());
-  for (; i < nwk_str.length(); i++) {
-    quote = (nwk_str[i] == '\'' || nwk_str[i] == '"');
-    is_label = (is_label != quote);
-    if (is_label && !quote) {
-      buf += nwk_str[i];
-    } else if (quote || nwk_str[i] == '\n' || nwk_str[i] == ';') {
+  if (nwk_str.back() != ';') {
+    error_exit("Given Newick tree ends with a character other than ';'.");
+  }
+  for (uint32_t i = 0; i < nwk_str.length(); i++) {
+    if (is_comment) {
+      is_comment = is_comment != (nwk_str[i] == ']');
       continue;
+    }
+    quote = (nwk_str[i] == '\'' || nwk_str[i] == '"');
+    if (quote & quote_p) {
+      is_quoted = false;
+      buf += "'";
+      continue;
+    }
+    quote_p = quote;
+    if (quote) {
+      is_quoted = (is_quoted != quote);
+      continue;
+    } else if (is_quoted) {
+      is_comment = is_comment != (nwk_str[i] == '[');
+      if (!is_comment) {
+        buf += nwk_str[i];
+      }
     } else if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',') {
       if (nwk_str[i] != '(' && nwk_str[i - 1] != '(') {
         if (buf.empty()) buf = "''";
@@ -76,6 +101,19 @@ void Tree::split_nwk(vec<std::string>& nd_v)
       }
       nd_v.push_back(std::string() + nwk_str[i]);
     } else {
+      if (nwk_str[i] == '[' || nwk_str[i] == ']') {
+        error_exit("Given Newick tree contains an unquoted label or length with '[' or ']'.");
+      }
+      if (nwk_str[i] == ';' && i != (nwk_str.length() - 1)) {
+        if (nwk_str.length() > (i + 1) && nwk_str[i + 1] == '\n') {
+          error_exit("Given Newick file may contain multiple trees, encountered unexpected ';'.");
+        } else {
+          error_exit("Given Newick tree contains an unquoted label or length with ';'.");
+        }
+      }
+      if ((nwk_str[i] == ' ' || nwk_str[i] == '\n') && !buf.empty()) {
+        error_exit("Given Newick tree contains an unquoted label or length with ' ' or newline.");
+      }
       buf += nwk_str[i];
     }
   }
@@ -326,6 +364,9 @@ void Tree::map_to_qtree(tree_sptr_t qtree)
       if (name_to_se.contains(curr->get_name())) {
         se_to_node[name_to_se[curr->get_name()]] = curr;
       } else {
+        strstream parsed_tree;
+        stream_newick_str(parsed_tree, root);
+        std::cerr << "Parsed tree: " << parsed_tree.rdbuf() << "\n";
         error_exit("Given placement tree contains a reference that does not appear in the index.");
       }
     }
