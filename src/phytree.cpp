@@ -325,6 +325,58 @@ node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
   return a;
 }
 
+void Tree::parse_lineages(std::ifstream& lineage_stream)
+{
+  root = std::make_shared<Node>(getptr(), "root", nullptr);
+  root->set_rank("root");
+  atter = 0, nnodes = 0, total_blen = 0;
+  subtree_root = root;
+  parallel_flat_phmap<std::string, node_sptr_t> taxon_to_node = {};
+
+  std::string line;
+  while (std::getline(lineage_stream, line)) {
+    line = std::regex_replace(line, std::regex("; "), ";");
+    std::istringstream iss(line);
+    std::string lineage, name;
+    if (!(std::getline(iss, name, '\t') && std::getline(iss, lineage, '\t'))) {
+      error_exit("Failed to reference to lineage mapping!");
+    }
+
+    std::stringstream lss(lineage);
+    std::string taxon, rank;
+    node_sptr_t parent = nullptr;
+    while (std::getline(lss, taxon, ';')) {
+      rank = std::regex_replace(taxon, std::regex("__.*"), "");
+      taxon = std::regex_replace(taxon, std::regex(".__"), "");
+      if (taxon.empty()) continue;
+      if (!taxon_to_node.contains(taxon)) {
+        taxon_to_node[taxon] = std::make_shared<Node>(getptr(), taxon, parent);
+        if (parent) taxon_to_node[taxon]->set_parent(parent);
+        taxon_to_node[taxon]->set_rank(rank);
+      }
+      parent = taxon_to_node[taxon];
+    }
+
+    if (!taxon_to_node.contains(name)) {
+      taxon_to_node[name] = std::make_shared<Node>(getptr(), name, parent, true);
+      taxon_to_node[name]->set_parent(parent);
+    } else {
+      error_exit("The same reference appears more than once in the lineage file.");
+    }
+  }
+
+  for (auto& [taxon, nd] : taxon_to_node) {
+    if (!nd->get_parent()) nd->set_parent(root);
+  }
+
+  reset_traversal();
+  while (curr = next_post_order()) {
+    nnodes++;
+    se_to_node.push_back(curr);
+    curr->set_se(nnodes);
+  }
+}
+
 double Tree::compute_distance(node_sptr_t a, node_sptr_t b)
 {
   double distance = 0;

@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "record.hpp"
+#include <cmath>
 
 typedef std::vector<std::string>::const_iterator vec_str_iter;
 
@@ -18,6 +19,7 @@ public:
   void compute_bdepth();
   bool check_compatible(tree_sptr_t tree);
   void split_nwk(vec<std::string>& n_vec);
+  void parse_lineages(std::ifstream& tree_stream);
   void parse(std::filesystem::path nwk_path);
   void save(std::ofstream& tree_stream);
   void load(std::ifstream& tree_stream);
@@ -61,19 +63,68 @@ public:
     : tree(tree)
   {
   }
+  Node(tree_sptr_t tree, std::string name, node_sptr_t parent, bool is_leaf = false)
+    : tree(tree)
+    , name(name)
+    , parent(parent)
+    , is_leaf(is_leaf)
+  {
+    if (is_leaf) {
+      card = 1;
+    }
+    ix_child = parent ? parent->get_nchildren() : -1;
+    sh = hash_name(name);
+    while (!sh) {
+      sh = rehash(reinterpret_cast<uint64_t>(&sh));
+    }
+    blen = std::numeric_limits<double>::quiet_NaN();
+    bdepth = std::numeric_limits<double>::quiet_NaN();
+    ldepth = parent ? parent->get_ldepth() + 1 : 0;
+    total_blen = std::numeric_limits<double>::quiet_NaN();
+  }
   void print_info();
   void parse(vec<std::string>& n_vec);
   void generate_tree(vec_str_iter name_first, vec_str_iter name_last);
   void set_sh(sh_t source) { sh = source; }
-  void set_parent(node_sptr_t source) { parent = source; }
+  void set_se(se_t source) { se = source; }
+  void set_rank(std::string r)
+  {
+    rank = r;
+    is_taxon = true;
+  }
+  void set_parent(node_sptr_t source)
+  {
+    if (!source) {
+      return;
+    }
+    parent = source;
+    ix_child = parent->get_nchildren();
+    parent->add_children(getptr());
+    ldepth = parent ? parent->get_ldepth() + 1 : 0;
+  }
   node_sptr_t getptr() { return shared_from_this(); }
   node_sptr_t* get_children() { return children.data(); }
+  void add_children(node_sptr_t child)
+  {
+    nchildren++;
+    children.push_back(child);
+    card = card + child->get_card();
+    sh = sh + child->get_sh();
+    is_leaf = false;
+  }
   tuint_t get_nchildren() { return nchildren; }
   node_sptr_t get_parent() { return parent; }
   tree_sptr_t get_tree() { return tree; }
   double get_bdepth() { return bdepth; }
   double get_blen() { return blen; }
-  double get_midpoint_pendant() { return blen / 2.0; }
+  double get_midpoint_pendant()
+  {
+    if (!std::isnan(blen)) {
+      return blen / 2.0;
+    } else {
+      return 0;
+    }
+  }
   double get_ldepth() { return ldepth; }
   std::string const get_name(bool return_na = false)
   {
@@ -100,6 +151,7 @@ public:
   se_t get_se() { return se; }
   se_t get_en() { return se - 1; }
   bool check_leaf() { return is_leaf; }
+  bool check_taxon() { return is_taxon; }
   bool is_labeled() { return !name.empty(); }
   sh_t sum_children_sh()
   {
@@ -107,17 +159,19 @@ public:
     std::for_each(children.begin(), children.end(), [&sh](node_sptr_t nd) { sh += nd->sh; });
     return sh;
   }
-  double total_blen = 0;
 
 private:
   vec<node_sptr_t> children;
   std::string name = "";
+  std::string rank = "";
   node_sptr_t parent = nullptr;
   tree_sptr_t tree = nullptr;
   double blen = 0;
   double bdepth = 0;
   uint32_t ldepth = 0;
+  double total_blen = 0;
   bool is_leaf = true;
+  bool is_taxon = false;
   tuint_t nchildren = 0;
   tuint_t ix_child = 0;
   tuint_t card = 0;

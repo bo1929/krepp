@@ -1,12 +1,8 @@
 #ifndef _RECORD_H
 #define _RECORD_H
 
-#include "MurmurHash3.hpp"
 #include "common.hpp"
 #include "phytree.hpp"
-
-#define MMHSEED1 1
-#define MMHSEED0 0
 
 class Subset : public std::enable_shared_from_this<Subset>
 {

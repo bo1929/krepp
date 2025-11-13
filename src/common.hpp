@@ -3,6 +3,7 @@
 
 #include <parallel_hashmap/phmap.h>
 #include <parallel_hashmap/btree.h>
+#include "MurmurHash3.hpp"
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -193,6 +194,30 @@ static inline uint64_t rmoddp_bp64(uint64_t x)
   x = (x | (x >> 8)) & 0x0000ffff0000ffff;
   x = (x | (x >> 16)) & 0x00000000ffffffff;
   return x;
+}
+
+static inline sh_t hash_name(std::string& name)
+{
+  sh_t sh = 0;
+  uint32_t a1, a2;
+  MurmurHash3_x86_32(name.c_str(), name.length(), MMHSEED0, &a1);
+  MurmurHash3_x86_32(name.c_str(), name.length(), MMHSEED1, &a2);
+  sh = sh | static_cast<uint64_t>(a1);
+  sh = sh << 32;
+  sh = sh | static_cast<uint64_t>(a2);
+  return sh;
+}
+
+static inline sh_t rehash(sh_t sh)
+{
+  uint32_t a1, a2;
+  MurmurHash3_x86_32(&sh, sizeof(sh), MMHSEED0, &a1);
+  MurmurHash3_x86_32(&sh, sizeof(sh), MMHSEED1, &a2);
+  sh = 0;
+  sh = sh | static_cast<uint64_t>(a1);
+  sh = sh << 32;
+  sh = sh | static_cast<uint64_t>(a2);
+  return sh;
 }
 
 static inline uint64_t conv_bp64_lr64(uint64_t x) { return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x); }

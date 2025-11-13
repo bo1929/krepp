@@ -239,7 +239,12 @@ void IBatch::report_placement(strstream& batch_stream)
     node_sptr_t nd_parent = nd_curr;
     // assert(!(std::isnan(mi_curr->d_llh) || std::isnan(mi_curr->v_llh)));
     while ((nd_parent = nd_parent->get_parent())) {
-      denom /= nd_parent->get_nchildren();
+      if (nd_parent->check_taxon() && nd_curr->check_taxon()) {
+        denom = 1.0;
+        // denom /= nd_parent->get_nchildren();
+      } else {
+        denom /= nd_parent->get_nchildren();
+      }
       if (!pp_map.contains(nd_parent)) {
         pp_map[nd_parent] = std::make_shared<Minfo>(hdist_th);
       }

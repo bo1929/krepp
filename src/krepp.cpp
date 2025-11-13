@@ -33,6 +33,18 @@ void TargetSketch::load_sketch()
   sketch->load_full_sketch();
   sketch->make_rho_partial();
 }
+
+void TargetIndex::read_lineages()
+{
+  qtree = std::make_shared<Tree>();
+  std::ifstream lineage_stream(lineage_path);
+  CHECK_STREAM_OR_EXIT(lineage_stream, (std::string("Error opening ") + lineage_path.string()));
+  qtree->parse_lineages(lineage_stream);
+  qtree->reset_traversal();
+  index->get_tree()->map_to_qtree(qtree);
+  lineage_stream.close();
+}
+
 void TargetIndex::ensure_backbone()
 {
   if (!nwk_path.empty()) {
@@ -40,9 +52,10 @@ void TargetIndex::ensure_backbone()
     std::ifstream tree_stream(nwk_path);
     CHECK_STREAM_OR_EXIT(tree_stream, (std::string("Error opening ") + nwk_path.string()));
     qtree->load(tree_stream);
-    CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the backbone tree of the index!");
+    CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the given backbone tree!");
     qtree->reset_traversal();
     index->get_tree()->map_to_qtree(qtree);
+    tree_stream.close();
   } else if (index->check_wbackbone()) {
     qtree = index->get_tree();
   } else {
@@ -118,6 +131,7 @@ void IndexMultiple::obtain_build_tree()
     CHECK_STREAM_OR_EXIT(tree_stream, (std::string("Error opening ") + nwk_path.string()));
     tree->load(tree_stream);
     CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the backbone tree of the index!");
+    tree_stream.close();
   }
   tree->reset_traversal();
 }
@@ -580,6 +594,13 @@ void QueryIndex::init_sc_place(CLI::App& sc)
                 nwk_path,
                 "Path to the Newick file for the (rooted) placement tree (overrides if the index has a backbone tree).")
     ->check(CLI::ExistingFile);
+  sc.add_option(
+      "-l,--lineage-file",
+      lineage_path,
+      "Path to the Greengenes/GTDB style taxonomic lineage file, the first column has to match reference IDs present in the index (tolerates missing IDs).")
+    ->excludes("--nwk-file")
+    ->excludes("-t")
+    ->check(CLI::ExistingFile);
   sc.add_option("--tau", tau, "Highest Hamming distance for placement threshold (increase to relax). [2]")
     ->check(CLI::NonNegativeNumber);
   multi = true;
@@ -718,10 +739,16 @@ int main(int argc, char** argv)
   if (sc_place.parsed()) {
     std::cerr << "Loading the index and the backbone tree..." << std::endl;
     krepp_place.load_index();
-    krepp_place.ensure_backbone();
-    std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
     std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
-    krepp_place.place_sequences();
+    if (sc_place.count("--lineage-file") + sc_place.count("-l")) {
+      krepp_place.read_lineages();
+      std::cerr << "Placing given sequences on the taxonomic lineage..." << std::endl;
+      krepp_place.place_sequences();
+    } else {
+      krepp_place.ensure_backbone();
+      std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
+      krepp_place.place_sequences();
+    }
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
     std::cerr << "Done placing queries, elapsed: " << es_s.count() << " sec" << std::endl;
     std::cerr << "Total number of sequences queried: " << krepp_place.get_total_qseq() << std::endl;
