@@ -212,6 +212,7 @@ private:
   double dist_max = 0.25;
   bool no_filter = true;
   bool filter = false;
+  bool tabular = false;
   bool multi = true;
   bool summarize = false;
   uint64_t total_qseq = 0;

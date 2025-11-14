@@ -403,6 +403,8 @@ void QueryIndex::header_preport(strstream& dreport_stream)
   qtree->stream_nwk_jplace(dreport_stream, qtree->get_root());
   if (summarize) {
     dreport_stream << "\nDISTAL_NODE\tEDGE_NUM\tWEIGHTED_COUNT\tSEQUENCE_ABUNDANCE\n";
+  } else if (tabular) {
+    dreport_stream << "\nSEQ_ID\tDISTAL_NODE\tEDGE_NUM\tLWR\tDIST\n";
   } else {
     (void)0; // TODO: Perhaps introduce an alternative placement report format.
   }
@@ -439,7 +441,7 @@ void QueryIndex::place_sequences()
   strstream preport_stream;
   preport_stream.precision(STRSTREAM_PRECISION);
   preport_stream << std::fixed;
-  if (summarize) {
+  if (summarize || tabular) {
     header_preport(preport_stream);
     (*output_stream) << preport_stream.rdbuf();
   } else {
@@ -461,7 +463,7 @@ void QueryIndex::place_sequences()
 #pragma omp task untied
         {
           strstream batch_stream;
-          ib.place_sequences(batch_stream);
+          ib.place_sequences(batch_stream, tabular);
           if (!summarize && !cont_reading) {
 #pragma omp task
             {
@@ -498,6 +500,8 @@ void QueryIndex::place_sequences()
       preport_stream << nd->get_name(true) << "\t" << nd->get_en() << "\t" << wcount << "\t" << wcount / twcount << "\n";
     }
     (*output_stream) << preport_stream.rdbuf();
+  } else if (tabular) {
+    (void)0;
   } else {
     preport_stream.str("");
     end_jplace(preport_stream);
@@ -615,6 +619,9 @@ void QueryIndex::init_sc_place(CLI::App& sc)
   sc.add_flag("--filter,!--no-filter",
               filter,
               "Filter a placement when there is not enough k-mer matches below threshold tau. [true]");
+  sc.add_flag("--tabular,!--no-tabular",
+              tabular,
+              "Output the per query sequence placements (taxonomic/phylogenetic) in a tab-separated format. [false]");
   sc.callback([&]() {
     no_filter = !filter;
     if (!output_path.empty()) {
@@ -747,12 +754,11 @@ int main(int argc, char** argv)
     if (sc_place.count("--lineage-file") + sc_place.count("-l")) {
       krepp_place.read_lineages();
       std::cerr << "Placing given sequences on the taxonomic lineage..." << std::endl;
-      krepp_place.place_sequences();
     } else {
       krepp_place.ensure_backbone();
       std::cerr << "Placing given sequences on the backbone tree..." << std::endl;
-      krepp_place.place_sequences();
     }
+    krepp_place.place_sequences();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
     std::cerr << "Done placing queries, elapsed: " << es_s.count() << " sec" << std::endl;
     std::cerr << "Total number of sequences queried: " << krepp_place.get_total_qseq() << std::endl;
