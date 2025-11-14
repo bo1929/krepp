@@ -56,9 +56,9 @@ public:
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void estimate_distances(strstream& batch_stream);
-  void place_sequences(strstream& batch_stream);
   void report_distances(strstream& batch_stream);
-  void report_placement(strstream& batch_stream);
+  void place_sequences(strstream& batch_stream, bool tabular);
+  void report_placement(strstream& batch_stream, bool tabular);
   const parallel_flat_phmap<node_sptr_t, double>& get_summary() { return node_to_wcount; }
 
 private:
@@ -187,6 +187,8 @@ public:
 #define PLACEMENT_FIELD(nd, mi)                                                                                             \
   "[" << nd->get_en() << ", 0, " << nd->get_midpoint_pendant() << ", " << -mi->v_llh << ", " << mi->lwr << ", "             \
       << mi->d_llh << "]"
+
+#define TABULAR_FIELD(nd, mi) nd->get_name(true) << "\t" << nd->get_en() << "\t" << mi->lwr << "\t" << mi->d_llh
 
 #define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
 
