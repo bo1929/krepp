@@ -193,6 +193,8 @@ public:
 
 #define TABULAR_FIELD(nd, mi) nd->get_name(true) << "\t" << nd->get_en() << "\t" << mi->lwr << "\t" << mi->d_llh
 
+#define TABULAR_FIELD(nd, mi) nd->get_name(true) << "\t" << nd->get_en() << "\t" << mi->lwr << "\t" << mi->d_llh
+
 #define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
 
 private:
