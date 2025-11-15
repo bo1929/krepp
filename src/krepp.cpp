@@ -321,9 +321,9 @@ void QuerySketch::seek_sequences()
 {
   strstream dreport_stream;
   header_dreport(dreport_stream);
-#if defined(_OPENMP) && _WOPENMP == 1
-  omp_set_num_threads(num_threads);
-#endif
+  // #if defined(_OPENMP) && _WOPENMP == 1
+  //   omp_set_num_threads(num_threads);
+  // #endif
   qseq_sptr_t qs = std::make_shared<QSeq>(query);
 #pragma omp parallel shared(qs)
   {
@@ -333,7 +333,7 @@ void QuerySketch::seek_sequences()
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
         SBatch sb(sketch, qs, hdist_th);
-#pragma omp task untied
+#pragma omp task
         {
           sb.seek_sequences(*output_stream);
         }

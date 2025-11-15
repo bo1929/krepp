@@ -26,7 +26,7 @@ public:
     hdisthist_v.resize(hdist_th + 1, 0);
   }
   void optimize_likelihood(optimize::HDistHistLLH llhfunc, double rho);
-  void add_matching_mer(sketch_sptr_t sketch, uint32_t rix, enc_t enc_lr);
+  uint32_t add_matching_mer(sketch_sptr_t sketch, uint32_t rix, enc_t enc_lr);
 
 private:
   uint32_t hdist_th;
@@ -61,6 +61,8 @@ private:
   vec<std::string> identifer_batch;
   optimize::HDistHistLLH llhfunc;
   double rho;
+  vec<double> x_v;
+  double mp;
 };
 
 #endif

@@ -46,6 +46,29 @@ namespace optimize {
 
     double prob_hit(const double d, const uint32_t x) { return rho * prob_collide(x) * prob_mutate(d, x); }
 
+    double mp(const double d, const double rho)
+    {
+      double npm = 0;
+      double dpm = 0;
+#pragma omp critical
+      {
+        for (uint32_t x = 0; x <= k; ++x) {
+          double v = (static_cast<double>(x) - k * d) / (d * (1 - d));
+          double p2 = pow((1.0 - d), k - x) * pow(d, x);
+          // double xa = static_cast<double>(x > hdist_th) +
+          //             static_cast<double>(x <= hdist_th) *
+          //               (1.0 - static_cast<double>(binom_coef_hnk[x]) / static_cast<double>(binom_coef_k[x]));
+          double xa = static_cast<double>(binom_coef_hnk[x]);
+          std::cout << x << " xa= " << xa << std::endl;
+          std::cout << x << " p2= " << p2 << std::endl;
+          std::cout << x << " v= " << v << std::endl;
+          npm += binom_coef_k[x] * v * p2 * xa;
+          dpm += (p2 * binom_coef_k[x] * xa);
+        }
+      }
+      return rho * (npm / (1.0 - rho + rho * dpm));
+    }
+
     HDistHistLLH() {}
 
     HDistHistLLH(uint32_t h, uint32_t k, uint32_t hdist_th)
@@ -58,7 +81,7 @@ namespace optimize {
       binom_coef_k.resize(k + 1);
       binom_coef_hnk.resize(hdist_th + 1);
       binom_coef_k[0] = 1;
-      binom_coef_hnk[0] = 0;
+      binom_coef_hnk[0] = 1;
       for (int32_t i = 0; i < k; ++i) {
         binom_coef_k[i + 1] = (binom_coef_k[i] * (k - i)) / (i + 1);
       }
