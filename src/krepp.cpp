@@ -792,7 +792,7 @@ int main(int argc, char** argv)
   if (sc_seek.parsed()) {
     std::cerr << "Loading the sketch..." << std::endl;
     krepp_seek.load_sketch();
-    std::cerr << "Seeking query sequences in the sktech..." << std::endl;
+    std::cerr << "Seeking query sequences in the sketch..." << std::endl;
     std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
     krepp_seek.seek_sequences();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;

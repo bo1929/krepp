@@ -55,14 +55,10 @@ namespace optimize {
         for (uint32_t x = 0; x <= k; ++x) {
           double v = (static_cast<double>(x) - k * d) / (d * (1 - d));
           double p2 = pow((1.0 - d), k - x) * pow(d, x);
-          // double xa = static_cast<double>(x > hdist_th) +
-          //             static_cast<double>(x <= hdist_th) *
-          //               (1.0 - static_cast<double>(binom_coef_hnk[x]) / static_cast<double>(binom_coef_k[x]));
-          double xa = static_cast<double>(binom_coef_hnk[x]);
-          std::cout << x << " xa= " << xa << std::endl;
-          std::cout << x << " p2= " << p2 << std::endl;
-          std::cout << x << " v= " << v << std::endl;
-          npm += binom_coef_k[x] * v * p2 * xa;
+          double xa = static_cast<double>(x > hdist_th) +
+                      static_cast<double>(x <= hdist_th) *
+                        (1.0 - static_cast<double>(binom_coef_k[x] -  binom_coef_hnk[x]) / static_cast<double>(binom_coef_k[x]));
+          npm +=  xa * binom_coef_k[x]* p2 * v;
           dpm += (p2 * binom_coef_k[x] * xa);
         }
       }
@@ -81,7 +77,7 @@ namespace optimize {
       binom_coef_k.resize(k + 1);
       binom_coef_hnk.resize(hdist_th + 1);
       binom_coef_k[0] = 1;
-      binom_coef_hnk[0] = 1;
+      binom_coef_hnk[0] = 0;
       for (int32_t i = 0; i < k; ++i) {
         binom_coef_k[i + 1] = (binom_coef_k[i] * (k - i)) / (i + 1);
       }
