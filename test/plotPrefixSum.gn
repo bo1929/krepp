@@ -1,0 +1,15 @@
+set terminal pngcairo size 800,400
+set output "values_plot.png"
+
+# CSV file with one column of numbers
+datafile = "values.csv"
+
+# X-axis: order of points
+# Y-axis: value from file
+set xlabel "Index"
+set ylabel "Value"
+set grid
+
+# Use pseudocolumn 0 for row index (0-based), add 1 to start at 1
+plot datafile using (0+$0+1):1 with linespoints lw 0.05 lc rgb "blue" pt 7 title "Values"
+

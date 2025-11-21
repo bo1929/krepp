@@ -1,0 +1,26 @@
+set terminal pngcairo size 900,500
+set output "interval_plot.png"
+
+set datafile separator ","
+datafile = "intervals.csv"
+
+# Count number of rows
+stats datafile nooutput
+N = STATS_records
+
+set xrange [0:*]
+set yrange [0:N+1]
+
+unset ytics
+unset ylabel
+set xlabel "X"
+unset grid
+
+# Plot each interval using vectors:
+#   x = start (col 1)
+#   y = row index (generated)
+#   dx = end - start (col 2 - col 1)
+#   dy = 0     (horizontal)
+plot for [i=0:N-1] datafile using 1:(i+1):(column(2)-column(1)):0 \
+    every ::i::i with vectors nohead lw 0.1 lc rgb "blue" notitle
+
