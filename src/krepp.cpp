@@ -88,10 +88,13 @@ void TargetIndex::load_index()
   }
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
-    if (suffix_to_ltype[suffixes[lix]] == lall_wbackbone) {
+    const std::set<std::string>& ltype = suffix_to_ltype[suffixes[lix]];
+    bool wobackbone = std::includes(ltype.begin(), ltype.end(), lall_wobackbone.begin(), lall_wobackbone.end());
+    bool wbackbone = std::includes(ltype.begin(), ltype.end(), lall_wbackbone.begin(), lall_wbackbone.end());
+    if (wbackbone) {
       index->load_partial_tree(suffixes[lix]);
       index->load_partial_index(suffixes[lix]);
-    } else if (suffix_to_ltype[suffixes[lix]] == lall_wobackbone) {
+    } else if (wobackbone) {
       index->generate_partial_tree(suffixes[lix]);
       index->load_partial_index(suffixes[lix]);
     } else {
@@ -108,6 +111,8 @@ void SketchSingle::create_sketch()
   sdynht->fill_table(nrows, rs);
   sketch_sflatht = std::make_shared<SFlatHT>(sdynht);
   rho = rs->get_rho();
+  std::cerr << "Total number of k-mers included in the sketch: " << sdynht->get_nkmers() << std::endl;
+  std::cerr << "Subsampling rate (rho) is: " << rho << std::endl;
 }
 
 void SketchSingle::save_sketch()
@@ -218,14 +223,13 @@ void IndexMultiple::save_index()
   CHECK_STREAM_OR_EXIT(crecord_stream, "Failed to write the color array of the index!");
   crecord_stream.close();
 
-  if (nwk_path.empty()) {
-    std::cerr << "Skipped saving a backbone for the index!" << std::endl;
-    std::ofstream reflist_stream(index_dir / ("reflist" + suffix));
-    std::ostream_iterator<std::string> reflist_iterator(reflist_stream, "\n");
-    std::copy(std::begin(names_v), std::end(names_v), reflist_iterator);
-    CHECK_STREAM_OR_EXIT(reflist_stream, "Failed to write the reference list of the index!");
-    reflist_stream.close();
-  } else {
+  std::cerr << "Skipped saving a backbone for the index!" << std::endl;
+  std::ofstream reflist_stream(index_dir / ("reflist" + suffix));
+  std::ostream_iterator<std::string> reflist_iterator(reflist_stream, "\n");
+  std::copy(std::begin(names_v), std::end(names_v), reflist_iterator);
+  CHECK_STREAM_OR_EXIT(reflist_stream, "Failed to write the reference list of the index!");
+  reflist_stream.close();
+  if (!nwk_path.empty()) {
     std::ofstream tree_stream(index_dir / ("tree" + suffix));
     root_flatht->get_tree()->save(tree_stream);
     CHECK_STREAM_OR_EXIT(tree_stream, "Failed to write the backbone tree of the index!");
@@ -780,7 +784,7 @@ int main(int argc, char** argv)
     krepp_sketch.create_sketch();
     krepp_sketch.save_sketch();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;
-    std::cerr << "Done skething & saving, elapsed: " << es_s.count() << " sec" << std::endl;
+    std::cerr << "Done sketching & saving, elapsed: " << es_s.count() << " sec" << std::endl;
   }
 
   if (sc_seek.parsed()) {

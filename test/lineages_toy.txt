@@ -1,0 +1,18 @@
+G000016665	k__Bacteria; p__Chloroflexota; c__Chloroflexia; o__Chloroflexales; f__Roseiflexaceae; g__Roseiflexus; s__
+G000018865	k__Bacteria; p__Chloroflexota; c__Chloroflexia; o__Chloroflexales; f__Chloroflexaceae; g__Chloroflexus; s__Chloroflexus aurantiacus
+G000021685	k__Bacteria; p__Chloroflexota; c__Chloroflexia; o__Thermomicrobiales; f__Thermomicrobiaceae; g__Thermomicrobium; s__Thermomicrobium roseum
+G000025025	k__Bacteria; p__Chloroflexota; c__Dehalococcoidia; o__Dehalococcoidales; f__Dehalococcoidaceae; g__Dehalococcoides; s__Dehalococcoides mccartyi_A
+G000341695	k__Bacteria; p__Chloroflexota; c__Dehalococcoidia; o__Dehalococcoidales; f__Dehalococcoidaceae; g__Dehalococcoides; s__Dehalococcoides mccartyi_B
+G000526415	k__Bacteria; p__Chloroflexota; c__Chloroflexia; o__Chloroflexales; f__Herpetosiphonaceae; g__JKG1; s__
+G000702505	k__Bacteria; p__Chloroflexota; c__Ktedonobacteria; o__Ktedonobacterales; f__Ktedonobacteraceae; g__Thermogemmatispora; s__Thermogemmatispora carboxidivorans
+G000735195	k__Bacteria; p__Chloroflexota; c__Chloroflexia; o__Chloroflexales; f__Chloroflexaceae; g__Chloroflexus; s__
+G000741845	k__Bacteria; p__Chloroflexota; c__Dehalococcoidia; o__Dehalococcoidales; f__Dehalococcoidaceae; g__Dehalococcoides; s__Dehalococcoides mccartyi_B
+G000830905	k__Bacteria; p__Chloroflexota; c__Dehalococcoidia; o__Dehalococcoidales; f__Dehalococcoidaceae; g__Dehalococcoides; s__Dehalococcoides mccartyi
+G001050235	k__Bacteria; p__Chloroflexota; c__Anaerolineae; o__Anaerolineales; f__Anaerolineaceae; g__Longilinea; s__Longilinea arvoryzae
+G001306055	k__Bacteria; p__Chloroflexota; c__Anaerolineae; o__Anaerolineales; f__Anaerolineaceae; g__Bellilinea; s__Bellilinea caldifistulae
+G001306135	k__Bacteria; p__Chloroflexota; c__Chloroflexia; o__Chloroflexales; f__Herpetosiphonaceae; g__Herpetosiphon; s__Herpetosiphon geysericola
+G001567105	k__Bacteria; p__Chloroflexota; c__Anaerolineae; o__Anaerolineales; f__envOPS12; g__OLB14; s__
+G001610775	k__Bacteria; p__Chloroflexota; c__Dehalococcoidia; o__Dehalococcoidales; f__Dehalococcoidaceae; g__Dehalococcoides; s__Dehalococcoides mccartyi_B
+G001889305	k__Bacteria; p__Chloroflexota; c__Dehalococcoidia; o__Dehalococcoidales; f__Dehalococcoidaceae; g__Dehalococcoides; s__Dehalococcoides mccartyi_A
+G001917855	k__Bacteria; p__Firmicutes_H; c__CSP1-3; o__CSP1-3; f__13-1-40CM-64-14; g__13-1-40CM-64-14; s__
+G001918235	k__Bacteria; p__Dormibacterota; c__Dormibacteria; o__Dormibacterales; f__Dormibacteraceae; g__40CM-4-65-16; s__40CM-4-65-16 sp1

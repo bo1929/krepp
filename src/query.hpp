@@ -8,6 +8,8 @@
 #include "table.hpp"
 #include "hdhistllh.hpp"
 
+#define CJC 4.0 / 3.0
+
 namespace optimize {
   class HDistHistLLH;
 }
@@ -180,13 +182,14 @@ public:
     }
     return total_leq_tau;
   }
+  double jukes_cantor_dist() { return -0.75 * log(1 - CJC * d_llh); }
   /* void compute_gamma(); */
   void optimize_likelihood(optimize::HDistHistLLH& llhfunc);
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
 #define PLACEMENT_FIELD(nd, mi)                                                                                             \
-  "[" << nd->get_en() << ", 0, " << nd->get_midpoint_pendant() << ", " << -mi->v_llh << ", " << mi->lwr << ", "             \
-      << mi->d_llh << "]"
+  "[" << nd->get_en() << ", " << mi->jukes_cantor_dist() - nd->get_midpoint_pendant() << ", " << nd->get_midpoint_pendant() \
+      << ", " << -mi->v_llh << ", " << mi->lwr << ", " << mi->d_llh << "]"
 
 #define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
 

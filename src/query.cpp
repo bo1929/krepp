@@ -1,5 +1,4 @@
 #include "query.hpp"
-#include "common.hpp"
 #include <boost/math/tools/minima.hpp>
 
 /* #define CHISQ_THRESHOLD 3.841 */

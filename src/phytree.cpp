@@ -1,5 +1,4 @@
 #include "phytree.hpp"
-#include "common.hpp"
 
 bool is_number(const std::string& s)
 {
@@ -86,7 +85,10 @@ void Tree::split_nwk(vec<std::string>& el_v)
 { // TODO: This doesn't parse The Rich Newick format. Mention in the docs.
   std::string buf = "";
   bool is_quoted = false, quote = false, quote_p = false, is_comment = false;
-  if (!nwk_str.empty()) {
+  if (nwk_str.empty()) {
+    error_exit("Given Newick tree seems to be empty?!?.");
+  }
+  if (nwk_str.back() == '\n') {
     nwk_str.pop_back();
   }
   buf.reserve(el_v.size());
@@ -151,13 +153,7 @@ void Node::parse(vec<std::string>& el_v)
       tree->atter++;
       children.emplace_back(std::make_shared<Node>(tree));
       (children.back())->set_parent(getptr());
-      (children.back())->ix_child = nchildren;
       (children.back())->parse(el_v);
-      card += (children.back())->card;
-      sh += (children.back())->sh;
-      total_blen += (children.back())->blen;
-      total_blen += (children.back())->total_blen;
-      nchildren++;
       if (el_v[tree->atter] == ",")
         continue;
       else
@@ -166,7 +162,6 @@ void Node::parse(vec<std::string>& el_v)
     if (nchildren == 1) {
       error_exit("A node has a single child in the backbone tree! Please suppress unifurcations.");
     }
-    is_leaf = false;
     tree->nnodes++;
     se = tree->nnodes;
     tree->se_to_node.push_back(getptr());
@@ -183,7 +178,7 @@ void Node::parse(vec<std::string>& el_v)
       }
       if (el_v[tree->atter] == ":") {
         blen = std::atof(el_v[tree->atter + 1].c_str());
-        tree->total_blen += blen;
+        tree->tblen += blen;
         tree->atter += 2;
       }
     }
@@ -200,7 +195,7 @@ void Node::parse(vec<std::string>& el_v)
       }
       if (el_v[tree->atter] == ":") {
         blen = std::atof(el_v[tree->atter + 1].c_str());
-        tree->total_blen += blen;
+        tree->tblen += blen;
         tree->atter += 2;
       }
     }
@@ -222,7 +217,7 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
   if (diff_size == 1) {
     name = *(name_first);
     blen = 1.0;
-    tree->total_blen += blen;
+    tree->tblen += blen;
     is_leaf = true;
     card = 1;
     sh = Subset::get_singleton_sh(name);
@@ -245,8 +240,8 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
       }
       card += (children.back())->card;
       sh += (children.back())->sh;
-      total_blen += (children.back())->blen;
-      total_blen += (children.back())->total_blen;
+      tblen += (children.back())->blen;
+      tblen += (children.back())->tblen;
       nchildren++;
     }
     blen = 1.0;
@@ -256,7 +251,7 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
     // name = "N" + std::to_string(se - 1);
     name = "";
     tree->se_to_node.push_back(getptr());
-    tree->total_blen += blen;
+    tree->tblen += blen;
   }
 }
 
@@ -309,7 +304,7 @@ void Tree::print_info()
 {
   std::cout << "The tree rooted at : " << root->get_name() << std::endl;
   std::cout << "\tNumber of nodes : " << nnodes << std::endl;
-  std::cout << "\tTotal branch length : " << total_blen << std::endl;
+  std::cout << "\tTotal branch length : " << tblen << std::endl;
 }
 
 node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
@@ -329,7 +324,7 @@ void Tree::parse_lineages(std::ifstream& lineage_stream)
 {
   root = std::make_shared<Node>(getptr(), "root", nullptr);
   root->set_rank("root");
-  atter = 0, nnodes = 0, total_blen = 0;
+  atter = 0, nnodes = 0, tblen = 0;
   subtree_root = root;
   parallel_flat_phmap<std::string, node_sptr_t> taxon_to_node = {};
 
@@ -405,7 +400,7 @@ void Tree::load(std::ifstream& tree_stream)
   vec<std::string> el_v;
   split_nwk(el_v);
   root = std::make_shared<Node>(getptr());
-  atter = 0, nnodes = 0, total_blen = 0;
+  atter = 0, nnodes = 0, tblen = 0;
   root->parse(el_v);
   subtree_root = root;
   // compute_bdepth();
