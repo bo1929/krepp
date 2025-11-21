@@ -3,7 +3,6 @@
 
 #include "common.hpp"
 #include "record.hpp"
-#include <cmath>
 
 typedef std::vector<std::string>::const_iterator vec_str_iter;
 
@@ -46,7 +45,7 @@ private:
   std::string nwk_str;
   tuint_t atter = 0;
   tuint_t nnodes = 0;
-  double total_blen = 0;
+  double tblen = 0;
   node_sptr_t root = nullptr;
   node_sptr_t curr = nullptr;
   node_sptr_t subtree_root = nullptr;
@@ -80,7 +79,7 @@ public:
     blen = std::numeric_limits<double>::quiet_NaN();
     bdepth = std::numeric_limits<double>::quiet_NaN();
     ldepth = parent ? parent->get_ldepth() + 1 : 0;
-    total_blen = std::numeric_limits<double>::quiet_NaN();
+    tblen = std::numeric_limits<double>::quiet_NaN();
   }
   void print_info();
   void parse(vec<std::string>& n_vec);
@@ -107,7 +106,8 @@ public:
   void add_children(node_sptr_t child)
   {
     nchildren++;
-    children.push_back(child);
+    tblen += child->get_blen() + child->get_tblen();
+    // children.push_back(child);
     card = card + child->get_card();
     sh = sh + child->get_sh();
     is_leaf = false;
@@ -117,6 +117,7 @@ public:
   tree_sptr_t get_tree() { return tree; }
   double get_bdepth() { return bdepth; }
   double get_blen() { return blen; }
+  double get_tblen() { return tblen; }
   double get_midpoint_pendant()
   {
     if (!std::isnan(blen)) {
@@ -169,7 +170,7 @@ private:
   double blen = 0;
   double bdepth = 0;
   uint32_t ldepth = 0;
-  double total_blen = 0;
+  double tblen = 0;
   bool is_leaf = true;
   bool is_taxon = false;
   tuint_t nchildren = 0;
