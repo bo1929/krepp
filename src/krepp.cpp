@@ -106,7 +106,9 @@ void SketchSingle::create_sketch()
   rseq_sptr_t rs = std::make_shared<RSeq>(input, lshf, w, r, frac, sdust_t, sdust_w);
   sdynht_sptr_t sdynht = std::make_shared<SDynHT>();
   sdynht->fill_table(nrows, rs);
+  std::cout << sdynht->get_nkmers() << std::endl;
   sketch_sflatht = std::make_shared<SFlatHT>(sdynht);
+
   rho = rs->get_rho();
 }
 

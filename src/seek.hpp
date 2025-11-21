@@ -61,7 +61,7 @@ private:
   vec<std::string> identifer_batch;
   optimize::HDistHistLLH llhfunc;
   double rho;
-  vec<double> x_v;
+  vec<double> s;
   double mp;
 };
 

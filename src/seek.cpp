@@ -21,16 +21,24 @@ using std::pair;
 using std::tuple;
 using std::vector;
 
-#define DD 0.1055
+#define DD 0.06
 #define KK 10000
+
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& v)
+{
+  for (const auto& element : v) {
+    os << element << " ";
+  }
+  return os;
+}
 
 vector<long double> prefix_sum(const vector<double>& X)
 {
   int n = X.size();
   vector<long double> P(n + 1, 0.0);
   for (int i = 0; i < n; ++i) {
-    P[i + 1] = P[i] + (-X[i]);
-    // std::cout << P[i + 1] << std::endl;
+    P[i + 1] = P[i] + X[i];
   }
   // for (int i = 0; i < n; ++i) {
   //   P[i] = std::lround(P[i] / 2) - std::lround(P[i] / 2) % 2;
@@ -225,10 +233,14 @@ int binary_search_in_segment(const vector<long double>& P,
 vector<pair<int, int>> monotonic_segment_optimized_intervals(const vector<double>& X, int K)
 {
   int n = X.size();
+  vector<pair<int, int>> intervals;
   vector<long double> P = prefix_sum(X);
   vector<long double> M = prefix_maxima(P);
   vector<long double> S_min = suffix_min(P);
   auto [segments, labels] = find_monotone_segments(P);
+  if (segments.size() < 3) {
+    return intervals;
+  }
   vector<vector<pair<long double, int>>> segment_data = build_segment_arrays(segments, P);
   vector<int> pm;
   long double cur_max = -std::numeric_limits<long double>::infinity();
@@ -238,7 +250,6 @@ vector<pair<int, int>> monotonic_segment_optimized_intervals(const vector<double
       cur_max = P[i];
     }
   vector<int> jl = compute_jump_labels(pm, labels, segments, P);
-  vector<pair<int, int>> intervals;
   for (int idx = 0; idx < pm.size(); ++idx) {
     int a = pm[idx];
     if (a >= n) continue;
@@ -281,7 +292,8 @@ void SBatch::seek_sequences(std::ostream& output_stream)
 {
   strstream batch_stream;
   for (bix = 0; bix < batch_size; ++bix) {
-    x_v.clear();
+    s.clear();
+    // s.push_back(0);
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
     enmers = len - k + 1;
@@ -290,11 +302,65 @@ void SBatch::seek_sequences(std::ostream& output_stream)
     SSummary or_summary(enmers, hdist_th);
     SSummary rc_summary(enmers, hdist_th);
     search_mers(seq, len, or_summary, rc_summary);
+    // s = {0,  1000, -1, 2,  -5, 1,   4,  3,  -2,   -1, 3,  -4, 2,   1,  1,
+    //      -1, 1000, -1, -3, -5, -20, 10, -2, 1000, -1, -3, -5, -20, 10, -2};
+    // std::inclusive_scan(s.begin(), s.end(), s.begin());
+    vector<long double> ss = prefix_sum(s);
+    // std::cout << s << std::endl;
 
-    vector<pair<int, int>> res = monotonic_segment_optimized_intervals(x_v, KK);
-    //for (uint32_t i = 0; i < x_v.size(); ++i) {
+    std::vector<double> prefmax(ss.size() + 1);
+    prefmax[0] = -std::numeric_limits<double>::max();
+    std::inclusive_scan(ss.begin(), ss.end(), prefmax.begin() + 1, [](double a, double b) { return std::max(a, b); });
+    // std::cout << prefmax << std::endl;
+
+    std::vector<double> suffmin(ss.size());
+    std::inclusive_scan(ss.rbegin(), ss.rend(), suffmin.rbegin(), [](double a, double b) { return std::min(a, b); });
+    suffmin.push_back(std::numeric_limits<double>::max());
+    // std::cout << suffmin << std::endl;
+
+    int n = ss.size();
+    int tau = KK;
+    int b = 0;
+    int bp = 0;
+
+    for (int a = 1; a < n; ++a) {
+      bp = b;
+      // b = 0;
+      if (b < (a + tau + 1)) {
+        b = a + tau + 1;
+      }
+      if (prefmax[a - 1] >= ss[a]) {
+        b = bp;
+        continue;
+      }
+      if (suffmin[b + 1] >= ss[a]) {
+        b = bp;
+        continue;
+      }
+      // if (b > n) {
+      //   std::cout << a << std::endl;
+      //   break;
+      // }
+      while (b <= n) {
+        // std::cout << a << ", " << b << ": " << (prefmax[a - 1] <= ss[b]) << "/" << (ss[b] < ss[a]) << "/"
+        //           << (ss[a] <= suffmin[b + 1]) << " # " << ss[a] << "<>" << ss[b] << " || " << suffmin[b + 1] << std::endl;
+        if ((prefmax[a - 1] <= ss[b]) && (ss[b] < ss[a]) && (ss[a] <= suffmin[b + 1])) {
+          std::cout << a << "," << b << std::endl;
+          break;
+        }
+        b += 1;
+      }
+      if (b > n) {
+        // std::cout << a << "," << ss[a] << "," << ss[b] << "," << bp << ", " << ss[bp] << "," << suffmin[bp + 1] << std::endl;
+        break;
+      }
+    }
+    std::cout << n << "," << n << std::endl;
+
+    // vector<pair<int, int>> res = monotonic_segment_optimized_intervals(s, KK);
+    // for (uint32_t i = 0; i < s.size(); ++i) {
     // #pragma omp critical
-    //   std::cout << x_v[i] << std::endl;
+    //   std::cout << s[i] << std::endl;
     // }
   }
 #pragma omp critical
@@ -350,9 +416,11 @@ void SBatch::search_mers(const char* seq, uint64_t len, SSummary& or_summary, SS
 #endif /* CANONICAL */
     hdist_curr = std::min(hdist_or, hdist_rc);
     if (hdist_curr <= hdist_th) {
-      x_v.push_back((static_cast<double>(hdist_curr) - k * DD) / (DD * (1 - DD)));
+      // s.push_back((s.back() - (static_cast<double>(hdist_curr) - k * DD) / (DD * (1 - DD))));
+      s.push_back(((static_cast<double>(hdist_curr) - k * DD) / (DD * (1 - DD))));
     } else {
-      x_v.push_back(mp);
+      // s.push_back(s.back() - mp);
+      s.push_back(mp);
     }
   }
 }
