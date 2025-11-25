@@ -1,9 +1,9 @@
 # krepp
-A k-mer-based maximum likelihood tool for estimating distances of reads to genomes and phylogenetic placement.
+krepp is a k-mer-based maximum likelihood tool for estimating distances of reads to genomes and phylogenetic placement.
 
 For the descripton of the method, please refer to the preprint [here](https://www.biorxiv.org/content/10.1101/2025.01.20.633730v1).
 
-See the [Wiki page](https://github.com/bo1929/krepp/wiki) or a detailed documentation, a list of available databases and tutorials.
+See the [Wiki](https://github.com/bo1929/krepp/wiki) for a detailed documentation, a list of available databases, and various tutorials.
 
 ## Installation
 ### Using `conda` (recommended)
@@ -23,7 +23,7 @@ and run `./krepp --help`. Then, perhaps, copy it to a directory you have in your
 
 
 ## Quickstart with a toy example
-#### Building a small index
+### Building a small index
 You can build an index from scratch, consisting of only 25 genomes provided in `test/`, to make yourself familiar with `krepp`.
 ```bash
 cd test/
@@ -34,7 +34,7 @@ This command took only a couple of seconds and used $<$1.5GB memory for 6,863,41
 The resulting index will be stored in `index_toy`.
 Alternatively, you could download one of the larger [public libraries](Available-reference-indexes) to make it more realistic and use it also for your novel query sequences.
 
-#### Querying sequences against the reference index
+### Querying sequences against the reference index
 Once you have your index (e.g., the one we built above: `index_toy`), you can estimate distance by running:
 ```bash
 krepp dist -i index_toy -q query_toy.fq --num-threads 4 | tee distances_toy.tsv
@@ -116,7 +116,7 @@ SEQ_ID  DISTAL_NODE     EDGE_NUM        LWR     DIST
 ||61435-2985    N4337   40      0.1997  0.0183
 ```
 
-# Citation
+## Citation
 ```bibtex
 @misc{sapci_k-mer-based_2025,
 	title = {A k-mer-based maximum likelihood method for estimating distances of reads to genomes enables genome-wide phylogenetic placement.},
