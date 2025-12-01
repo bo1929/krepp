@@ -21,8 +21,8 @@ using std::pair;
 using std::tuple;
 using std::vector;
 
-#define DD 0.06
-#define KK 10000
+#define DD 0.20
+#define KK 100
 
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& v)
