@@ -232,17 +232,11 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
     for (uint32_t pix = 0; pix < 2; ++pix) {
       children.emplace_back(std::make_shared<Node>(tree));
       (children.back())->set_parent(getptr());
-      (children.back())->ix_child = nchildren;
       if (pix) {
         (children.back())->generate_tree(name_first, name_half);
       } else {
         (children.back())->generate_tree(name_half, name_last);
       }
-      card += (children.back())->card;
-      sh += (children.back())->sh;
-      tblen += (children.back())->blen;
-      tblen += (children.back())->tblen;
-      nchildren++;
     }
     blen = 1.0;
     is_leaf = false;
