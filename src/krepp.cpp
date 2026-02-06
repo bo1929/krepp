@@ -533,8 +533,8 @@ SketchSingle::SketchSingle(CLI::App& sc)
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m. [true]");
-  sc.add_option("--sdust-t", sdust_t, "SDUST threshold. [20]")->check(CLI::NonNegativeNumber);
-  sc.add_option("--sdust-w", sdust_w, "SDUST window. [64]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-t", sdust_t, "SDUST threshold (dustmasker: 20). [0]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-w", sdust_w, "SDUST window (dustmasker: 64). [0]")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;

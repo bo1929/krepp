@@ -53,8 +53,8 @@ public:
     r = 1;
     frac = true;
     nrows = pow(2, 2 * h - 1);
-    sdust_t = 20;
-    sdust_w = 64;
+    sdust_t = 0;
+    sdust_w = 0;
   }
   bool validate_configuration()
   {
@@ -77,8 +77,9 @@ public:
     if (is_invalid = (k - h) > 16) {
       std::cerr << "For compact k-mer encodings, h must be >= k-16." << std::endl;
     }
-    if (sdust_t == 0 || sdust_w == 0) {
-      std::cerr << "Setting --sdust-w or --sdust-t to 0 will disable dustmasker." << std::endl;
+    if (sdust_t != 0 && sdust_w != 0) {
+      std::cerr << "Setting --sdust-w and --sdust-t to >0 will enable dustmasker." << std::endl;
+      std::cerr << "With dustmasker, krepp might fail to model subsampling and be slightly inaccurate." << std::endl;
     }
     return !is_invalid;
   }
