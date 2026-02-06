@@ -40,8 +40,8 @@ void LSHF::set_lshf()
     mask_drop_lr += (0x0000000100000001ull << npos_v[i]);
     mask_drop_bp += (0x0000000000000003ull << (npos_v[i] * 2));
   }
-  for (uint32_t i = 2 * (k - h) + 1; i < 32; ++i) {
-    mask_drop_lr += (0x0000000000000001ull << i);
+  for (uint32_t i = 0; i < 16-(k-h); ++i) {
+    mask_drop_lr += 0x0000000000000001ull << (i + k);
   }
   for (int i = ppos_v.size() - 1; i >= 0; --i) {
     mask_hash_lr += (0x0000000100000001ull << ppos_v[i]);
@@ -63,7 +63,6 @@ uint32_t LSHF::compute_hash(uint64_t enc64_bp) { return static_cast<uint32_t>(_p
 
 uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
 {
-
   /* return (static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_l)) << 16) + */
   /*        static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_r)); */
   return static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_lr));
