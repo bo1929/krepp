@@ -41,8 +41,8 @@ public:
     r = 1;
     frac = true;
     nrows = pow(2, 2 * h - 1);
-    sdust_t = 20;
-    sdust_w = 64;
+    sdust_t = 0;
+    sdust_w = 0;
   }
   void set_index_defaults()
   {
@@ -225,6 +225,9 @@ class InfoIndex : public TargetIndex
 public:
   InfoIndex(CLI::App& sc);
   void display_info();
+
+private:
+  std::ostream* output_stream = &std::cout;
 };
 
 #endif

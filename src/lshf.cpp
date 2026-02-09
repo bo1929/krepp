@@ -40,7 +40,7 @@ void LSHF::set_lshf()
     mask_drop_lr += (0x0000000100000001ull << npos_v[i]);
     mask_drop_bp += (0x0000000000000003ull << (npos_v[i] * 2));
   }
-  for (uint32_t i = 0; i < 16-(k-h); ++i) {
+  for (uint32_t i = 0; i < 16 - (k - h); ++i) {
     mask_drop_lr += 0x0000000000000001ull << (i + k);
   }
   for (int i = ppos_v.size() - 1; i >= 0; --i) {

@@ -29,13 +29,11 @@ public:
     : nrows(nrows)
     , tree(tree)
     , record(record)
-  {
-  }
+  {}
   DynHT()
     : tree(nullptr)
     , record(nullptr)
-  {
-  }
+  {}
   void print_info();
   void clear_rows();
   void make_unique();
@@ -72,7 +70,7 @@ class SFlatHT
 
 public:
   SFlatHT(sdynht_sptr_t source);
-  SFlatHT() {};
+  SFlatHT(){};
   ~SFlatHT()
   {
     inc_v.clear();
@@ -112,7 +110,7 @@ public:
   FlatHT(dynht_sptr_t source);
   FlatHT(tree_sptr_t tree, crecord_sptr_t crecord)
     : tree(tree)
-    , crecord(crecord) {};
+    , crecord(crecord){};
   ~FlatHT()
   {
     inc_v.clear();
@@ -144,7 +142,7 @@ public:
       return cmer_v.end();
     }
   }
-  void display_info(uint32_t r);
+  void display_info(std::ostream* output_stream, uint32_t r);
 
 private:
   uint32_t nrows = 0;

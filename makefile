@@ -50,12 +50,12 @@ GOMP_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) $(LDFLAG
 
 $(info ===== Build mode: $(mode) =====)
 ifeq ($(mode),dynamic)
-	LDLIBS = -lstdc++ -lm -lz
+	LDLIBS = -lm -lz -lstdc++ -lstdc++fs
 else ifeq ($(mode),static)
-	LDLIBS = --static -static-libgcc -static-libstdc++ -lm -lz
+	LDLIBS = --static -static-libgcc -static-libstdc++ -lm -lz -lstdc++fs
 	CURL_SUPPORTED = no
 else
-	LDLIBS = -lm -lz -lstdc++
+	LDLIBS = -lm -lz -lstdc++ -lstdc++fs
 endif
 
 WLCURL = 0

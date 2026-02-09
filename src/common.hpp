@@ -118,8 +118,7 @@ struct mer_t
   mer_t(enc_t encoding, sh_t sh)
     : encoding(encoding)
     , sh(sh)
-  {
-  }
+  {}
 };
 
 static inline uint32_t gp_hash(const std::string& str)
@@ -253,6 +252,18 @@ constexpr Integral extract_bits(Integral x, Integral mask)
     mask &= (mask - 1);
   }
   return res;
+}
+
+static std::string vec_to_str(const std::vector<uint8_t>& v)
+{
+  std::ostringstream oss;
+  oss << "[";
+  for (size_t i = 0; i < v.size(); ++i) {
+    if (i > 0) oss << ", ";
+    oss << static_cast<int>(v[i]);
+  }
+  oss << "]";
+  return oss.str();
 }
 
 #define assertm(exp, msg) assert(((void)msg, exp))

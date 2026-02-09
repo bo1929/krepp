@@ -21,8 +21,7 @@ public:
     , ch(ch)
     , card(card)
     , nonce(nonce)
-  {
-  }
+  {}
   subset_sptr_t getptr() { return shared_from_this(); }
   static inline sh_t get_singleton_sh(std::string& name)
   {
@@ -97,7 +96,7 @@ public:
   crecord_sptr_t getptr() { return shared_from_this(); }
   pse_t get_pse(se_t se) const { return se_to_pse[se]; }
   double get_rho(se_t se) const { return se_to_rho[se]; }
-  void display_info(uint32_t r, vec<uint64_t>& se_to_count);
+  void display_info(std::ostream* output_stream, uint32_t r, vec<uint64_t>& se_to_count);
   // TODO: void merge(crecord_sptr_t rhs);
 
 private:

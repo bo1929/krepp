@@ -276,12 +276,12 @@ void DynHT::fill_table(sh_t sh, rseq_sptr_t rs)
   make_unique();
 }
 
-void FlatHT::display_info(uint32_t r)
+void FlatHT::display_info(std::ostream* output_stream, uint32_t r)
 {
   vec<uint64_t> se_to_count;
   se_to_count.resize(crecord->get_nsubsets());
   for (uint64_t ix = 0; ix < nkmers; ++ix) {
     se_to_count[cmer_v[ix].second]++;
   }
-  crecord->display_info(r, se_to_count);
+  crecord->display_info(output_stream, r, se_to_count);
 }

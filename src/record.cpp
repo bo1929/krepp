@@ -254,9 +254,9 @@ void CRecord::decode_se(se_t se, vec<node_sptr_t>& subset_v)
   }
 }
 
-void CRecord::display_info(uint32_t r, vec<uint64_t>& se_to_count)
+void CRecord::display_info(std::ostream* output_stream, uint32_t r, vec<uint64_t>& se_to_count)
 {
-  std::cout << r << "\tNUM_COLORS\t" << nsubsets << "\n";
+  (*output_stream) << r << "\tNUM_COLORS\t" << nsubsets - 1 << "\n";
   vec<uint64_t> se_to_outdegree(se_to_pse.size());
   for (int ix = 1; ix < se_to_pse.size(); ++ix) {
     se_to_outdegree[se_to_pse[ix].first]++;
@@ -269,10 +269,10 @@ void CRecord::display_info(uint32_t r, vec<uint64_t>& se_to_count)
     outdegree_hist[se_to_outdegree[ix]]++;
   }
   for (auto const& [key, val] : count_hist) {
-    std::cout << r << "\tMER_COUNT\t" << key << "\t" << val << "\n";
+    (*output_stream) << r << "\tMER_COUNT\t" << key << "\t" << val << "\n";
   }
   for (auto const& [key, val] : outdegree_hist) {
-    std::cout << r << "\tOUTDEGREE_COUNT\t" << key << "\t" << val << "\n";
+    (*output_stream) << r << "\tOUTDEGREE_COUNT\t" << key << "\t" << val << "\n";
   }
   // std::queue<se_t> se_q;
   // uint64_t se;
@@ -297,7 +297,7 @@ void CRecord::display_info(uint32_t r, vec<uint64_t>& se_to_count)
   //     }
   //     depth--;
   //   }
-  //   std::cout << r << "\tCOLOR_INFO\t" << ix << "\t" << depth << "\t" << se_to_count[ix] << "\n";
+  //   (*output_stream) << r << "\tCOLOR_INFO\t" << ix << "\t" << depth << "\t" << se_to_count[ix] << "\n";
   // }
 }
 

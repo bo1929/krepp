@@ -76,10 +76,13 @@ void TargetIndex::load_index()
     pos1 = filename.find("-", 0);
     pos2 = filename.find("-", pos1 + 1);
     ltype = filename.substr(0, pos1);
-    if (lall.find(ltype) != lall.end() && entry.path().extension().empty()) {
-      mrcfg = filename.substr(pos1, pos2 - pos1);
-      fracv = filename.substr(pos2, filename.size() - pos2);
-      suffix_to_ltype[mrcfg + fracv].insert(ltype);
+    if (lall.find(ltype) != lall.end()) {
+      if (entry.path().extension().empty()) {
+        mrcfg = filename.substr(pos1, pos2 - pos1);
+        fracv = filename.substr(pos2, filename.size() - pos2);
+        suffix_to_ltype[mrcfg + fracv].insert(ltype);
+      }
+    } else {
     }
   }
   std::vector<std::string> suffixes;
@@ -177,18 +180,6 @@ void IndexMultiple::build_index()
   root_flatht = std::make_shared<FlatHT>(root_dynht);
 }
 
-static std::string vec_to_str(const std::vector<uint8_t>& v)
-{
-  std::ostringstream oss;
-  oss << "[";
-  for (size_t i = 0; i < v.size(); ++i) {
-    if (i > 0) oss << ", ";
-    oss << static_cast<int>(v[i]);
-  }
-  oss << "]";
-  return oss.str();
-}
-
 void IndexMultiple::save_info(std::ofstream& info_stream)
 {
   info_stream << "krepp version: " << VERSION << "\n";
@@ -204,8 +195,8 @@ void IndexMultiple::save_info(std::ofstream& info_stream)
   info_stream << "npos_v: " << vec_to_str(lshf->get_npos()) << "\n";
   info_stream << "nrows: " << nrows << "\n";
   info_stream << "total_num_kmers: " << root_flatht->get_nkmers() << "\n";
-  info_stream << "SDUST-T: " << sdust_t << "\n";
-  info_stream << "SDUST-W: " << sdust_w << "\n";
+  info_stream << "sdust-t: " << sdust_t << "\n";
+  info_stream << "sdust-w: " << sdust_w << "\n";
 }
 
 void IndexMultiple::save_index()
@@ -509,7 +500,7 @@ void QueryIndex::place_sequences()
   }
 }
 
-void InfoIndex::display_info() { index->display_info(); }
+void InfoIndex::display_info() { index->display_info(output_stream); }
 
 InfoIndex::InfoIndex(CLI::App& sc)
 {
@@ -533,7 +524,7 @@ SketchSingle::SketchSingle(CLI::App& sc)
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m. [true]");
-  sc.add_option("--sdust-t", sdust_t, "SDUST threshold (dustmasker: 20). [0]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-t", sdust_t, "SDUST threshold (NCBI dustmasker: 20). [0]")->check(CLI::NonNegativeNumber);
   sc.add_option("--sdust-w", sdust_w, "SDUST window (dustmasker: 64). [0]")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
@@ -579,8 +570,8 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", frac, "Include k-mers with r <= LSH(x) mod m. [true]");
-  sc.add_option("--sdust-t", sdust_t, "SDUST threshold. [20]")->check(CLI::NonNegativeNumber);
-  sc.add_option("--sdust-w", sdust_w, "SDUST window. [64]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-t", sdust_t, "SDUST threshold (NCBI dustmasker: 20). [0]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--sdust-w", sdust_w, "SDUST window (dustmasker: 64). [0]")->check(CLI::NonNegativeNumber);
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;

@@ -60,8 +60,7 @@ class Node : public std::enable_shared_from_this<Node>
 public:
   Node(tree_sptr_t tree)
     : tree(tree)
-  {
-  }
+  {}
   Node(tree_sptr_t tree, std::string name, node_sptr_t parent, bool is_leaf = false)
     : tree(tree)
     , name(name)
