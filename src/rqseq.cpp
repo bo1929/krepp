@@ -79,17 +79,6 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
       l = 0, i++;
       continue;
     }
-    if ((mi < mn) && ((i + k) >= mrs)) {
-      mi++;
-      i = mre, l = 0;
-      if (mi < mn) {
-        mre = (uint32_t)(rgs[mi]);
-        mrs = (uint32_t)(rgs[mi] >> 32);
-      } else {
-        free(rgs);
-      }
-      continue;
-    }
     l++, i++;
     if (l < k) {
       continue;
@@ -98,6 +87,22 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
       compute_encoding(seq + i - k, seq + i, orenc64_lr, orenc64_bp);
     } else {
       update_encoding(seq + i - 1, orenc64_lr, orenc64_bp);
+    }
+    if ((mi < mn) && ((i + k) > mrs)) {
+      c1.add(xur64_hash(orenc64_bp & mask_bp));
+      if (i < mre) {
+        continue;
+      } else {
+        mi++;
+        l = 0;
+        if ((mi < mn)) {
+          mre = (uint32_t)(rgs[mi]);
+          mrs = (uint32_t)(rgs[mi] >> 32);
+        } else {
+          free(rgs);
+        }
+        continue;
+      }
     }
     klix = kix % ldiff;
     lsh_enc_win[klix] = {orenc64_bp & mask_bp, orenc64_lr & mask_lr, xur64_hash(orenc64_bp & mask_bp)};
