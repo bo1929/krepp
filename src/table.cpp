@@ -257,9 +257,10 @@ void SDynHT::fill_table(uint32_t nrows, rseq_sptr_t rs)
       rs->extract_mers(enc_vvec);
     }
   }
-  rs->compute_rho();
   sort_columns();
   make_unique();
+  /* update_nkmers(); */
+  rs->compute_rho();
 }
 
 void DynHT::fill_table(sh_t sh, rseq_sptr_t rs)
@@ -270,10 +271,10 @@ void DynHT::fill_table(sh_t sh, rseq_sptr_t rs)
       rs->extract_mers(mer_vvec, sh);
     }
   }
-  rs->compute_rho();
-  // update_nkmers();
   sort_columns();
   make_unique();
+  /* update_nkmers(); */
+  rs->compute_rho();
 }
 
 void FlatHT::display_info(std::ostream* output_stream, uint32_t r)

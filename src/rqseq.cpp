@@ -4,6 +4,11 @@ extern "C"
 #include "sdust.h"
 }
 
+struct hashmer_t
+{
+  uint64_t x, y, z;
+};
+
 RSeq::RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac, int sdust_t, int sdust_w)
   : w(w)
   , r(r)
@@ -55,10 +60,12 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     ldiff = 1;
     w = k;
   }
-  uint64_t kix = 0;
+  hll::HyperLogLog c1(12);
+  hll::HyperLogLog c2(12);
+  uint64_t kix = 0, klix = 0;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
-  std::vector<std::pair<uint64_t, uint64_t>> lsh_enc_win(ldiff);
-  std::pair<uint64_t, uint64_t> cminimizer, pminimizer;
+  std::vector<hashmer_t> lsh_enc_win(ldiff);
+  hashmer_t cminimizer, pminimizer;
   uint32_t mrs = 0, mre = len;
   int mn = 0, mi = 0;
   uint64_t* rgs;
@@ -92,39 +99,41 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     } else {
       update_encoding(seq + i - 1, orenc64_lr, orenc64_bp);
     }
-    lsh_enc_win[kix % ldiff].first = orenc64_bp & mask_bp;
-    lsh_enc_win[kix % ldiff].second = orenc64_lr & mask_lr;
+    klix = kix % ldiff;
+    lsh_enc_win[klix] = {orenc64_bp & mask_bp, orenc64_lr & mask_lr, xur64_hash(orenc64_bp & mask_bp)};
+    c1.add(lsh_enc_win[klix].z);
     kix++;
     if ((l < w) && (i != len)) {
       continue;
     }
-    cminimizer = *std::min_element(
-      lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint64_t, uint64_t> lhs, std::pair<uint64_t, uint64_t> rhs) {
-        return xur64_hash(lhs.second) < xur64_hash(rhs.second);
-      });
+    cminimizer =
+      *std::min_element(lsh_enc_win.begin(), lsh_enc_win.end(), [](hashmer_t lhs, hashmer_t rhs) { return lhs.z < rhs.z; });
+    c2.add(cminimizer.z);
 #ifdef CANONICAL
-    rcenc64_bp = revcomp_bp64(cminimizer.first, k);
-    if (cminimizer.first < rcenc64_bp) {
-      cminimizer.first = rcenc64_bp;
-      cminimizer.second = conv_bp64_lr64(rcenc64_bp);
+    rcenc64_bp = revcomp_bp64(cminimizer.x, k);
+    if (cminimizer.x < rcenc64_bp) {
+      cminimizer.x = rcenc64_bp;
+      cminimizer.y = conv_bp64_lr64(rcenc64_bp);
     }
 #endif /* CANONICAL */
-    rix = lshf->compute_hash(cminimizer.first);
+    rix = lshf->compute_hash(cminimizer.x);
     rix_res = rix % m;
     if (frac ? rix_res <= r : rix_res == r) {
       rix = frac ? rix / m * (r + 1) + rix_res : rix / m;
       if constexpr (std::is_same_v<T, mer_t>) {
-        table[rix].emplace_back(lshf->drop_ppos_lr(cminimizer.second), sh);
+        table[rix].emplace_back(lshf->drop_ppos_lr(cminimizer.y), sh);
       } else {
-        table[rix].push_back(lshf->drop_ppos_lr(cminimizer.second));
+        table[rix].push_back(lshf->drop_ppos_lr(cminimizer.y));
       }
       wnix++;
-      if (cminimizer.first != pminimizer.first) {
+      if (cminimizer.x != pminimizer.x) {
         wcix++;
       }
       pminimizer = cminimizer;
     }
   }
+  n1_est += c1.estimate();
+  n2_est += c2.estimate();
 }
 
 QSeq::~QSeq()
