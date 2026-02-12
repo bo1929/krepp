@@ -115,7 +115,7 @@ void SSummary::add_matching_mer(sketch_sptr_t sketch, uint32_t rix, enc_t enc_lr
     hdisthist_v[hdist_min]++;
   }
 }
-void SSummary::optimize_likelihood(optimize::HDistHistLLH llhfunc, double rho)
+void SSummary::optimize_likelihood(optimize::HDistHistLLH& llhfunc, double rho)
 {
   llhfunc.set_parameters(hdisthist_v.data(), mismatch_count, rho);
   std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.5, 16);
