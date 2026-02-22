@@ -99,7 +99,7 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
     nonce = Subset::rehash(nonce++ * sh1 * sh2);
   }
   sh += nonce;
-  if (!subset) {
+  if (!subset | nonce != 0) {
     sh_to_subset[sh] = std::make_shared<Subset>(
       sh, subset1->card > subset2->card ? subset1->sh : subset2->sh, subset1->card + subset2->card, nonce);
   }

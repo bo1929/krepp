@@ -213,41 +213,19 @@ void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
       temp_v.push_back(*it_dest);
       it_dest++;
     }
+    mer_t x = *it_source;
     while ((it_dest != dest_v.end()) && (it_source->encoding == it_dest->encoding)) {
-      it_source->sh = record->add_subset(it_dest->sh, it_source->sh);
+      /* it_source->sh = record->add_subset(it_dest->sh, it_source->sh); */
+      x.sh = record->add_subset(it_dest->sh, x.sh);
       it_dest++;
     }
-    temp_v.push_back(*it_source);
+    temp_v.push_back(x);
   }
   for (; it_dest != dest_v.end(); ++it_dest) {
     temp_v.push_back(*it_dest);
   }
   dest_v = std::move(temp_v);
 }
-
-/*
-void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
-{
-  dest_v.insert(dest_v.end(), source_v.begin(), source_v.end());
-  std::inplace_merge(dest_v.begin(),
-                     std::next(dest_v.begin(), dest_v.size() - source_v.size()),
-                     dest_v.end(),
-                     comp_encoding);
-  auto it_dest = dest_v.begin(), result = dest_v.begin();
-  while (++it_dest != dest_v.end()) {
-    if (result->encoding == it_dest->encoding) {
-      result->sh = record->add_subset(it_dest->sh, result->sh);
-    } else if (++result != it_dest) {
-      *result = *it_dest;
-    } else {
-      result = it_dest;
-    }
-  }
-  if (result != dest_v.end()) {
-    dest_v.erase(++result, dest_v.end());
-  }
-}
-*/
 
 void SDynHT::fill_table(uint32_t nrows, rseq_sptr_t rs)
 {

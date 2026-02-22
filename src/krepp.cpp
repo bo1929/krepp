@@ -271,7 +271,7 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
 #endif
     for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
       children_dynht_v.emplace_back(std::make_shared<DynHT>(nrows, tree, dynht->get_record()));
-#pragma omp task untied shared(dynht)
+#pragma omp task shared(dynht)
       {
         build_for_subtree(*std::next(nd->get_children(), i), children_dynht_v[i]);
 #if defined(_OPENMP) && _WOPENMP == 1
