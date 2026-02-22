@@ -473,9 +473,13 @@ void QueryIndex::place_sequences()
               if (cont_reading) {
                 (*output_stream) << batch_stream.rdbuf();
               } else {
-                batch_stream.seekp(-2, std::ios_base::end);
-                batch_stream << "\n\t";
-                (*output_stream) << batch_stream.rdbuf();
+                if (batch_stream.peek() != EOF) {
+                  batch_stream.seekp(-2, std::ios_base::end);
+                  if (!tabular) {
+                    batch_stream << "\n\t";
+                  }
+                  (*output_stream) << batch_stream.rdbuf();
+                }
               }
             }
           }
@@ -484,8 +488,8 @@ void QueryIndex::place_sequences()
 #pragma omp taskwait
     }
   }
-  // output_stream->seekp(-1, output_stream->cur);
-  //output_stream->seekp(-1, std::ios_base::end);
+  preport_stream.str("");
+  preport_stream.clear();
   if (summarize) {
     for (auto& [nd, wcount] : node_to_wcount) {
       preport_stream << nd->get_name(true) << "\t" << nd->get_en() << "\t" << wcount << "\t" << wcount / twcount << "\n";
@@ -494,7 +498,6 @@ void QueryIndex::place_sequences()
   } else if (tabular) {
     (void)0;
   } else {
-    preport_stream.str("");
     end_jplace(preport_stream);
     (*output_stream) << preport_stream.rdbuf();
   }
