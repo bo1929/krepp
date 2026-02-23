@@ -214,7 +214,6 @@ void IndexMultiple::save_index()
   CHECK_STREAM_OR_EXIT(crecord_stream, "Failed to write the color array of the index!");
   crecord_stream.close();
 
-  std::cerr << "Skipped saving a backbone for the index!" << std::endl;
   std::ofstream reflist_stream(index_dir / ("reflist" + suffix));
   std::ostream_iterator<std::string> reflist_iterator(reflist_stream, "\n");
   std::copy(std::begin(names_v), std::end(names_v), reflist_iterator);
@@ -225,6 +224,8 @@ void IndexMultiple::save_index()
     root_flatht->get_tree()->save(tree_stream);
     CHECK_STREAM_OR_EXIT(tree_stream, "Failed to write the backbone tree of the index!");
     tree_stream.close();
+  } else {
+    std::cerr << "Skipped saving a backbone for the index!" << std::endl;
   }
 
   std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
@@ -269,6 +270,7 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
     omp_lock_t parent_lock;
     omp_init_lock(&parent_lock);
 #endif
+    children_dynht_v.reserve(nd->get_nchildren());
     for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
       children_dynht_v.emplace_back(std::make_shared<DynHT>(nrows, tree, dynht->get_record()));
 #pragma omp task shared(dynht)
