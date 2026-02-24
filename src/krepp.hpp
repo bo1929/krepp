@@ -59,25 +59,25 @@ public:
   bool validate_configuration()
   {
     bool is_invalid = true;
-    if (is_invalid = w < k) {
+    if ((is_invalid = (w < k))) {
       std::cerr << "The minimum minimizer window size (-w) is k (-k)." << std::endl;
     }
-    if (is_invalid = h < 3) {
+    if ((is_invalid = (h < 3))) {
       std::cerr << "The minimum number of LSH positions (-h) is 3." << std::endl;
     }
-    if (is_invalid = h > 15) {
+    if ((is_invalid = (h > 15))) {
       std::cerr << "The maximum number of LSH positions (-h) is 15." << std::endl;
     }
-    if (is_invalid = k > 31) {
+    if ((is_invalid = (k > 31))) {
       std::cerr << "The maximum allowed k-mer length (-k) is 31." << std::endl;
     }
-    if (is_invalid = k < 19) {
+    if ((is_invalid = (k < 19))) {
       std::cerr << "The minimum allowed k-mer length (-k) is 19." << std::endl;
     }
-    if (is_invalid = (k - h) > 16) {
+    if ((is_invalid = ((k - h) > 16))) {
       std::cerr << "For compact k-mer encodings, h must be >= k-16." << std::endl;
     }
-    if (sdust_t != 0 && sdust_w != 0) {
+    if ((sdust_t != 0) && (sdust_w != 0)) {
       std::cerr << "Setting --sdust-w and --sdust-t to >0 will enable dustmasker." << std::endl;
       std::cerr << "With dustmasker, krepp might fail to model subsampling and be slightly inaccurate." << std::endl;
     }
@@ -192,7 +192,7 @@ public:
   bool validate_configuration_place()
   {
     bool is_invalid = true;
-    if (is_invalid = (hdist_th < tau)) {
+    if ((is_invalid = (hdist_th < tau))) {
       std::cerr << "The threshold tau must be less than HD threshold --hdist-th!" << std::endl;
     }
     return !is_invalid;

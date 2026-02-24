@@ -359,7 +359,7 @@ void Tree::parse_lineages(std::ifstream& lineage_stream)
   }
 
   reset_traversal();
-  while (curr = next_post_order()) {
+  while ((curr = next_post_order())) {
     nnodes++;
     se_to_node.push_back(curr);
     curr->set_se(nnodes);
@@ -419,7 +419,7 @@ void Tree::map_to_qtree(tree_sptr_t qtree)
 {
   parallel_flat_phmap<std::string, se_t> name_to_se;
   reset_traversal();
-  while (curr = next_post_order()) {
+  while ((curr = next_post_order())) {
     if (curr->check_leaf()) {
       name_to_se[curr->get_name()] = curr->get_se();
       se_to_node[curr->get_se()] = nullptr;
@@ -428,7 +428,7 @@ void Tree::map_to_qtree(tree_sptr_t qtree)
   root = qtree->get_root();
   subtree_root = qtree->get_subtree();
   reset_traversal();
-  while (curr = next_post_order()) {
+  while ((curr = next_post_order())) {
     if (curr->check_leaf() && curr->is_labeled()) {
       if (name_to_se.contains(curr->get_name())) {
         se_to_node[name_to_se[curr->get_name()]] = curr;

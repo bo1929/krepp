@@ -8,7 +8,7 @@ Record::Record(tree_sptr_t tree)
   node_sptr_t nd_curr;
   sh_t ch;
   tree->reset_traversal();
-  while (nd_curr = tree->next_post_order()) {
+  while ((nd_curr = tree->next_post_order())) {
     sh_to_node[nd_curr->get_sh()] = nd_curr;
     if (nd_curr->check_leaf()) {
       ch = 0;
@@ -62,7 +62,7 @@ void Record::rehash_tree()
   sh_t ch;
   sh_t ah;
   tree->reset_traversal();
-  while (nd_curr = tree->next_post_order()) {
+  while ((nd_curr = tree->next_post_order())) {
     if (nd_curr->check_leaf()) {
       nd_curr->set_sh(++ah + Subset::rehash(nd_curr->get_sh()));
     } else {
@@ -99,7 +99,7 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
     nonce = Subset::rehash(nonce++ * sh1 * sh2);
   }
   sh += nonce;
-  if (!subset | nonce != 0) {
+  if ((!subset) | (nonce != 0)) {
     sh_to_subset[sh] = std::make_shared<Subset>(
       sh, subset1->card > subset2->card ? subset1->sh : subset2->sh, subset1->card + subset2->card, nonce);
   }
@@ -135,7 +135,7 @@ void Record::make_compact()
   se_t curr_senum = 1;
   node_sptr_t nd_curr;
   tree->reset_traversal();
-  while (nd_curr = tree->next_post_order()) {
+  while ((nd_curr = tree->next_post_order())) {
     if (curr_senum < limit_senum) {
       sh_to_se[nd_curr->get_sh()] = curr_senum++;
     } else {
@@ -164,7 +164,7 @@ CRecord::CRecord(record_sptr_t record)
   nnodes = record->sh_to_node.size() + 1;
   se_to_pse.resize(nsubsets);
   se_to_rho.resize(nnodes);
-  while (nd_curr = tree->next_post_order()) {
+  while ((nd_curr = tree->next_post_order())) {
     se_to_rho[nd_curr->get_se()] = record->sh_to_rho[nd_curr->get_sh()];
   }
   tree->reset_traversal();
