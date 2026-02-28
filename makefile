@@ -3,7 +3,8 @@
 COMPILER ?= g++
 mode ?= dynamic  # Default to dynamic linking
 
-CXXFLAGS += -std=c++17 -O3 # TODO: remove -g
+# TODO: -g -ggdb3 -fsanitize=address -fno-omit-frame-pointer
+CXXFLAGS = -std=c++17 -O3
 WFLAGS += -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas -Wno-undefined-inline # -Wall
 
 INC = -Iexternal/CLI11/include/CLI \
@@ -87,10 +88,10 @@ endif
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp
 	@mkdir -p build
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(LDLIBS) $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o $(LDLIBS) 
 
 $(PROGRAM): $(OBJECTS)
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(LDLIBS) $(VARDEF) $(LDFLAGS) $(INC) -o $@
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(VARDEF) $(LDFLAGS) $(INC) -o $@ $(LDLIBS) 
 
 clean:
 	rm -f $(PROGRAM) $(OBJECTS)

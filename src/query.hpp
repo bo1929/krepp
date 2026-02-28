@@ -199,15 +199,15 @@ public:
   void optimize_likelihood(optimize::HDistHistLLH& llhfunc);
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
-#define PLACEMENT_FIELD(nd, mi)                                                                                             \
+#define PP_JPLACE_FIELDS(nd, mi)                                                                                             \
   "[" << nd->get_en() << ", " << mi->jukes_cantor_dist() - nd->get_midpoint_pendant() << ", " << nd->get_midpoint_pendant() \
       << ", " << -mi->v_llh << ", " << mi->lwr << ", " << mi->d_llh << "]"
 
-#define TABULAR_FIELD(nd, mi) nd->get_name(true) << "\t" << nd->get_en() << "\t" << mi->lwr << "\t" << mi->d_llh
+#define PP_TABULAR_FIELDS(nd, mi) nd->get_name(true) << "\t" << nd->get_en() << "\t" << mi->lwr << "\t" << mi->d_llh
 
-#define MATCH_FIELD(nd, mi) nd->get_name() << "\t" << mi->get_match_string() << "\n"
+#define MATCH_FIELDS(nd, mi) nd->get_name() << "\t" << mi->get_match_string() << "\n"
 
-#define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
+#define DISTANCE_FIELDS(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
 
 private:
   double nmers = 0;

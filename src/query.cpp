@@ -177,18 +177,18 @@ void IBatch::report_distances(strstream& batch_stream)
     if (multi) {
       if (no_filter) {
         for (const auto& [nd, mi] : node_to_minfo) {
-          batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi);
+          batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd, mi);
         }
       } else {
         for (auto& [nd, mi] : node_to_minfo) {
           mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
           if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
-            batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd, mi);
+            batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd, mi);
           }
         }
       }
     } else {
-      batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELD(nd_closest, mi_closest);
+      batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd_closest, mi_closest);
     }
   }
 }
@@ -225,9 +225,9 @@ void IBatch::report_placement(strstream& batch_stream, bool tabular)
       node_to_wcount[nd_pp] += 1.0;
     } else {
       if (tabular) {
-        batch_stream << identifer_batch[bix] << "\t" << TABULAR_FIELD(nd_pp, mi_pp) << "\n";
+        batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(nd_pp, mi_pp) << "\n";
       } else {
-        batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
+        batch_stream << PP_JPLACE_FIELDS(nd_pp, mi_pp) << "]},\n";
       }
     }
     return;
@@ -288,9 +288,9 @@ void IBatch::report_placement(strstream& batch_stream, bool tabular)
       } else {
         if (i > 0 && !tabular) batch_stream << ",";
         if (tabular) {
-          batch_stream << identifer_batch[bix] << "\t" << TABULAR_FIELD(nd_pp, mi_pp) << "\n";
+          batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(nd_pp, mi_pp) << "\n";
         } else {
-          batch_stream << "\n\t\t\t\t" << PLACEMENT_FIELD(nd_pp, mi_pp);
+          batch_stream << "\n\t\t\t\t" << PP_JPLACE_FIELDS(nd_pp, mi_pp);
         }
       }
     }
@@ -312,9 +312,9 @@ void IBatch::report_placement(strstream& batch_stream, bool tabular)
       node_to_wcount[nd_pp] += 1.0;
     } else {
       if (tabular) {
-        batch_stream << identifer_batch[bix] << "\t" << TABULAR_FIELD(nd_pp, mi_pp) << "\n";
+        batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(nd_pp, mi_pp) << "\n";
       } else {
-        batch_stream << PLACEMENT_FIELD(nd_pp, mi_pp) << "]},\n";
+        batch_stream << PP_JPLACE_FIELDS(nd_pp, mi_pp) << "]},\n";
       }
     }
   }
