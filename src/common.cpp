@@ -26,8 +26,7 @@ const uint64_t nt4_bp_table[4] = {0, 1, 2, 3};
 inline void warn_msg(const std::string& msg) { std::cerr << "[WARNING] " << msg << std::endl; }
 
 template<typename StreamT>
-inline void
-check_fstream_or_exit(const StreamT& stream, const std::string& msg, const std::string& path)
+inline void check_fstream_or_exit(const StreamT& stream, const std::string& msg, const std::string& path)
 {
   if (!stream.good()) {
     if (!path.empty()) {
@@ -38,7 +37,5 @@ check_fstream_or_exit(const StreamT& stream, const std::string& msg, const std::
   }
 }
 
-template void
-check_fstream_or_exit<std::ifstream>(const std::ifstream&, const std::string&, const std::string&);
-template void
-check_fstream_or_exit<std::ofstream>(const std::ofstream&, const std::string&, const std::string&);
+template void check_fstream_or_exit<std::ifstream>(const std::ifstream&, const std::string&, const std::string&);
+template void check_fstream_or_exit<std::ofstream>(const std::ofstream&, const std::string&, const std::string&);

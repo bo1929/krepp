@@ -11,7 +11,7 @@ class Sketch
 {
 public:
   Sketch(std::filesystem::path sketch_path)
-    : sketch_path(sketch_path) {};
+    : sketch_path(sketch_path){};
   void load_full_sketch();
   void make_rho_partial();
   std::pair<vec_enc_it, vec_enc_it> bucket_indices(uint32_t rix);

@@ -3,6 +3,7 @@
 
 #include <parallel_hashmap/phmap.h>
 #include <parallel_hashmap/btree.h>
+#include "MurmurHash3.hpp"
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -44,7 +45,9 @@
   #include <immintrin.h>
 #endif
 
-#define VERSION "v0.5.1"
+#define STRSTREAM_PRECISION 4
+
+#define VERSION "v0.7.2"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
@@ -115,8 +118,7 @@ struct mer_t
   mer_t(enc_t encoding, sh_t sh)
     : encoding(encoding)
     , sh(sh)
-  {
-  }
+  {}
 };
 
 static inline uint32_t gp_hash(const std::string& str)
@@ -169,10 +171,7 @@ static inline uint32_t hdist_lr32(const uint32_t x, const uint32_t y)
   return __builtin_popcount((z1 | (z1 >> 16)) & 0x0000ffff);
 }
 
-static inline uint32_t popcount_lr32(const uint32_t z)
-{
-  return __builtin_popcount((z | (z >> 16)) & 0x0000ffff);
-}
+static inline uint32_t popcount_lr32(const uint32_t z) { return __builtin_popcount((z | (z >> 16)) & 0x0000ffff); }
 
 static inline uint64_t revcomp_bp64(const uint64_t x, uint8_t k)
 {
@@ -196,13 +195,33 @@ static inline uint64_t rmoddp_bp64(uint64_t x)
   return x;
 }
 
-static inline uint64_t conv_bp64_lr64(uint64_t x)
+static inline sh_t hash_name(std::string& name)
 {
-  return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x);
+  sh_t sh = 0;
+  uint32_t a1, a2;
+  MurmurHash3_x86_32(name.c_str(), name.length(), MMHSEED0, &a1);
+  MurmurHash3_x86_32(name.c_str(), name.length(), MMHSEED1, &a2);
+  sh = sh | static_cast<uint64_t>(a1);
+  sh = sh << 32;
+  sh = sh | static_cast<uint64_t>(a2);
+  return sh;
 }
 
-static inline void
-compute_encoding(const char* s1, const char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
+static inline sh_t rehash(sh_t sh)
+{
+  uint32_t a1, a2;
+  MurmurHash3_x86_32(&sh, sizeof(sh), MMHSEED0, &a1);
+  MurmurHash3_x86_32(&sh, sizeof(sh), MMHSEED1, &a2);
+  sh = 0;
+  sh = sh | static_cast<uint64_t>(a1);
+  sh = sh << 32;
+  sh = sh | static_cast<uint64_t>(a2);
+  return sh;
+}
+
+static inline uint64_t conv_bp64_lr64(uint64_t x) { return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x); }
+
+static inline void compute_encoding(const char* s1, const char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
@@ -235,11 +254,22 @@ constexpr Integral extract_bits(Integral x, Integral mask)
   return res;
 }
 
+static std::string vec_to_str(const std::vector<uint8_t>& v)
+{
+  std::ostringstream oss;
+  oss << "[";
+  for (size_t i = 0; i < v.size(); ++i) {
+    if (i > 0) oss << ", ";
+    oss << static_cast<int>(v[i]);
+  }
+  oss << "]";
+  return oss.str();
+}
+
 #define assertm(exp, msg) assert(((void)msg, exp))
 
-#define EXTRAARGS                                                                                  \
-  phmap::priv::hash_default_hash<K>, phmap::priv::hash_default_eq<K>,                              \
-    std::allocator<std::pair<const K, V>>, 4
+#define EXTRAARGS                                                                                                           \
+  phmap::priv::hash_default_hash<K>, phmap::priv::hash_default_eq<K>, std::allocator<std::pair<const K, V>>, 4
 
 template<class K, class V>
 using parallel_flat_phmap = phmap::parallel_flat_hash_map<K, V, EXTRAARGS, std::mutex>;
@@ -266,11 +296,10 @@ using node_phmap = phmap::node_hash_map<K, V>;
 inline void warn_msg(const std::string& msg);
 
 // Macro for concise file stream error checks
-#define CHECK_STREAM_OR_EXIT(stream, msg)                                                          \
+#define CHECK_STREAM_OR_EXIT(stream, msg)                                                                                   \
   if (!(stream).good()) error_exit(msg)
 
 template<typename StreamT>
-inline void
-check_fstream_or_exit(const StreamT& stream, const std::string& msg, const std::string& path = "");
+inline void check_fstream_or_exit(const StreamT& stream, const std::string& msg, const std::string& path = "");
 
 #endif

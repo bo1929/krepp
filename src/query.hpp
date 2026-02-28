@@ -8,6 +8,8 @@
 #include "table.hpp"
 #include "hdhistllh.hpp"
 
+#define CJC 4.0 / 3.0
+
 namespace optimize {
   class HDistHistLLH;
 }
@@ -52,13 +54,14 @@ public:
          uint32_t tau,
          bool no_filter,
          bool multi,
-         bool matches);
+         bool summarize);
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
-  void estimate_distances(std::ostream& output_stream);
-  void place_sequences(std::ostream& output_stream);
+  void estimate_distances(strstream& batch_stream);
   void report_distances(strstream& batch_stream);
-  void report_placement(strstream& batch_stream);
+  void place_sequences(strstream& batch_stream, bool tabular);
+  void report_placement(strstream& batch_stream, bool tabular);
+  const parallel_flat_phmap<node_sptr_t, double>& get_summary() { return node_to_wcount; }
 
 private:
   uint32_t k;
@@ -68,6 +71,7 @@ private:
   double chisq_value;
   double dist_max;
   bool no_filter;
+  bool summarize;
   uint32_t tau;
   tree_sptr_t tree;
   lshf_sptr_t lshf;
@@ -89,6 +93,7 @@ private:
 
 protected:
   parallel_flat_phmap<node_sptr_t, minfo_sptr_t> node_to_minfo = {};
+  parallel_flat_phmap<node_sptr_t, double> node_to_wcount = {};
 };
 
 class Minfo
@@ -170,14 +175,14 @@ public:
     }
   }
 
-  std::string to_match_string() const {
+  std::string get_match_string() const {
     std::ostringstream oss;
-    oss << "[";
-    for (size_t i = 0; i < hdisthist_v.size(); ++i) { //Already contains hdist_th values?
-      if (i > 0) oss << ",";
+    // oss << "[";
+    for (size_t i = 0; i < hdisthist_v.size(); ++i) {
+      if (i > 0) oss << "\t";
       oss << hdisthist_v[i];
     }
-    oss << "]";
+    // oss << "]";
     return oss.str();
   }
 
@@ -189,17 +194,20 @@ public:
     }
     return total_leq_tau;
   }
+  double jukes_cantor_dist() { return -0.75 * log(1 - CJC * d_llh); }
   /* void compute_gamma(); */
   void optimize_likelihood(optimize::HDistHistLLH& llhfunc);
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
-#define PLACEMENT_FIELD(nd, mi)                                                                    \
-  "[" << (nd->get_se() - 1) << ", 0, " << (nd->get_blen() / 2.0) << ", " << -mi->v_llh << ", "     \
-      << exp(-mi->chisq / 2) << ", " << mi->d_llh << "]"
+#define PLACEMENT_FIELD(nd, mi)                                                                                             \
+  "[" << nd->get_en() << ", " << mi->jukes_cantor_dist() - nd->get_midpoint_pendant() << ", " << nd->get_midpoint_pendant() \
+      << ", " << -mi->v_llh << ", " << mi->lwr << ", " << mi->d_llh << "]"
 
-#define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh
-#define MATCH_FIELD(nd, mi) nd->get_name() << "\t" << mi->to_match_string()
+#define TABULAR_FIELD(nd, mi) nd->get_name(true) << "\t" << nd->get_en() << "\t" << mi->lwr << "\t" << mi->d_llh
 
+#define MATCH_FIELD(nd, mi) nd->get_name() << "\t" << mi->get_match_string() << "\n"
+
+#define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
 
 private:
   double nmers = 0;
@@ -213,6 +221,7 @@ private:
   uint32_t hdist_min = 0xFFFFFFFF;
   std::vector<double> hdisthist_v;
   double chisq = std::numeric_limits<double>::quiet_NaN();
+  double lwr = 1; // std::numeric_limits<double>::quiet_NaN();
   double v_llh = std::numeric_limits<double>::quiet_NaN();
   double d_llh = std::numeric_limits<double>::max();
   /* std::vector<match_t> match_v; */

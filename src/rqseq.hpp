@@ -4,6 +4,7 @@
 #include "common.hpp"
 #include "lshf.hpp"
 #include "table.hpp"
+#include "hyperloglog.hpp"
 
 /* #define CANONICAL */
 #define RBATCH_SIZE 512
@@ -66,17 +67,12 @@ class RSeq : public HandlerURL
   friend class DynHT;
 
 public:
-  RSeq(std::string input,
-       lshf_sptr_t lshf,
-       uint8_t w,
-       uint32_t r,
-       bool frac,
-       int sdust_t,
-       int sdust_w);
+  RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac, int sdust_t, int sdust_w);
   ~RSeq();
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   double get_rho() { return rho; }
-  void compute_rho() { rho = static_cast<double>(wcix) / static_cast<double>(wnix); }
+  /* void compute_rho() { rho = static_cast<double>(wcix) / static_cast<double>(wnix); } */
+  void compute_rho() { rho = n2_est / n1_est; }
   bool set_curr_seq()
   {
     name = kseq->name.s;
@@ -105,6 +101,8 @@ private:
   double rho = 0;
   uint64_t wcix = 0;
   uint64_t wnix = 0;
+  double n1_est = 0;
+  double n2_est = 0;
   std::filesystem::path input_path = "";
   int sdust_t;
   int sdust_w;

@@ -37,50 +37,51 @@ public:
     k = 26;
     w = k + 6;
     h = 10;
-    m = 5;
+    m = 4;
     r = 1;
     frac = true;
     nrows = pow(2, 2 * h - 1);
-    sdust_t = 20;
-    sdust_w = 64;
+    sdust_t = 0;
+    sdust_w = 0;
   }
   void set_index_defaults()
   {
     k = 29;
     w = k + 6;
     h = 13;
-    m = 5;
+    m = 4;
     r = 1;
     frac = true;
     nrows = pow(2, 2 * h - 1);
-    sdust_t = 20;
-    sdust_w = 64;
+    sdust_t = 0;
+    sdust_w = 0;
   }
   bool validate_configuration()
   {
-    bool is_valid = true;
-    if (is_valid = w < k) {
+    bool is_invalid = true;
+    if ((is_invalid = (w < k))) {
       std::cerr << "The minimum minimizer window size (-w) is k (-k)." << std::endl;
     }
-    if (is_valid = h < 3) {
+    if ((is_invalid = (h < 3))) {
       std::cerr << "The minimum number of LSH positions (-h) is 3." << std::endl;
     }
-    if (is_valid = h > 15) {
+    if ((is_invalid = (h > 15))) {
       std::cerr << "The maximum number of LSH positions (-h) is 15." << std::endl;
     }
-    if (is_valid = k > 31) {
+    if ((is_invalid = (k > 31))) {
       std::cerr << "The maximum allowed k-mer length (-k) is 31." << std::endl;
     }
-    if (is_valid = k < 19) {
+    if ((is_invalid = (k < 19))) {
       std::cerr << "The minimum allowed k-mer length (-k) is 19." << std::endl;
     }
-    if (is_valid = (k - h) > 16) {
+    if ((is_invalid = ((k - h) > 16))) {
       std::cerr << "For compact k-mer encodings, h must be >= k-16." << std::endl;
     }
-    if (sdust_t == 0 || sdust_w == 0) {
-      std::cerr << "Setting --sdust-w or --sdust-t to 0 will disable dustmasker." << std::endl;
+    if ((sdust_t != 0) && (sdust_w != 0)) {
+      std::cerr << "Setting --sdust-w and --sdust-t to >0 will enable dustmasker." << std::endl;
+      std::cerr << "With dustmasker, krepp might fail to model subsampling and be slightly inaccurate." << std::endl;
     }
-    return !is_valid;
+    return !is_invalid;
   }
 
 protected:
@@ -111,9 +112,11 @@ class TargetIndex
 public:
   void load_index();
   void ensure_backbone();
+  void read_lineages();
 
 protected:
   std::filesystem::path nwk_path;
+  std::filesystem::path lineage_path;
   index_sptr_t index = nullptr;
   tree_sptr_t qtree = nullptr;
   std::filesystem::path index_dir;
@@ -182,9 +185,23 @@ public:
   void estimate_distances();
   void place_sequences();
   void header_dreport(strstream& dreport_stream);
+  void header_preport(strstream& dreport_stream);
   void begin_jplace(strstream& jplace_stream);
   void end_jplace(strstream& jplace_stream);
   uint32_t get_total_qseq() { return total_qseq; }
+  bool validate_configuration_place()
+  {
+    bool is_invalid = true;
+    if ((is_invalid = (hdist_th < tau))) {
+      std::cerr << "The threshold tau must be less than HD threshold --hdist-th!" << std::endl;
+    }
+    return !is_invalid;
+  }
+  bool validate_configuration_dist()
+  {
+    bool is_invalid = false;
+    return !is_invalid;
+  }
 
 private:
   std::string query;
@@ -195,7 +212,10 @@ private:
   uint32_t hdist_th = 4;
   double dist_max = 0.25;
   bool no_filter = true;
+  bool filter = false;
+  bool tabular = false;
   bool multi = true;
+  bool summarize = false;
   uint64_t total_qseq = 0;
   double chisq_value = 2.706;
 };
@@ -205,6 +225,9 @@ class InfoIndex : public TargetIndex
 public:
   InfoIndex(CLI::App& sc);
   void display_info();
+
+private:
+  std::ostream* output_stream = &std::cout;
 };
 
 #endif

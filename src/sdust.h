@@ -51,14 +51,13 @@ typedef kvec_t(uint64_t) uint64_v;
 typedef struct sdust_buf_s sdust_buf_t;
 
 unsigned char seq2nt4[256] = {
-  0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-  4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-  4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+  0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 4, 1, 4, 4, 4, 2, 4, 4,
+  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4,
+  4, 4, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
 
 struct sdust_buf_s
 {
@@ -88,8 +87,7 @@ void sdust_buf_destroy(sdust_buf_t* buf)
   kfree(buf->km, buf);
 }
 
-static inline void
-shift_window(int t, kdq_t(int) * w, int T, int W, int* L, int* rw, int* rv, int* cw, int* cv)
+static inline void shift_window(int t, kdq_t(int) * w, int T, int W, int* L, int* rw, int* rv, int* cw, int* cv)
 {
   int s;
   if ((int)kdq_size(w) >= W - SD_WLEN + 1) { // TODO: is this right for SD_WLEN!=3?
@@ -127,14 +125,7 @@ static inline void save_masked_regions(void* km, uint64_v* res, perf_intv_v* P, 
   P->n = i + 1;
 }
 
-static void find_perfect(void* km,
-                         perf_intv_v* P,
-                         const kdq_t(int) * w,
-                         int T,
-                         int start,
-                         int L,
-                         int rv,
-                         const int* cv)
+static void find_perfect(void* km, perf_intv_v* P, const kdq_t(int) * w, int T, int start, int L, int rv, const int* cv)
 {
   int c[SD_WTOT], r = rv, i, max_r = 0, max_l = 0;
   memcpy(c, cv, SD_WTOT * sizeof(int));
@@ -163,7 +154,7 @@ const uint64_t* sdust_core(const uint8_t* seq, int l_seq, int T, int W, int* n, 
 {
   int rv = 0, rw = 0, L = 0, cv[SD_WTOT], cw[SD_WTOT];
   int i, start,
-    l; // _start_: start of the current window; _l_: length of a contiguous A/C/G/T (sub)sequence
+    l;        // _start_: start of the current window; _l_: length of a contiguous A/C/G/T (sub)sequence
   unsigned t; // current word
 
   buf->P.n = buf->res.n = 0;
@@ -177,9 +168,7 @@ const uint64_t* sdust_core(const uint8_t* seq, int l_seq, int T, int W, int* n, 
       ++l, t = (t << 2 | b) & SD_WMSK;
       if (l >= SD_WLEN) {                              // we have seen a word
         start = (l - W > 0 ? l - W : 0) + (i + 1 - l); // set the start of the current window
-        save_masked_regions(buf->km,
-                            &buf->res,
-                            &buf->P,
+        save_masked_regions(buf->km, &buf->res, &buf->P,
                             start); // save intervals falling out of the current window?
         shift_window(t, buf->w, T, W, &L, &rw, &rv, cw, cv);
         if (rw * 10 > L * T) find_perfect(buf->km, &buf->P, buf->w, T, start, L, rv, cv);
@@ -187,8 +176,7 @@ const uint64_t* sdust_core(const uint8_t* seq, int l_seq, int T, int W, int* n, 
     } else { // N or the end of sequence; N effectively breaks input into pieces of independent sequences
       start = (l - W + 1 > 0 ? l - W + 1 : 0) + (i + 1 - l);
       while (buf->P.n)
-        save_masked_regions(
-          buf->km, &buf->res, &buf->P, start++); // clear up unsaved perfect intervals
+        save_masked_regions(buf->km, &buf->res, &buf->P, start++); // clear up unsaved perfect intervals
       l = t = 0;
     }
   }

@@ -5,6 +5,9 @@
 #ifndef _MURMURHASH3_H_
 #define _MURMURHASH3_H_
 
+#define MMHSEED1 1
+#define MMHSEED0 0
+
 //-----------------------------------------------------------------------------
 // Platform-specific functions and macros
 

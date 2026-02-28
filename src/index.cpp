@@ -52,6 +52,9 @@ void Index::load_partial_index(std::string suffix)
 { // TODO: Split for each file (e.g, metadata, crecord etc.)
   std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
   std::ifstream metadata_stream(metadata_path, std::ifstream::binary);
+  if (!metadata_stream.is_open()) {
+    error_exit(std::string("Failed to open ") + metadata_path.string());
+  }
   uint8_t k_curr, w, h_curr;
   uint32_t m_curr, r, nrows_partial;
   bool frac;
@@ -115,16 +118,41 @@ void Index::load_partial_index(std::string suffix)
   CHECK_STREAM_OR_EXIT(crecord_stream, "Failed to read the color array of a partial index!");
   crecord_stream.close();
 
+  std::string info_str;
+  std::filesystem::path info_path = index_dir / ("metadata" + suffix + ".txt");
+  if (std::filesystem::exists(info_path)) {
+    std::ifstream info_stream(info_path);
+    info_str.assign((std::istreambuf_iterator<char>(info_stream)), std::istreambuf_iterator<char>());
+    CHECK_STREAM_OR_EXIT(info_stream, "Failed to metadata info_str text of a partial index!");
+  } else {
+    info_str += "krepp version: ?\n";
+    info_str += "date: ?\n";
+    info_str += "seed: ?\n";
+    info_str += "k: " + std::to_string(static_cast<uint32_t>(k)) + "\n";
+    info_str += "w: " + std::to_string(static_cast<uint32_t>(w)) + "\n";
+    info_str += "h: " + std::to_string(static_cast<uint32_t>(h)) + "\n";
+    info_str += "m: " + std::to_string(m) + "\n";
+    info_str += frac ? "frac: true\n" : "frac: false\n";
+    info_str += "ppos_v: " + vec_to_str(curr_lshf->get_ppos()) + "\n";
+    info_str += "npos_v: " + vec_to_str(curr_lshf->get_npos()) + "\n";
+    info_str += "nrows: " + std::to_string(nrows) + "\n";
+    info_str += "total_num_kmers: " + std::to_string(curr_flatht->get_nkmers()) + "\n";
+    info_str += "sdust-t: ?\n";
+    info_str += "sdust-w: ?\n";
+  }
+
 #pragma omp critical
   {
     if (frac) {
       for (uint32_t ix = 0; ix <= r; ++ix) {
         r_to_flatht[ix] = curr_flatht;
         r_to_numerator[ix] = r + 1;
+        r_to_info[ix] = info_str;
       }
     } else {
       r_to_flatht[r] = curr_flatht;
       r_to_numerator[r] = 1;
+      r_to_info[r] = info_str;
     }
   }
 }
@@ -136,11 +164,26 @@ std::pair<vec_cmer_it, vec_cmer_it> Index::bucket_indices(uint32_t rix)
   if (r_to_numerator[rix_res] > 1) {
     offset = offset * r_to_numerator[rix_res] + rix_res;
   }
-  return std::make_pair(r_to_flatht[rix_res]->bucket_start(offset),
-                        r_to_flatht[rix_res]->bucket_next(offset));
+  return std::make_pair(r_to_flatht[rix_res]->bucket_start(offset), r_to_flatht[rix_res]->bucket_next(offset));
 }
 
 crecord_sptr_t Index::get_crecord(uint32_t rix) { return r_to_flatht[rix % m]->get_crecord(); }
+
+void Index::display_info(std::ostream* output_stream)
+{
+  if (wbackbone) {
+    strstream newick_stream;
+    tree->stream_nwk_basic(newick_stream, tree->get_root());
+    (*output_stream) << "Backbone tree: " << newick_stream.rdbuf() << "\n";
+  } else {
+    (*output_stream) << "Backbone tree: NA\n";
+  }
+  for (auto const& [key, val] : r_to_info) {
+    (*output_stream) << "======= Partial index: " << key << " =======\n";
+    (*output_stream) << r_to_info[key];
+    r_to_flatht[key]->display_info(output_stream, key);
+  }
+}
 
 void Index::make_rho_partial()
 {

@@ -26,8 +26,7 @@ typedef struct
 
 static ketopt_t KETOPT_INIT = {1, 0, 0, -1, 1, 0, 0};
 
-static void
-ketopt_permute(char* argv[], int j, int n) /* move argv[j] over n elements to the left */
+static void ketopt_permute(char* argv[], int j, int n) /* move argv[j] over n elements to the left */
 {
   int k;
   char* p = argv[j];
@@ -56,12 +55,7 @@ ketopt_permute(char* argv[], int j, int n) /* move argv[j] over n elements to th
  *         argv[] is fully processed; '?' for an unknown option or an ambiguous
  *         long option; ':' if an option argument is missing
  */
-static int ketopt(ketopt_t* s,
-                  int argc,
-                  char* argv[],
-                  int permute,
-                  const char* ostr,
-                  const ko_longopt_t* longopts)
+static int ketopt(ketopt_t* s, int argc, char* argv[], int permute, const char* ostr, const ko_longopt_t* longopts)
 {
   int opt = -1, i0, j;
   if (permute) {

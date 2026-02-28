@@ -119,8 +119,7 @@ void DynHT::sort_columns()
 void DynHT::ensure_sorted_columns()
 {
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
-    if ((!mer_vvec[i].empty()) &&
-        !std::is_sorted(mer_vvec[i].begin(), mer_vvec[i].end(), comp_encoding)) {
+    if ((!mer_vvec[i].empty()) && !std::is_sorted(mer_vvec[i].begin(), mer_vvec[i].end(), comp_encoding)) {
       std::sort(mer_vvec[i].begin(), mer_vvec[i].end(), comp_encoding);
     }
   }
@@ -160,8 +159,7 @@ void DynHT::make_unique()
   nkmers = 0;
   for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
     if (!mer_vvec[i].empty()) {
-      mer_vvec[i].erase(std::unique(mer_vvec[i].begin(), mer_vvec[i].end(), eq_encoding),
-                        mer_vvec[i].end());
+      mer_vvec[i].erase(std::unique(mer_vvec[i].begin(), mer_vvec[i].end(), eq_encoding), mer_vvec[i].end());
     }
     nkmers += mer_vvec[i].size();
   }
@@ -208,48 +206,30 @@ void DynHT::union_table(dynht_sptr_t source)
 void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
 {
   vec<mer_t> temp_v;
-  temp_v.reserve(source_v.size() + dest_v.size());
-  auto it_dest = dest_v.begin(), it_source = source_v.begin();
-  for (; it_source != source_v.end(); ++it_source) {
-    while ((it_dest != dest_v.end()) && (it_source->encoding > it_dest->encoding)) {
-      temp_v.push_back(*it_dest);
-      it_dest++;
-    }
-    while ((it_dest != dest_v.end()) && (it_source->encoding == it_dest->encoding)) {
-      it_source->sh = record->add_subset(it_dest->sh, it_source->sh);
-      it_dest++;
-    }
-    temp_v.push_back(*it_source);
-  }
-  for (; it_dest != dest_v.end(); ++it_dest) {
-    temp_v.push_back(*it_dest);
-  }
-  dest_v = std::move(temp_v);
-}
+  temp_v.reserve(dest_v.size() + source_v.size());
 
-/*
-void DynHT::union_row(vec<mer_t>& dest_v, vec<mer_t>& source_v)
-{
-  dest_v.insert(dest_v.end(), source_v.begin(), source_v.end());
-  std::inplace_merge(dest_v.begin(),
-                     std::next(dest_v.begin(), dest_v.size() - source_v.size()),
-                     dest_v.end(),
-                     comp_encoding);
-  auto it_dest = dest_v.begin(), result = dest_v.begin();
-  while (++it_dest != dest_v.end()) {
-    if (result->encoding == it_dest->encoding) {
-      result->sh = record->add_subset(it_dest->sh, result->sh);
-    } else if (++result != it_dest) {
-      *result = *it_dest;
+  auto id = dest_v.begin(), is = source_v.begin();
+  const auto ed = dest_v.end(), es = source_v.end();
+
+  while (id != ed && is != es) {
+    if (id->encoding < is->encoding) {
+      temp_v.push_back(*id++);
+    } else if (is->encoding < id->encoding) {
+      temp_v.push_back(*is++);
     } else {
-      result = it_dest;
+      mer_t x = *is++;
+      while (id != ed && id->encoding == x.encoding) {
+        x.sh = record->add_subset(id->sh, x.sh);
+        ++id;
+      }
+      temp_v.push_back(x);
     }
   }
-  if (result != dest_v.end()) {
-    dest_v.erase(++result, dest_v.end());
-  }
+  temp_v.insert(temp_v.end(), id, ed);
+  temp_v.insert(temp_v.end(), is, es);
+
+  dest_v.swap(temp_v);
 }
-*/
 
 void SDynHT::fill_table(uint32_t nrows, rseq_sptr_t rs)
 {
@@ -259,9 +239,10 @@ void SDynHT::fill_table(uint32_t nrows, rseq_sptr_t rs)
       rs->extract_mers(enc_vvec);
     }
   }
-  rs->compute_rho();
   sort_columns();
   make_unique();
+  /* update_nkmers(); */
+  rs->compute_rho();
 }
 
 void DynHT::fill_table(sh_t sh, rseq_sptr_t rs)
@@ -272,18 +253,18 @@ void DynHT::fill_table(sh_t sh, rseq_sptr_t rs)
       rs->extract_mers(mer_vvec, sh);
     }
   }
-  rs->compute_rho();
-  // update_nkmers();
   sort_columns();
   make_unique();
+  /* update_nkmers(); */
+  rs->compute_rho();
 }
 
-void FlatHT::display_info(uint32_t r)
+void FlatHT::display_info(std::ostream* output_stream, uint32_t r)
 {
   vec<uint64_t> se_to_count;
   se_to_count.resize(crecord->get_nsubsets());
   for (uint64_t ix = 0; ix < nkmers; ++ix) {
     se_to_count[cmer_v[ix].second]++;
   }
-  crecord->display_info(r, se_to_count);
+  crecord->display_info(output_stream, r, se_to_count);
 }
