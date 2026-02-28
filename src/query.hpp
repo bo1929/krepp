@@ -174,6 +174,18 @@ public:
       hdist_min = hdist_curr;
     }
   }
+
+  std::string get_match_string() const {
+    std::ostringstream oss;
+    // oss << "[";
+    for (size_t i = 0; i < hdisthist_v.size(); ++i) {
+      if (i > 0) oss << "\t";
+      oss << hdisthist_v[i];
+    }
+    // oss << "]";
+    return oss.str();
+  }
+
   double get_leq_tau(uint32_t tau)
   {
     double total_leq_tau = 0.0;
@@ -192,6 +204,8 @@ public:
       << ", " << -mi->v_llh << ", " << mi->lwr << ", " << mi->d_llh << "]"
 
 #define TABULAR_FIELD(nd, mi) nd->get_name(true) << "\t" << nd->get_en() << "\t" << mi->lwr << "\t" << mi->d_llh
+
+#define MATCH_FIELD(nd, mi) nd->get_name() << "\t" << mi->get_match_string() << "\n"
 
 #define DISTANCE_FIELD(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
 
