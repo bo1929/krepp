@@ -60,22 +60,22 @@ public:
   {
     bool is_invalid = true;
     if ((is_invalid = (w < k))) {
-      std::cerr << "The minimum minimizer window size (-w) is k (-k)." << std::endl;
+      error_exit("The minimum minimizer window size (-w) is k (-k).");
     }
     if ((is_invalid = (h < 3))) {
-      std::cerr << "The minimum number of LSH positions (-h) is 3." << std::endl;
+      error_exit("The minimum number of LSH positions (-h) is 3.");
     }
     if ((is_invalid = (h > 15))) {
-      std::cerr << "The maximum number of LSH positions (-h) is 15." << std::endl;
+      error_exit("The maximum number of LSH positions (-h) is 15.");
     }
     if ((is_invalid = (k > 31))) {
-      std::cerr << "The maximum allowed k-mer length (-k) is 31." << std::endl;
+      error_exit("The maximum allowed k-mer length (-k) is 31.");
     }
     if ((is_invalid = (k < 19))) {
-      std::cerr << "The minimum allowed k-mer length (-k) is 19." << std::endl;
+      error_exit("The minimum allowed k-mer length (-k) is 19.");
     }
     if ((is_invalid = ((k - h) > 16))) {
-      std::cerr << "For compact k-mer encodings, h must be >= k-16." << std::endl;
+      error_exit("For compact k-mer encodings, h must be >= k-16.");
     }
     if ((sdust_t != 0) && (sdust_w != 0)) {
       std::cerr << "Setting --sdust-w and --sdust-t to >0 will enable dustmasker." << std::endl;

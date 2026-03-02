@@ -15,7 +15,7 @@ void LSHF::set_lshf()
   std::vector<int8_t> g;
   int8_t lp = 31;
   int8_t jp = 0;
-  for (int8_t j = 0; j < ppos_v.size(); j++) {
+  for (size_t j = 0; j < ppos_v.size(); j++) {
     if (j == 0) {
       v.push_back((lp - ppos_v[j]) * 2);
       lp = ppos_v[j];
@@ -140,10 +140,10 @@ void LSHF::get_random_positions()
   std::sort(ppos_v.begin(), ppos_v.end());
   uint8_t ix_pos = 0;
   for (uint8_t i = 0; i < k; ++i) {
-    if (i != ppos_v[ix_pos])
-      npos_v.push_back(i);
-    else
+    if (ix_pos < h && i == ppos_v[ix_pos])
       ix_pos++;
+    else
+      npos_v.push_back(i);
   }
   std::sort(ppos_v.begin(), ppos_v.end(), std::greater<uint8_t>());
 }
