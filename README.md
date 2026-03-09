@@ -32,7 +32,7 @@ krepp index -h 11 -k 27 -w 35 -o index_toy -i input_map.tsv -t tree_toy.nwk --nu
 ```
 This command took only a couple of seconds and used $<$1.5GB memory for 6,863,411 indexed *k*-mers.
 The resulting index will be stored in `index_toy`.
-Alternatively, you could download one of the larger [public libraries](Available-reference-indexes) to make it more realistic and use it also for your novel query sequences.
+Alternatively, you could download one of the larger [public libraries](https://github.com/bo1929/krepp/wiki/Available-reference-indexes) to make it more realistic and use it also for your novel query sequences.
 
 ### Querying sequences against the reference index
 Once you have your index (e.g., the one we built above: `index_toy`), you can estimate distance by running:
