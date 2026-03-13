@@ -175,7 +175,7 @@ void DynHT::prune_columns(size_t max_size)
       std::sample(mer_vvec[i].begin(), mer_vvec[i].end(), std::back_inserter(tmp_v), max_size, gen);
       mer_vvec[i] = std::move(tmp_v);
     }
-    nkmers += max_size;
+    nkmers += mer_vvec[i].size();
   }
 }
 

@@ -106,7 +106,7 @@ public:
   {
     nchildren++;
     tblen += child->get_blen() + child->get_tblen();
-    // children.push_back(child);
+    children.push_back(child);
     card = card + child->get_card();
     sh = sh + child->get_sh();
     is_leaf = false;

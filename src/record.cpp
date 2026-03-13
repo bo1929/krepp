@@ -60,7 +60,7 @@ void Record::rehash_tree()
   sh_to_subset.clear();
   node_sptr_t nd_curr;
   sh_t ch;
-  sh_t ah;
+  sh_t ah = 0;
   tree->reset_traversal();
   while ((nd_curr = tree->next_post_order())) {
     if (nd_curr->check_leaf()) {

@@ -151,9 +151,9 @@ void Node::parse(vec<std::string>& el_v)
   if (el_v[tree->atter] == "(") {
     while (true) {
       tree->atter++;
-      children.emplace_back(std::make_shared<Node>(tree));
-      (children.back())->parse(el_v);
-      (children.back())->set_parent(getptr());
+      node_sptr_t child = std::make_shared<Node>(tree);
+      child->parse(el_v);
+      child->set_parent(getptr());
       if (el_v[tree->atter] == ",")
         continue;
       else
@@ -230,13 +230,13 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
   } else {
     vec_str_iter name_half = std::next(name_first, diff_size / 2);
     for (uint32_t pix = 0; pix < 2; ++pix) {
-      children.emplace_back(std::make_shared<Node>(tree));
+      node_sptr_t child = std::make_shared<Node>(tree);
       if (pix) {
-        (children.back())->generate_tree(name_first, name_half);
+        child->generate_tree(name_first, name_half);
       } else {
-        (children.back())->generate_tree(name_half, name_last);
+        child->generate_tree(name_half, name_last);
       }
-      (children.back())->set_parent(getptr());
+      child->set_parent(getptr());
     }
     blen = 1.0;
     is_leaf = false;

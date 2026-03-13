@@ -29,7 +29,7 @@ protected:
       error_exit(std::string("Failed to get temp directory: ") + tmp_dir.string());
     }
     std::string hash_str = std::to_string(gp_hash(url));
-    std::string tmp_filename = "rseq_" + hash_str + ".tmp";
+    std::string tmp_filename = "seq_" + hash_str + ".tmp";
     std::filesystem::path tmp_path = tmp_dir / tmp_filename;
 
     FILE* fp = fopen(tmp_path.string().c_str(), "wb");
@@ -69,6 +69,10 @@ class RSeq : public HandlerURL
 public:
   RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac, int sdust_t, int sdust_w);
   ~RSeq();
+  RSeq(const RSeq&) = delete;
+  RSeq& operator=(const RSeq&) = delete;
+  RSeq(RSeq&&) = delete;
+  RSeq& operator=(RSeq&&) = delete;
   bool read_next_seq() { return kseq_read(kseq) >= 0; }
   double get_rho() { return rho; }
   /* void compute_rho() { rho = static_cast<double>(wcix) / static_cast<double>(wnix); } */
@@ -116,6 +120,10 @@ class QSeq : public HandlerURL
 public:
   QSeq(std::string input);
   ~QSeq();
+  QSeq(const QSeq&) = delete;
+  QSeq& operator=(const QSeq&) = delete;
+  QSeq(QSeq&&) = delete;
+  QSeq& operator=(QSeq&&) = delete;
   bool read_next_batch();
   bool is_batch_finished();
   void clear_curr_batch();

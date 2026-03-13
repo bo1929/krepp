@@ -29,11 +29,13 @@ public:
     : nrows(nrows)
     , tree(tree)
     , record(record)
-  {}
+  {
+  }
   DynHT()
     : tree(nullptr)
     , record(nullptr)
-  {}
+  {
+  }
   void print_info();
   void clear_rows();
   void make_unique();
@@ -70,12 +72,8 @@ class SFlatHT
 
 public:
   SFlatHT(sdynht_sptr_t source);
-  SFlatHT(){};
-  ~SFlatHT()
-  {
-    inc_v.clear();
-    enc_v.clear();
-  }
+  SFlatHT() {};
+  ~SFlatHT() = default;
   void save(std::ofstream& sketch_stream);
   void load(std::ifstream& sketch_stream);
   std::vector<enc_t>::const_iterator bucket_start(uint32_t rix)
@@ -110,14 +108,8 @@ public:
   FlatHT(dynht_sptr_t source);
   FlatHT(tree_sptr_t tree, crecord_sptr_t crecord)
     : tree(tree)
-    , crecord(crecord){};
-  ~FlatHT()
-  {
-    inc_v.clear();
-    cmer_v.clear();
-    crecord.reset();
-    tree.reset();
-  }
+    , crecord(crecord) {};
+  ~FlatHT() = default;
   void load(std::ifstream& mer_stream, std::ifstream& inc_stream);
   void save(std::ofstream& mer_stream, std::ofstream& inc_stream);
   void set_crecord(crecord_sptr_t source) { crecord = source; }

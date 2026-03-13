@@ -81,12 +81,7 @@ class CRecord : public std::enable_shared_from_this<CRecord>
 public:
   CRecord(tree_sptr_t tree);
   CRecord(record_sptr_t record);
-  ~CRecord()
-  {
-    se_to_pse.clear();
-    se_to_rho.clear();
-    tree.reset();
-  }
+  ~CRecord() = default;
   void print_info();
   void apply_rho_coef(double coef);
   void decode_se(se_t se, vec<node_sptr_t>& subset_v);

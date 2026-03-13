@@ -129,11 +129,9 @@ void LSHF::get_random_positions()
   assert(h <= 16);
   assert(h < k);
   std::uniform_int_distribution<uint8_t> distrib(0, k - 1);
-  for (uint8_t c = 0; c < h; c++) {
+  while (ppos_v.size() < h) {
     n = distrib(gen);
-    if (std::count(ppos_v.begin(), ppos_v.end(), n)) {
-      c -= 1;
-    } else {
+    if (!std::count(ppos_v.begin(), ppos_v.end(), n)) {
       ppos_v.push_back(n);
     }
   }

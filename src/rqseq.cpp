@@ -68,7 +68,7 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
   hashmer_t cminimizer, pminimizer;
   uint32_t mrs = 0, mre = len;
   int mn = 0, mi = 0;
-  uint64_t* rgs;
+  uint64_t* rgs = nullptr;
   if (sdust_t > 0 && sdust_w > 0) rgs = sdust(0, (uint8_t*)seq, -1, sdust_t, sdust_w, &mn);
   if (mn > 0) {
     mre = (uint32_t)(rgs[mi]);
@@ -100,6 +100,7 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
           mrs = (uint32_t)(rgs[mi] >> 32);
         } else {
           free(rgs);
+          rgs = nullptr;
         }
         continue;
       }
@@ -111,8 +112,8 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     if ((l < w) && (i != len)) {
       continue;
     }
-    cminimizer =
-      *std::min_element(lsh_enc_win.begin(), lsh_enc_win.end(), [](hashmer_t lhs, hashmer_t rhs) { return lhs.z < rhs.z; });
+    cminimizer = *std::min_element(
+      lsh_enc_win.begin(), lsh_enc_win.end(), [](const hashmer_t& lhs, const hashmer_t& rhs) { return lhs.z < rhs.z; });
     c2.add(cminimizer.z);
 #ifdef CANONICAL
     rcenc64_bp = revcomp_bp64(cminimizer.x, k);
@@ -137,6 +138,7 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
       pminimizer = cminimizer;
     }
   }
+  free(rgs);
   n1_est += c1.estimate();
   n2_est += c2.estimate();
 }
@@ -145,6 +147,9 @@ QSeq::~QSeq()
 {
   kseq_destroy(kseq);
   gzclose(gfile);
+  if (is_url) {
+    std::filesystem::remove(input_path);
+  }
 }
 
 void QSeq::clear_curr_batch()
