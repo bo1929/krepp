@@ -1,7 +1,7 @@
 # krepp
 krepp is a k-mer-based maximum likelihood tool for estimating distances of reads to genomes and phylogenetic placement.
 
-For the descripton of the method, please refer to the preprint [here](https://www.biorxiv.org/content/10.1101/2025.01.20.633730v1).
+For the description of the method, refer to the main paper on [here](https://link.springer.com/article/10.1186/s13059-026-03999-y).
 
 See the [Wiki](https://github.com/bo1929/krepp/wiki) for a detailed documentation, a list of available databases, and various tutorials.
 
@@ -11,7 +11,7 @@ The easiest way to install krepp is by using [conda](https://anaconda.org/biocon
 ```bash
 conda install bioconda::krepp 
 ```
-This will install the latest available version, simply run `krepp --help` to test.
+This will install the latest available version. Simply run `krepp --help` to test.
 
 ### Compiling from the source
 To compile from the source, clone the repository with its submodules (might take a while) and compile with
@@ -24,13 +24,13 @@ and run `./krepp --help`. Then, perhaps, copy it to a directory you have in your
 
 ## Quickstart with a toy example
 ### Building a small index
-You can build an index from scratch, consisting of only 25 genomes provided in `test/`, to make yourself familiar with `krepp`.
+You can build an index from scratch, using only the 25 genomes provided in `test/`, to familiarize yourself with `krepp`.
 ```bash
 cd test/
 tar -xvf references_toy.tar.gz && xz -d references_toy/*
 krepp index -h 11 -k 27 -w 35 -o index_toy -i input_map.tsv -t tree_toy.nwk --num-threads 8
 ```
-This command took only a couple of seconds and used $<$1.5GB memory for 6,863,411 indexed *k*-mers.
+This command took only a couple of seconds and used <1.5GB of memory to index 6,863,411 *k*-mers.
 The resulting index will be stored in `index_toy`.
 Alternatively, you could download one of the larger [public libraries](https://github.com/bo1929/krepp/wiki/Available-reference-indexes) to make it more realistic and use it also for your novel query sequences.
 
@@ -118,19 +118,20 @@ SEQ_ID  DISTAL_NODE     EDGE_NUM        LWR     DIST
 
 ## Citation
 ```bibtex
-@misc{sapci_k-mer-based_2025,
-	title = {A k-mer-based maximum likelihood method for estimating distances of reads to genomes enables genome-wide phylogenetic placement.},
-	copyright = {2025, Posted by Cold Spring Harbor Laboratory. The copyright holder for this pre-print is the author. All rights reserved. The material may not be redistributed, re-used or adapted without the author's permission.},
-	url = {https://www.biorxiv.org/content/10.1101/2025.01.20.633730v1},
-	doi = {10.1101/2025.01.20.633730},
-	language = {en},
-	urldate = {2025-01-27},
-	publisher = {bioRxiv},
-	author = {Sapci, Ali Osman Berk and Mirarab, Siavash},
-	month = jan,
-	year = {2025},
-	note = {Pages: 2025.01.20.633730
-Section: New Results},
+@article{sapci_krepp_2026,
+	title = {krepp: a k-mer-based maximum pseudo-likelihood method for estimating read distances and genome-wide phylogenetic placement},
+	volume = {27},
+	issn = {1474-760X},
+	shorttitle = {krepp},
+	url = {https://doi.org/10.1186/s13059-026-03999-y},
+	doi = {10.1186/s13059-026-03999-y},
+	number = {1},
+	urldate = {2026-03-28},
+	journal = {Genome Biology},
+	author = {Şapcı, Ali Osman Berk and Mirarab, Siavash},
+	month = feb,
+	year = {2026},
+	keywords = {Average nucleotide identity, k-mer-based sequence comparison, Metagenomics, Phylogenetic placement},
+	pages = {108},
 }
-
 ```
