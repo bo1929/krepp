@@ -195,6 +195,7 @@ void IBatch::report_distances(strstream& batch_stream)
 
 void IBatch::place_sequences(strstream& batch_stream, bool tabular)
 {
+  bool has_previous = false;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
@@ -206,20 +207,25 @@ void IBatch::place_sequences(strstream& batch_stream, bool tabular)
     summarize_matches(imers_or, imers_rc);
     batch_stream.precision(STRSTREAM_PRECISION);
     batch_stream << std::fixed;
-    report_placement(batch_stream, tabular);
+    if (report_placement(batch_stream, tabular, has_previous) && !summarize && !tabular) {
+      has_previous = true;
+    }
   }
 }
 
-void IBatch::report_placement(strstream& batch_stream, bool tabular)
+bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_previous)
 {
   if (node_to_minfo.size() == 0 || !(no_filter || (mi_closest->get_leq_tau(tau) > 1.0))) {
-    return;
+    return false;
   }
   node_sptr_t nd_pp = nd_closest;
   minfo_sptr_t mi_pp = mi_closest;
   mi_pp->chisq = 0;
 
-  if (!tabular) batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [";
+  if (!tabular && !summarize) {
+    if (has_previous) batch_stream << ",\n";
+    batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [";
+  }
   if (node_to_minfo.size() == 1) {
     if (summarize) {
       node_to_wcount[nd_pp] += 1.0;
@@ -227,10 +233,10 @@ void IBatch::report_placement(strstream& batch_stream, bool tabular)
       if (tabular) {
         batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(nd_pp, mi_pp) << "\n";
       } else {
-        batch_stream << PP_JPLACE_FIELDS(nd_pp, mi_pp) << "]},\n";
+        batch_stream << PP_JPLACE_FIELDS(nd_pp, mi_pp) << "]}";
       }
     }
-    return;
+    return true;
   }
 
   vec<node_sptr_t> nd_v;
@@ -295,7 +301,7 @@ void IBatch::report_placement(strstream& batch_stream, bool tabular)
       }
     }
     if (!summarize && !tabular) {
-      batch_stream << "]\n\t\t\t},\n";
+      batch_stream << "]\n\t\t\t}";
     }
   } else {
     if (nd_v.size() > 1) {
@@ -314,10 +320,11 @@ void IBatch::report_placement(strstream& batch_stream, bool tabular)
       if (tabular) {
         batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(nd_pp, mi_pp) << "\n";
       } else {
-        batch_stream << PP_JPLACE_FIELDS(nd_pp, mi_pp) << "]},\n";
+        batch_stream << PP_JPLACE_FIELDS(nd_pp, mi_pp) << "]}";
       }
     }
   }
+  return true;
 }
 
 IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)

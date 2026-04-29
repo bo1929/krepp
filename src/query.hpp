@@ -60,7 +60,7 @@ public:
   void estimate_distances(strstream& batch_stream);
   void report_distances(strstream& batch_stream);
   void place_sequences(strstream& batch_stream, bool tabular);
-  void report_placement(strstream& batch_stream, bool tabular);
+  bool report_placement(strstream& batch_stream, bool tabular, bool has_previous);
   const parallel_flat_phmap<node_sptr_t, double>& get_summary() { return node_to_wcount; }
 
 private:

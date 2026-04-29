@@ -441,6 +441,7 @@ void QueryIndex::place_sequences()
     begin_jplace(preport_stream);
     (*output_stream) << preport_stream.rdbuf();
   }
+  bool has_previous = false;
 #if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
 #endif
@@ -457,12 +458,6 @@ void QueryIndex::place_sequences()
         {
           strstream batch_stream;
           ib.place_sequences(batch_stream, tabular);
-          if (!summarize && !cont_reading) {
-#pragma omp task
-            {
-#pragma omp taskwait
-            }
-          }
 #pragma omp critical
           {
             if (summarize) {
@@ -471,16 +466,15 @@ void QueryIndex::place_sequences()
                 node_to_wcount[nd] += wcount;
               }
             } else {
-              // if (batch_stream.tellp() != std::streampos(0)) {
-              if (cont_reading) {
+              if (tabular) {
                 (*output_stream) << batch_stream.rdbuf();
               } else {
-                if (batch_stream.peek() != EOF) {
-                  batch_stream.seekp(-2, std::ios_base::end);
-                  if (!tabular) {
-                    batch_stream << "\n\t";
+                if (batch_stream.tellp() != std::streampos(0)) {
+                  if (has_previous) {
+                    (*output_stream) << ",\n";
                   }
                   (*output_stream) << batch_stream.rdbuf();
+                  has_previous = true;
                 }
               }
             }
