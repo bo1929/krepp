@@ -628,7 +628,7 @@ void QueryIndex::init_sc_place(CLI::App& sc)
 void QueryIndex::init_sc_dist(CLI::App& sc)
 {
   sc.add_option(
-      "--dist-max", dist_max, "Maximum distance to report for matching references, overrides --filter if given. [0.25]")
+      "--dist-max", dist_max, "Maximum distance to report for matching references.")
     ->check(CLI::Range(1e-8, 0.33));
   multi = true;
   sc.add_flag(
@@ -639,11 +639,7 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
     filter,
     "Filter a hit if its distance is too high compared to the best hit (based on the statistical significance). [false]");
   sc.callback([&]() {
-    if (sc.count("--dist-max")) {
-      no_filter = false;
-    } else {
-      no_filter = !filter;
-    }
+    no_filter = !filter;
     if (!output_path.empty()) {
       output_file.open(output_path);
       output_stream = &output_file;

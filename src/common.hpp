@@ -47,7 +47,7 @@
 
 #define STRSTREAM_PRECISION 4
 
-#define VERSION "v0.7.2"
+#define VERSION "v0.8.0"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
@@ -118,7 +118,8 @@ struct mer_t
   mer_t(enc_t encoding, sh_t sh)
     : encoding(encoding)
     , sh(sh)
-  {}
+  {
+  }
 };
 
 static inline uint32_t gp_hash(const std::string& str)

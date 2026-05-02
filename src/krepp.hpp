@@ -210,7 +210,7 @@ private:
   std::ostream* output_stream = &std::cout;
   uint32_t tau = 2;
   uint32_t hdist_th = 4;
-  double dist_max = 0.25;
+  double dist_max = std::numeric_limits<double>::quiet_NaN();
   bool no_filter = true;
   bool filter = false;
   bool tabular = false;

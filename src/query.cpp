@@ -162,7 +162,7 @@ void IBatch::report_distances(strstream& batch_stream)
     nd_v.reserve(node_to_minfo.size());
     for (auto& [nd, mi] : node_to_minfo) {
       mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
-      if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
+      if (mi->chisq < chisq_value && (std::isnan(dist_max) || mi->d_llh < dist_max)) {
         nd_v.push_back(nd);
       }
     }
@@ -170,19 +170,21 @@ void IBatch::report_distances(strstream& batch_stream)
       node_to_wcount[nd] += 1.0 / nd_v.size();
     }
   } else {
-    if (node_to_minfo.empty() || (!no_filter && (mi_closest->d_llh > dist_max))) {
+    if (node_to_minfo.empty() || (!std::isnan(dist_max) && (mi_closest->d_llh > dist_max))) {
       batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
       return;
     }
     if (multi) {
       if (no_filter) {
         for (const auto& [nd, mi] : node_to_minfo) {
-          batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd, mi);
+          if (std::isnan(dist_max) || mi->d_llh < dist_max) {
+            batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd, mi);
+          }
         }
       } else {
         for (auto& [nd, mi] : node_to_minfo) {
           mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
-          if (mi->chisq < chisq_value && mi->d_llh < dist_max) {
+          if (mi->chisq < chisq_value && (std::isnan(dist_max) || mi->d_llh < dist_max)) {
             batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd, mi);
           }
         }
