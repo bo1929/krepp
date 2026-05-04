@@ -126,7 +126,10 @@ void Tree::split_nwk(vec<std::string>& el_v)
       if (nwk_str[i] == '[' || nwk_str[i] == ']') {
         error_exit("Given Newick tree contains an unquoted label or length with '[' or ']'.");
       }
-      if (nwk_str[i] == ';' && i != (nwk_str.length() - 1)) {
+      if (nwk_str[i] == ';') {
+        if (i == (nwk_str.length() - 1)) {
+          break;
+        }
         if (nwk_str.length() > (i + 1) && nwk_str[i + 1] == '\n') {
           error_exit("Given Newick file may contain multiple trees, encountered unexpected ';'.");
         } else {
