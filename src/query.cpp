@@ -255,7 +255,7 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
         denom = 1.0;
         // denom /= nd_parent->get_nchildren();
       } else {
-        denom /= nd_parent->get_nchildren();
+        denom /= nd_parent->get_eff_nchildren();
       }
       if (!pp_map.contains(nd_parent)) {
         pp_map[nd_parent] = std::make_shared<Minfo>(hdist_th);

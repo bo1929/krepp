@@ -24,6 +24,7 @@ public:
   void load(std::ifstream& tree_stream);
   void generate_tree(vec<std::string>& names_v);
   void map_to_qtree(tree_sptr_t qtree);
+  void compute_eff_nchildren();
   static double compute_distance(node_sptr_t a, node_sptr_t b);
   static node_sptr_t compute_lca(node_sptr_t x, node_sptr_t y);
   void stream_nwk_basic(std::stringstream& nwk_strstream, node_sptr_t nd);
@@ -60,7 +61,8 @@ class Node : public std::enable_shared_from_this<Node>
 public:
   Node(tree_sptr_t tree)
     : tree(tree)
-  {}
+  {
+  }
   Node(tree_sptr_t tree, std::string name, node_sptr_t parent, bool is_leaf = false)
     : tree(tree)
     , name(name)
@@ -105,6 +107,7 @@ public:
   void add_children(node_sptr_t child)
   {
     nchildren++;
+    eff_nchildren++;
     tblen += child->get_blen() + child->get_tblen();
     children.push_back(child);
     card = card + child->get_card();
@@ -112,6 +115,7 @@ public:
     is_leaf = false;
   }
   tuint_t get_nchildren() { return nchildren; }
+  tuint_t get_eff_nchildren() { return eff_nchildren; }
   node_sptr_t get_parent() { return parent; }
   tree_sptr_t get_tree() { return tree; }
   double get_bdepth() { return bdepth; }
@@ -173,6 +177,7 @@ private:
   bool is_leaf = true;
   bool is_taxon = false;
   tuint_t nchildren = 0;
+  tuint_t eff_nchildren = 0;
   tuint_t ix_child = 0;
   tuint_t card = 0;
   sh_t sh = 0;

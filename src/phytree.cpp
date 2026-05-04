@@ -445,4 +445,28 @@ void Tree::map_to_qtree(tree_sptr_t qtree)
     }
   }
   reset_traversal();
+  compute_eff_nchildren();
+}
+
+void Tree::compute_eff_nchildren()
+{
+  flat_phmap<node_sptr_t, bool> is_covered;
+  for (se_t se = 1; se <= nnodes; ++se) {
+    node_sptr_t nd_leaf = se_to_node[se];
+    if (!nd_leaf || !nd_leaf->check_leaf()) continue;
+    node_sptr_t nd_anc = nd_leaf;
+    while (nd_anc && !is_covered.count(nd_anc)) {
+      is_covered[nd_anc] = true;
+      nd_anc = nd_anc->get_parent();
+    }
+  }
+  reset_traversal();
+  while ((curr = next_post_order())) {
+    curr->eff_nchildren = 0;
+  }
+  reset_traversal();
+  for (auto& [nd, _] : is_covered) {
+    node_sptr_t p = nd->get_parent();
+    if (p) p->eff_nchildren++;
+  }
 }
