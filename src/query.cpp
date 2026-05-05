@@ -266,6 +266,9 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
 
   // Collect candidate placements.
   for (auto& [nd_curr, mi_curr] : pp_map) {
+    if (nd_curr->get_nchildren() != nd_curr->get_eff_nchildren()) {
+      continue;
+    }
     if (no_filter || (mi_curr->get_leq_tau(tau) > 1.0)) {
       if (!nd_curr->check_leaf()) {
         mi_curr->optimize_likelihood(llhfunc);

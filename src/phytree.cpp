@@ -435,13 +435,14 @@ void Tree::map_to_qtree(tree_sptr_t qtree)
     if (curr->check_leaf() && curr->is_labeled()) {
       if (name_to_se.contains(curr->get_name())) {
         se_to_node[name_to_se[curr->get_name()]] = curr;
-      } else {
-        strstream parsed_tree;
-        stream_nwk_basic(parsed_tree, root);
-        std::cerr << "Parsed tree: " << parsed_tree.rdbuf() << "\n";
-        std::cerr << "Unexpected leaf: " << curr->get_name() << "\n";
-        error_exit("Given placement tree contains a reference that does not appear in the index.");
       }
+      // else {
+      //   strstream parsed_tree;
+      //   stream_nwk_basic(parsed_tree, root);
+      //   std::cerr << "Parsed tree: " << parsed_tree.rdbuf() << "\n";
+      //   std::cerr << "Unexpected leaf: " << curr->get_name() << "\n";
+      //   std::cerr << "Placement tree has a leaf absent from the index\n";
+      // }
     }
   }
   reset_traversal();
