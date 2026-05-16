@@ -167,7 +167,11 @@ void IndexMultiple::build_index()
   dynht_sptr_t root_dynht = std::make_shared<DynHT>(nrows, tree, record);
 #if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
-  omp_set_nested(1);
+#if _OPENMP >= 202011
+    omp_set_max_active_levels(2);
+#else
+    omp_set_nested(1);
+#endif
 #endif
 #pragma omp parallel
   {
@@ -330,7 +334,7 @@ void QuerySketch::seek_sequences()
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
         auto sb = std::make_shared<SBatch>(sketch, qs, hdist_th);
-#pragma omp task untied
+#pragma omp task firstprivate(sb)
         {
           sb->seek_sequences(*output_stream);
         }
@@ -361,7 +365,7 @@ void QueryIndex::estimate_distances()
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
         auto ib = std::make_shared<IBatch>(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
-#pragma omp task untied
+#pragma omp task firstprivate(ib)
         {
           strstream batch_stream;
           ib->estimate_distances(batch_stream);
@@ -454,7 +458,7 @@ void QueryIndex::place_sequences()
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
         auto ib = std::make_shared<IBatch>(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
-#pragma omp task untied
+#pragma omp task firstprivate(ib)
         {
           strstream batch_stream;
           ib->place_sequences(batch_stream, tabular);
@@ -627,9 +631,7 @@ void QueryIndex::init_sc_place(CLI::App& sc)
 
 void QueryIndex::init_sc_dist(CLI::App& sc)
 {
-  sc.add_option(
-      "--dist-max", dist_max, "Maximum distance to report for matching references.")
-    ->check(CLI::Range(1e-8, 0.33));
+  sc.add_option("--dist-max", dist_max, "Maximum distance to report for matching references.")->check(CLI::Range(1e-8, 0.33));
   multi = true;
   sc.add_flag(
     "--multi,!--no-multi", multi, "Output all distances satisfying the filters (not just the closest reference). [true]");
