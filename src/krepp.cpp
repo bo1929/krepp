@@ -329,10 +329,10 @@ void QuerySketch::seek_sequences()
       bool cont_reading = false;
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        SBatch sb(sketch, qs, hdist_th);
+        auto sb = std::make_shared<SBatch>(sketch, qs, hdist_th);
 #pragma omp task untied
         {
-          sb.seek_sequences(*output_stream);
+          sb->seek_sequences(*output_stream);
         }
       }
 #pragma omp taskwait
@@ -360,15 +360,15 @@ void QueryIndex::estimate_distances()
       bool cont_reading = false;
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
+        auto ib = std::make_shared<IBatch>(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
 #pragma omp task untied
         {
           strstream batch_stream;
-          ib.estimate_distances(batch_stream);
+          ib->estimate_distances(batch_stream);
 #pragma omp critical
           {
             if (summarize) {
-              for (auto& [nd, wcount] : ib.get_summary()) {
+              for (auto& [nd, wcount] : ib->get_summary()) {
                 twcount += wcount;
                 node_to_wcount[nd] += wcount;
               }
@@ -453,15 +453,15 @@ void QueryIndex::place_sequences()
       bool cont_reading = false;
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
+        auto ib = std::make_shared<IBatch>(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
 #pragma omp task untied
         {
           strstream batch_stream;
-          ib.place_sequences(batch_stream, tabular);
+          ib->place_sequences(batch_stream, tabular);
 #pragma omp critical
           {
             if (summarize) {
-              for (auto& [nd, wcount] : ib.get_summary()) {
+              for (auto& [nd, wcount] : ib->get_summary()) {
                 twcount += wcount;
                 node_to_wcount[nd] += wcount;
               }
