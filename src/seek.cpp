@@ -22,6 +22,8 @@ SBatch::SBatch(sketch_sptr_t sketch, qseq_sptr_t qs, uint32_t hdist_th)
 void SBatch::seek_sequences(std::ostream& output_stream)
 {
   strstream batch_stream;
+  batch_stream.precision(STRSTREAM_PRECISION);
+  batch_stream << std::fixed;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();

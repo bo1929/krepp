@@ -149,7 +149,7 @@ void IBatch::estimate_distances(strstream& batch_stream)
 
     search_mers(seq, len, imers_or, imers_rc);
     summarize_matches(imers_or, imers_rc);
-    batch_stream.precision(STRSTREAM_PRECISION);
+    batch_stream.precision(5);
     batch_stream << std::fixed;
     report_distances(batch_stream);
   }
@@ -207,7 +207,7 @@ void IBatch::place_sequences(strstream& batch_stream, bool tabular)
 
     search_mers(seq, len, imers_or, imers_rc);
     summarize_matches(imers_or, imers_rc);
-    batch_stream.precision(STRSTREAM_PRECISION);
+    batch_stream.precision(5);
     batch_stream << std::fixed;
     if (report_placement(batch_stream, tabular, has_previous) && !summarize && !tabular) {
       has_previous = true;
@@ -427,7 +427,7 @@ void Minfo::optimize_likelihood(optimize::HDistHistLLH& llhfunc)
 {
   llhfunc.set_parameters(hdisthist_v.data(), mismatch_count, rho);
   // Locating Function Minima using Brent's algorithm, depends on boost::math.
-  std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.33, 13);
+  std::pair<double, double> sol_r = boost::math::tools::brent_find_minima(llhfunc, 1e-10, 0.5, 16);
   d_llh = sol_r.first;
   v_llh = sol_r.second;
 }
