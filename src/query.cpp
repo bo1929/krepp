@@ -171,7 +171,7 @@ void IBatch::report_distances(strstream& batch_stream)
     }
   } else {
     if (node_to_minfo.empty() || (!std::isnan(dist_max) && (mi_closest->d_llh > dist_max))) {
-      batch_stream << identifer_batch[bix] << "\tNaN\tNaN\n";
+      batch_stream << identifer_batch[bix] << "\tNA\tNaN\n";
       return;
     }
     if (multi) {
