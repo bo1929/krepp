@@ -3,7 +3,9 @@ krepp is a *k*-mer-based maximum likelihood tool for estimating distances of rea
 
 For the description of the method, refer to the main paper [here](https://link.springer.com/article/10.1186/s13059-026-03999-y).
 
-See the [Wiki](https://github.com/bo1929/krepp/wiki) for a detailed documentation, a list of available databases, and various tutorials.
+See the [Wiki](https://github.com/bo1929/krepp/wiki) for detailed documentation, a list of available databases, and various tutorials.
+
+See [this tutorial for metagenomic analysis of a toy marine sample](https://alisapci.xyz/documents/krepp-tutorial-ismb2026/index.html) (from ISMB 2026).
 
 ## Installation
 ### Using `conda` (recommended)
