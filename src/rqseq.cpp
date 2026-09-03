@@ -4,6 +4,8 @@ extern "C"
 #include "sdust.h"
 }
 
+#define HLL_BUCKET_FACTOR 12
+
 struct hashmer_t
 {
   uint64_t x, y, z;
@@ -60,8 +62,8 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     ldiff = 1;
     w = k;
   }
-  hll::HyperLogLog c1(12);
-  hll::HyperLogLog c2(12);
+  hll::HyperLogLog c1(HLL_BUCKET_FACTOR);
+  hll::HyperLogLog c2(HLL_BUCKET_FACTOR);
   uint64_t kix = 0, klix = 0;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
   std::vector<hashmer_t> lsh_enc_win(ldiff);
@@ -114,7 +116,7 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     }
     cminimizer = *std::min_element(
       lsh_enc_win.begin(), lsh_enc_win.end(), [](const hashmer_t& lhs, const hashmer_t& rhs) { return lhs.z < rhs.z; });
-    c2.add(cminimizer.z);
+    c2.add(xur64m_hash(cminimizer.y & mask_lr));
 #ifdef CANONICAL
     rcenc64_bp = revcomp_bp64(cminimizer.x, k);
     if (cminimizer.x < rcenc64_bp) {

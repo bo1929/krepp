@@ -154,6 +154,14 @@ static inline uint64_t xur64_hash(uint64_t h)
   return h;
 }
 
+static inline uint64_t xur64m_hash(uint64_t h)
+{
+  h += 0x9E3779B97F4A7C15L;
+  h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9L;
+  h = (h ^ (h >> 27)) * 0x94D049BB133111EBL;
+  return h ^ (h >> 31);
+}
+
 static inline uint32_t hdist_lr64(const uint64_t x, const uint64_t y)
 {
   uint64_t z1 = x ^ y;
