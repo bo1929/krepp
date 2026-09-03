@@ -175,7 +175,8 @@ public:
     }
   }
 
-  std::string get_match_string() const {
+  std::string get_match_string() const
+  {
     std::ostringstream oss;
     // oss << "[";
     for (size_t i = 0; i < hdisthist_v.size(); ++i) {
@@ -199,7 +200,7 @@ public:
   void optimize_likelihood(optimize::HDistHistLLH& llhfunc);
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
-#define PP_JPLACE_FIELDS(nd, mi)                                                                                             \
+#define PP_JPLACE_FIELDS(nd, mi)                                                                                            \
   "[" << nd->get_en() << ", " << mi->jukes_cantor_dist() - nd->get_midpoint_pendant() << ", " << nd->get_midpoint_pendant() \
       << ", " << -mi->v_llh << ", " << mi->lwr << ", " << mi->d_llh << "]"
 

@@ -115,11 +115,13 @@ void Tree::split_nwk(vec<std::string>& el_v)
       if (!is_comment) {
         buf += nwk_str[i];
       }
-    } else if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',') {
+    } else if (nwk_str[i] == '(' || nwk_str[i] == ')' || nwk_str[i] == ':' || nwk_str[i] == ',' || nwk_str[i] == '{' ||
+               nwk_str[i] == '}') {
       if (nwk_str[i] != '(' && nwk_str[i - 1] != '(') {
-        if (buf.empty()) buf = "";
-        el_v.push_back(buf);
-        buf = "";
+        if (!buf.empty()) {
+          el_v.push_back(buf);
+          buf = "";
+        }
       }
       el_v.push_back(std::string() + nwk_str[i]);
     } else {
@@ -170,38 +172,43 @@ void Node::parse(vec<std::string>& el_v)
     tree->se_to_node.push_back(getptr());
     if (el_v[tree->atter] == ")") {
       tree->atter++;
-      if (el_v[tree->atter] == ")") return;
+      if (tree->atter < el_v.size() && el_v[tree->atter] == "{") {
+        parse_decoration_en(el_v);
+      }
+      if (tree->atter < el_v.size() && el_v[tree->atter] == ")") return;
     }
     name = "";
     blen = std::numeric_limits<double>::quiet_NaN(); // No branch length...
-    if (el_v[tree->atter] != ",") {
+    if (tree->atter < el_v.size() && el_v[tree->atter] != ",") {
       if (el_v[tree->atter] != ":") {
         name = el_v[tree->atter];
         tree->atter++;
       }
-      if (el_v[tree->atter] == ":") {
+      if (tree->atter < el_v.size() && el_v[tree->atter] == ":") {
         blen = std::atof(el_v[tree->atter + 1].c_str());
         tree->tblen += blen;
         tree->atter += 2;
       }
     }
+    parse_decoration_en(el_v);
     // if (!name.empty() && name[name.length() - 1] == '\n') {
     //   name.erase(name.length() - 1);
     // }
   } else {
     name = "";
     blen = std::numeric_limits<double>::quiet_NaN(); // No branch length...
-    if (el_v[tree->atter] != ",") {
+    if (tree->atter < el_v.size() && el_v[tree->atter] != ",") {
       if (el_v[tree->atter] != ":") {
         name = el_v[tree->atter];
         tree->atter++;
       }
-      if (el_v[tree->atter] == ":") {
+      if (tree->atter < el_v.size() && el_v[tree->atter] == ":") {
         blen = std::atof(el_v[tree->atter + 1].c_str());
         tree->tblen += blen;
         tree->atter += 2;
       }
     }
+    parse_decoration_en(el_v);
     is_leaf = true;
     card = 1;
     sh = Subset::get_singleton_sh(name);
@@ -212,6 +219,21 @@ void Node::parse(vec<std::string>& el_v)
     se = tree->nnodes;
     tree->se_to_node.push_back(getptr());
   }
+}
+
+void Node::parse_decoration_en(vec<std::string>& el_v)
+{
+  if (tree->atter >= el_v.size()) return;
+  if (el_v[tree->atter] != "{") return;
+  tree->atter++;
+  if (tree->atter < el_v.size() && el_v[tree->atter] != "}") {
+    edge_num = static_cast<se_t>(std::atol(el_v[tree->atter].c_str()));
+    tree->atter++;
+  }
+  if (tree->atter < el_v.size() && el_v[tree->atter] == "}") {
+    tree->atter++;
+  }
+  is_decorated = true;
 }
 
 void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
@@ -324,6 +346,7 @@ void Tree::parse_lineages(std::ifstream& lineage_stream)
   atter = 0, nnodes = 0, tblen = 0;
   subtree_root = root;
   parallel_flat_phmap<std::string, node_sptr_t> taxon_to_node = {};
+  parallel_flat_phmap<std::string, bool> rid_to_presence = {};
 
   std::string line;
   while (std::getline(lineage_stream, line)) {
@@ -333,6 +356,10 @@ void Tree::parse_lineages(std::ifstream& lineage_stream)
     if (!(std::getline(iss, name, '\t') && std::getline(iss, lineage, '\t'))) {
       error_exit("Failed to reference to lineage mapping!");
     }
+    if (rid_to_presence.contains(name)) {
+      error_exit("Duplicate reference ID \"" + name + "\" in the lineage file!");
+    }
+    rid_to_presence[name] = true;
 
     std::stringstream lss(lineage);
     std::string taxon, rank;
@@ -349,12 +376,11 @@ void Tree::parse_lineages(std::ifstream& lineage_stream)
       parent = taxon_to_node[taxon];
     }
 
-    if (!taxon_to_node.contains(name)) {
-      taxon_to_node[name] = std::make_shared<Node>(getptr(), name, parent, true);
-      taxon_to_node[name]->set_parent(parent);
-    } else {
-      error_exit("The same reference appears more than once in the lineage file.");
+    if (taxon_to_node.contains(name)) {
+      error_exit("Reference ID \"" + name + "\" collides with a taxon name in the lineage file!");
     }
+    taxon_to_node[name] = std::make_shared<Node>(getptr(), name, parent, true);
+    taxon_to_node[name]->set_parent(parent);
   }
 
   for (auto& [taxon, nd] : taxon_to_node) {
@@ -400,7 +426,35 @@ void Tree::load(std::ifstream& tree_stream)
   atter = 0, nnodes = 0, tblen = 0;
   root->parse(el_v);
   subtree_root = root;
+  check_unique_labels();
+
+  tuint_t ndecorated = 0, ntotal = 0;
+  reset_traversal();
+  while ((curr = next_post_order())) {
+    ntotal++;
+    if (curr->check_decorated()) {
+      ndecorated++;
+    }
+  }
+  if (ndecorated && (ndecorated != ntotal)) {
+    error_exit("The given Newick tree is only partially decorated with edge numbers ({N}); decorate all " +
+               std::to_string(ntotal) + " nodes or none, so that the output does not edge numbering schemes.");
+  }
   // compute_bdepth();
+}
+
+void Tree::check_unique_labels()
+{
+  flat_phmap<std::string, bool> seen_labels;
+  reset_traversal();
+  while ((curr = next_post_order())) {
+    if (curr->name.empty()) continue;
+    if (seen_labels.contains(curr->name)) {
+      error_exit("Duplicate node name \"" + curr->name + "\" in the given Newick tree!");
+    }
+    seen_labels[curr->name] = true;
+  }
+  reset_traversal();
 }
 
 void Tree::compute_bdepth()

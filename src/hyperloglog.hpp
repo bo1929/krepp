@@ -18,21 +18,21 @@
 
   #if defined(__has_builtin) && (defined(__GNUC__) || defined(__clang__))
 
-    #define _GET_CLZ(x, b) (uint8_t) std::min(b, ::__builtin_clz(x)) + 1
+    #define _GET_CLZ(x, b) (uint8_t) std::min(b, ::__builtin_clzll(x)) + 1
 
   #else
 
-inline uint8_t _get_leading_zero_count(uint32_t x, uint8_t b)
+inline uint8_t _get_leading_zero_count(uint64_t x, uint8_t b)
 {
 
     #if defined(_MSC_VER)
-  uint32_t leading_zero_len = 32;
-  ::_BitScanReverse(&leading_zero_len, x);
+  uint64_t leading_zero_len = 64;
+  ::_BitScanReverse64(&leading_zero_len, x);
   --leading_zero_len;
   return std::min(b, (uint8_t)leading_zero_len);
     #else
   uint8_t v = 1;
-  while (v <= b && !(x & 0x80000000)) {
+  while (v <= b && !(x & 0x8000000000000000ULL)) {
     v++;
     x <<= 1;
   }
@@ -44,8 +44,8 @@ inline uint8_t _get_leading_zero_count(uint32_t x, uint8_t b)
 
 namespace hll {
 
-  static const double pow_2_32 = 4294967296.0;      ///< 2^32
-  static const double neg_pow_2_32 = -4294967296.0; ///< -(2^32)
+  static const double pow_2_64 = 18446744073709551616.0;      ///< 2^64
+  static const double neg_pow_2_64 = -18446744073709551616.0; ///< -(2^64)
 
   /** @class HyperLogLog
  *  @brief Implement of 'HyperLogLog' estimate cardinality algorithm
@@ -95,10 +95,10 @@ namespace hll {
      * @param[in] str string to add
      * @param[in] len length of string
      */
-    void add(const uint32_t hash)
+    void add(const uint64_t hash)
     {
-      uint32_t index = hash >> (32 - b_);
-      uint8_t rank = _GET_CLZ((hash << b_), 32 - b_);
+      uint64_t index = hash >> (64 - b_);
+      uint8_t rank = _GET_CLZ((hash << b_), 64 - b_);
       if (rank > M_[index]) {
         M_[index] = rank;
       }
@@ -114,7 +114,7 @@ namespace hll {
       double estimate;
       double sum = 0.0;
       for (uint32_t i = 0; i < m_; i++) {
-        sum += 1.0 / (1 << M_[i]);
+        sum += 1.0 / static_cast<double>(uint64_t(1) << M_[i]);
       }
       estimate = alphaMM_ / sum; // E in the original paper
       if (estimate <= 2.5 * m_) {
@@ -127,8 +127,8 @@ namespace hll {
         if (zeros != 0) {
           estimate = m_ * std::log(static_cast<double>(m_) / zeros);
         }
-      } else if (estimate > (1.0 / 30.0) * pow_2_32) {
-        estimate = neg_pow_2_32 * log(1.0 - (estimate / pow_2_32));
+      } else if (estimate > (1.0 / 30.0) * pow_2_64) {
+        estimate = neg_pow_2_64 * log(1.0 - (estimate / pow_2_64));
       }
       return estimate;
     }
@@ -206,7 +206,8 @@ namespace hll {
       , register_limit_((1 << 5) - 1)
       , c_(0.0)
       , p_(1 << b)
-    {}
+    {
+    }
 
     /**
      * Adds element to the estimator
@@ -214,10 +215,10 @@ namespace hll {
      * @param[in] str string to add
      * @param[in] len length of string
      */
-    void add(const uint32_t hash)
+    void add(const uint64_t hash)
     {
-      uint32_t index = hash >> (32 - b_);
-      uint8_t rank = _GET_CLZ((hash << b_), 32 - b_);
+      uint64_t index = hash >> (64 - b_);
+      uint8_t rank = _GET_CLZ((hash << b_), 64 - b_);
       rank = rank == 0 ? register_limit_ : std::min(register_limit_, rank);
       const uint8_t old = M_[index];
       if (rank > old) {

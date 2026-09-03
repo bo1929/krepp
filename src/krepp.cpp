@@ -155,6 +155,9 @@ void IndexMultiple::read_input_file()
     if (!(std::getline(iss, name, '\t') && std::getline(iss, input, '\t'))) {
       error_exit("Failed to read the reference name to path/URL mapping!");
     }
+    if (name_to_path.contains(name)) {
+      error_exit("Duplicate reference ID \"" + name + "\" in the input map file!");
+    }
     name_to_path[name] = input;
     names_v.push_back(name);
   }
@@ -167,11 +170,11 @@ void IndexMultiple::build_index()
   dynht_sptr_t root_dynht = std::make_shared<DynHT>(nrows, tree, record);
 #if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
-#if _OPENMP >= 202011
-    omp_set_max_active_levels(2);
-#else
-    omp_set_nested(1);
-#endif
+  #if _OPENMP >= 202011
+  omp_set_max_active_levels(2);
+  #else
+  omp_set_nested(1);
+  #endif
 #endif
 #pragma omp parallel
   {
@@ -322,6 +325,7 @@ void QuerySketch::seek_sequences()
 {
   strstream dreport_stream;
   header_dreport(dreport_stream);
+  (*output_stream) << dreport_stream.rdbuf();
 #if defined(_OPENMP) && _WOPENMP == 1
   omp_set_num_threads(num_threads);
 #endif
@@ -592,9 +596,11 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
 
 void QueryIndex::init_sc_place(CLI::App& sc)
 {
-  sc.add_option("-t,--nwk-file",
-                nwk_path,
-                "Path to the Newick file for the (rooted) placement tree (overrides if the index has a backbone tree).")
+  sc.add_option(
+      "-t,--nwk-file",
+      nwk_path,
+      "Path to the Newick file for the (rooted) placement tree (overrides if the index has a backbone tree). "
+      "May be a jplace-style decorated tree, whose edge numbers ({N}) are used directly in the output (all nodes must be decorated).")
     ->check(CLI::ExistingFile);
   sc.add_option(
       "-l,--lineage-file",

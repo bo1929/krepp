@@ -22,6 +22,7 @@ public:
   void parse(std::filesystem::path nwk_path);
   void save(std::ofstream& tree_stream);
   void load(std::ifstream& tree_stream);
+  void check_unique_labels();
   void generate_tree(vec<std::string>& names_v);
   void map_to_qtree(tree_sptr_t qtree);
   void compute_eff_nchildren();
@@ -87,6 +88,13 @@ public:
   void generate_tree(vec_str_iter name_first, vec_str_iter name_last);
   void set_sh(sh_t source) { sh = source; }
   void set_se(se_t source) { se = source; }
+  void set_edge_num(se_t source)
+  {
+    edge_num = source;
+    is_decorated = true;
+  }
+  bool check_decorated() { return is_decorated; }
+  void parse_decoration_en(vec<std::string>& el_v);
   void set_rank(std::string r)
   {
     rank = r;
@@ -153,7 +161,7 @@ public:
   tuint_t get_card() { return card; }
   sh_t get_sh() { return sh; }
   se_t get_se() { return se; }
-  se_t get_en() { return se - 1; }
+  se_t get_en() { return is_decorated ? edge_num : se - 1; }
   bool check_leaf() { return is_leaf; }
   bool check_taxon() { return is_taxon; }
   bool is_labeled() { return !name.empty(); }
@@ -182,6 +190,8 @@ private:
   tuint_t card = 0;
   sh_t sh = 0;
   se_t se = 0;
+  se_t edge_num = 0;
+  bool is_decorated = false;
 };
 
 #endif

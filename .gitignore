@@ -1,0 +1,7 @@
+tmp
+build
+
+test/index*
+test/references*
+
+krepp

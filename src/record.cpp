@@ -157,20 +157,52 @@ CRecord::CRecord(record_sptr_t record)
 {
   record->make_compact();
   tree = record->get_tree();
-  se_t curr_senum = 1;
   node_sptr_t nd_curr;
   tree->reset_traversal();
   nsubsets = record->sh_to_se.size() + 1;
   nnodes = record->sh_to_node.size() + 1;
-  se_to_pse.resize(nsubsets);
   se_to_rho.resize(nnodes);
   while ((nd_curr = tree->next_post_order())) {
     se_to_rho[nd_curr->get_se()] = record->sh_to_rho[nd_curr->get_sh()];
   }
+  se_to_pse.resize(nsubsets);
   tree->reset_traversal();
+  while ((nd_curr = tree->next_post_order())) {
+    se_t nd_se = record->sh_to_se[nd_curr->get_sh()];
+    tuint_t nchildren = nd_curr->get_nchildren();
+    if (nchildren == 0) {
+      se_to_pse[nd_se] = std::make_pair(0, 0);
+      continue;
+    }
+    if (nchildren == 1) {
+      error_exit("A node has a single child in the backbone tree! Please suppress unifurcations.");
+    }
+    se_t acc_se = record->sh_to_se[(*nd_curr->get_children())->get_sh()];
+    for (tuint_t ix = 1; ix < nchildren; ++ix) {
+      se_t child_se = record->sh_to_se[(*std::next(nd_curr->get_children(), ix))->get_sh()];
+      if (ix + 1 == nchildren) {
+        se_to_pse[nd_se] = std::make_pair(acc_se, child_se);
+      } else {
+        se_to_pse.push_back(std::make_pair(acc_se, child_se));
+        acc_se = static_cast<se_t>(se_to_pse.size() - 1);
+      }
+    }
+  }
+  nsubsets = static_cast<se_t>(se_to_pse.size());
+
   for (auto& [sh, subset] : record->sh_to_subset) {
-    se_to_pse[record->sh_to_se[sh]] =
-      std::make_pair(record->sh_to_se[subset->ch], record->sh_to_se[sh - subset->ch - subset->nonce]);
+    if (record->sh_to_node.contains(sh)) {
+      continue;
+    }
+    se_t se = record->sh_to_se[sh];
+    se_t xse = 0, yse = 0;
+    sh_t y_sh = sh - subset->ch - subset->nonce, y_ch = subset->ch;
+    record->sh_to_se.if_contains(y_ch, [&xse](const parallel_flat_phmap<sh_t, se_t>::value_type& v) { xse = v.second; });
+    record->sh_to_se.if_contains(y_sh, [&yse](const parallel_flat_phmap<sh_t, se_t>::value_type& v) { yse = v.second; });
+    if ((subset->ch && !xse) || ((sh - subset->ch - subset->nonce) && !yse)) {
+      error_exit("Failed to decompose a color into its recorded partitions.");
+    }
+    se_to_pse[se] = std::make_pair(xse, yse);
   }
   se_to_pse[0] = std::make_pair(0, 0);
 }
