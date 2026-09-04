@@ -43,7 +43,7 @@ public:
   void update_nkmers();
   void update_size_hist();
   void ensure_sorted_columns();
-  void fill_table(sh_t sh, rseq_sptr_t rqseq);
+  void fill_table(sh_t sh, rseq_sptr_t rqseq, bool curr = false);
   void prune_columns(size_t max_size);
   void union_table(dynht_sptr_t source);
   void reserve() { mer_vvec.reserve(nrows); }

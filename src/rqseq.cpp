@@ -11,13 +11,14 @@ struct hashmer_t
   uint64_t x, y, z;
 };
 
-RSeq::RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac, int sdust_t, int sdust_w)
+RSeq::RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac, int sdust_t, int sdust_w, uint64_t offset)
   : w(w)
   , r(r)
   , frac(frac)
   , lshf(lshf)
   , sdust_t(sdust_t)
   , sdust_w(sdust_w)
+  , soffset(offset)
 {
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   k = lshf->get_k();
@@ -37,6 +38,9 @@ RSeq::RSeq(std::string input, lshf_sptr_t lshf, uint8_t w, uint32_t r, bool frac
   gfile = gzopen(input_path.c_str(), "rb");
   if (gfile == nullptr) {
     error_exit(std::string("Failed to open the file at ") + input_path.string());
+  }
+  if (soffset) {
+    gzseek(gfile, soffset, SEEK_SET);
   }
   kseq = kseq_init(gfile);
 }

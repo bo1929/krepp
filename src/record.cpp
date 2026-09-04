@@ -142,8 +142,13 @@ void Record::make_compact()
       error_exit("The current se_t size is too small to fit all nodes!");
     }
   }
-  tree->reset_traversal();
+  vec<sh_t> subset_keys;
+  subset_keys.reserve(sh_to_subset.size());
   for (auto& [sh, subset] : sh_to_subset) {
+    subset_keys.push_back(sh);
+  }
+  std::sort(subset_keys.begin(), subset_keys.end());
+  for (sh_t sh : subset_keys) {
     if (curr_senum < limit_senum) {
       curr_senum += static_cast<se_t>(sh_to_se.try_emplace(sh, curr_senum).second);
     } else {

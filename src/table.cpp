@@ -245,12 +245,17 @@ void SDynHT::fill_table(uint32_t nrows, rseq_sptr_t rs)
   rs->compute_rho();
 }
 
-void DynHT::fill_table(sh_t sh, rseq_sptr_t rs)
+void DynHT::fill_table(sh_t sh, rseq_sptr_t rs, bool curr)
 {
   mer_vvec.resize(nrows);
-  while (rs->read_next_seq()) {
-    if (rs->set_curr_seq()) {
-      rs->extract_mers(mer_vvec, sh);
+  if (curr) {
+    rs->reset_estimates();
+    rs->extract_mers(mer_vvec, sh);
+  } else {
+    while (rs->read_next_seq()) {
+      if (rs->set_curr_seq()) {
+        rs->extract_mers(mer_vvec, sh);
+      }
     }
   }
   sort_columns();

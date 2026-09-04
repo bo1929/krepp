@@ -12,6 +12,7 @@
 #include "rqseq.hpp"
 #include "table.hpp"
 #include <CLI.hpp>
+#include <atomic>
 
 const auto url_validator = CLI::Validator(
   [](std::string& input) {
@@ -144,6 +145,8 @@ public:
   void read_input_file();
   void save_index();
   void build_index();
+  void index_sequences();
+  void index_files();
   void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht);
   void save_info(std::ofstream& info_stream);
 
@@ -151,9 +154,12 @@ private:
   std::string suffix;
   tuint_t build_count = 0;
   vec<std::string> names_v;
+  vec<std::string> fastx_names;
+  vec<uint64_t> fastx_offsets;
   std::filesystem::path input;
   std::filesystem::path index_dir;
   std::filesystem::path nwk_path;
+  bool per_sequence = false;
   tree_sptr_t tree = nullptr;
   flatht_sptr_t root_flatht = nullptr;
   parallel_flat_phmap<std::string, std::string> name_to_path;

@@ -47,7 +47,7 @@
 
 #define STRSTREAM_PRECISION 5
 
-#define VERSION "v0.8.5"
+#define VERSION "v0.9.0"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;

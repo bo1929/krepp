@@ -199,7 +199,7 @@ typedef struct __kstring_t
       }                                                                                                                     \
     }                                                                                                                       \
     if (c == '>' || c == '@') seq->last_char = c; /* the first header char has been read */                                 \
-    seq->seq.s[seq->seq.l] = 0;                   /* null terminated string */                                              \
+    if (seq->seq.s) seq->seq.s[seq->seq.l] = 0;   /* null terminated string; seq.s may be NULL for an empty record */       \
     if (c != '+') return seq->seq.l;              /* FASTA */                                                               \
     if (seq->qual.m < seq->seq.m) {               /* allocate enough memory */                                              \
       seq->qual.m = seq->seq.m;                                                                                             \
@@ -210,9 +210,9 @@ typedef struct __kstring_t
     if (c == -1) return -2; /* we should not stop here */                                                                   \
     while ((c = ks_getc(ks)) != -1 && seq->qual.l < seq->seq.l)                                                             \
       if (c >= 33 && c <= 127) seq->qual.s[seq->qual.l++] = (unsigned char)c;                                               \
-    seq->qual.s[seq->qual.l] = 0;             /* null terminated string */                                                  \
-    seq->last_char = 0;                       /* we have not come to the next header line */                                \
-    if (seq->seq.l != seq->qual.l) return -2; /* qual string is shorter than seq string */                                  \
+    if (seq->qual.s) seq->qual.s[seq->qual.l] = 0; /* null terminated string; qual.s may be NULL for an empty record */     \
+    seq->last_char = 0;                            /* we have not come to the next header line */                           \
+    if (seq->seq.l != seq->qual.l) return -2;      /* qual string is shorter than seq string */                             \
     return seq->seq.l;                                                                                                      \
   }
 

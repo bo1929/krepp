@@ -131,7 +131,13 @@ void SketchSingle::save_sketch()
 void IndexMultiple::obtain_build_tree()
 {
   tree = std::make_shared<Tree>();
-  if (nwk_path.empty()) {
+  if (per_sequence) {
+    if (!nwk_path.empty()) {
+      error_exit("A guide tree (-t) is incompatible with a per sequence indexing.");
+    }
+    std::cerr << "No guide tree for per sequence indexing." << std::endl;
+    tree->generate_tree(names_v);
+  } else if (nwk_path.empty()) {
     std::cerr << "No tree has given as a guide, the color index could be suboptimal." << std::endl;
     tree->generate_tree(names_v);
   } else {
@@ -146,6 +152,62 @@ void IndexMultiple::obtain_build_tree()
 
 void IndexMultiple::read_input_file()
 {
+  gzFile gfile = gzopen(input.c_str(), "rb");
+  if (gfile != nullptr) {
+    int c;
+    while ((c = gzgetc(gfile)) != -1 && (c == '\n' || c == '\r' || c == ' ' || c == '\t')) {
+    }
+    gzrewind(gfile);
+    kseq_t* kseq = nullptr;
+    bool is_fastx = false;
+    if (c == '>' || c == '@') {
+      kseq = kseq_init(gfile);
+      int osk = kseq_read(kseq);
+      if (osk < -1) {
+        error_exit("Error reading the input (truncated FASTQ record?).");
+      }
+      is_fastx = osk >= 0 && kseq->name.l > 0 && (c == '>' || (kseq->seq.l > 0 && kseq->qual.l == kseq->seq.l));
+    }
+    if (is_fastx) {
+      gzrewind(gfile);
+      kseq_rewind(kseq);
+      per_sequence = true;
+      flat_phmap<std::string, bool> seen_names;
+      uint64_t r_offset = 0, n_offset = 0;
+      int kret;
+      while ((kret = kseq_read(kseq)) >= 0) {
+        std::string name(kseq->name.s);
+        if (name.empty()) {
+          error_exit("Empty reference ID in the input!");
+        }
+        if (seen_names.contains(name)) {
+          error_exit("Duplicate reference ID \"" + name + "\" in the input!");
+        }
+        seen_names[name] = true;
+        fastx_names.push_back(name);
+        fastx_offsets.push_back(r_offset);
+        if (kseq->seq.l < w) {
+          std::cerr << "[WARNING] Skipping \"" << name << "\" it is shorter than the minimizer window." << std::endl;
+        } else {
+          names_v.push_back(name);
+        }
+        n_offset = gztell(kseq->f->f) - (kseq->f->end - kseq->f->begin) - (kseq->last_char ? 1 : 0);
+        r_offset = n_offset;
+      }
+      if (kret < -1) {
+        error_exit("Error reading the input (truncated record?).");
+      }
+      fastx_offsets.push_back(n_offset);
+      kseq_destroy(kseq);
+      gzclose(gfile);
+      if (names_v.empty()) {
+        error_exit("No sequences of longer the minimizer length found in the input!");
+      }
+      return;
+    }
+    kseq_destroy(kseq);
+    gzclose(gfile);
+  }
   std::ifstream input_stream(input);
   CHECK_STREAM_OR_EXIT(input_stream, (std::string("Error opening ") + input.string()));
   std::string line;
@@ -166,25 +228,11 @@ void IndexMultiple::read_input_file()
 
 void IndexMultiple::build_index()
 {
-  record_sptr_t record = std::make_shared<Record>(tree);
-  dynht_sptr_t root_dynht = std::make_shared<DynHT>(nrows, tree, record);
-#if defined(_OPENMP) && _WOPENMP == 1
-  omp_set_num_threads(num_threads);
-  #if _OPENMP >= 202011
-  omp_set_max_active_levels(2);
-  #else
-  omp_set_nested(1);
-  #endif
-#endif
-#pragma omp parallel
-  {
-#pragma omp single
-    {
-      build_for_subtree(tree->get_root(), root_dynht);
-    }
+  if (per_sequence) {
+    index_sequences();
+  } else {
+    index_files();
   }
-  assertm(root_dynht->get_nkmers() > 0, "No k-mers to index!");
-  root_flatht = std::make_shared<FlatHT>(root_dynht);
 }
 
 void IndexMultiple::save_info(std::ofstream& info_stream)
@@ -303,6 +351,125 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht)
                 << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r" << std::flush;
     }
   }
+}
+
+void IndexMultiple::index_sequences()
+{
+  record_sptr_t record = std::make_shared<Record>(tree);
+  const uint32_t nrec = static_cast<uint32_t>(fastx_names.size());
+  vec<std::atomic<int32_t>> pending_children(tree->get_nnodes() + 1);
+  flat_phmap<std::string, node_sptr_t> name_to_leaf;
+  tree->reset_traversal();
+  node_sptr_t nd;
+  while ((nd = tree->next_post_order())) {
+    if (nd->check_leaf()) {
+      name_to_leaf[nd->get_name()] = nd;
+    }
+    pending_children[nd->get_se()] = nd->get_nchildren();
+  }
+  vec<dynht_sptr_t> se_to_table(tree->get_nnodes() + 1);
+#if defined(_OPENMP) && _WOPENMP == 1
+  omp_set_num_threads(num_threads);
+#endif
+  const uint32_t nsl = std::min<uint32_t>(std::max<uint32_t>(num_threads, 1), nrec);
+  vec<std::pair<uint32_t, uint32_t>> slices;
+  {
+    uint32_t b = 0;
+    for (uint32_t s = 1; s <= nsl; ++s) {
+      uint64_t target = (s == nsl) ? std::numeric_limits<uint64_t>::max()
+                                   : (fastx_offsets[nrec] - fastx_offsets[0]) * s / nsl + fastx_offsets[0];
+      uint32_t e = b;
+      while (e < nrec && fastx_offsets[e] < target)
+        e++;
+      if (e > b) slices.emplace_back(b, e);
+      b = e;
+    }
+  }
+  auto fill_slice = [&](uint32_t b, uint32_t e) {
+    rseq_sptr_t rs = std::make_shared<RSeq>(input.string(), lshf, w, r, frac, sdust_t, sdust_w, fastx_offsets[b]);
+    for (uint32_t i = b; i < e; ++i) {
+      if (!rs->read_next_seq()) {
+        error_exit("FASTX record missing during the build (offset desync at record " + fastx_names[i] + ").");
+      }
+      bool usable = rs->set_curr_seq();
+      if (fastx_names[i] != rs->get_name()) {
+        error_exit("FASTX record mismatch at offset " + std::to_string(fastx_offsets[i]) + "; expected \"" + fastx_names[i] +
+                   "\" but read \"" + rs->get_name() + "\".");
+      }
+      auto lit = name_to_leaf.find(fastx_names[i]);
+      if (lit == name_to_leaf.end() || !usable) {
+        continue; // Short record skipped from the index; it has been consumed.
+      }
+      node_sptr_t lf = lit->second;
+      dynht_sptr_t ltab = std::make_shared<DynHT>(nrows, tree, record);
+      ltab->fill_table(lf->get_sh(), rs, true);
+      record->insert_rho(lf->get_sh(), rs->get_rho());
+      se_to_table[lf->get_se()] = ltab;
+#pragma omp critical
+      {
+        std::cerr << "\33[2K\r" << std::flush;
+        std::cerr << "Leaf node: " << lf->get_name() << "\tsize: " << ltab->get_nkmers() << "\tprogress: " << (++build_count)
+                  << "/" << tree->get_nnodes() << "\r" << std::flush;
+      }
+      node_sptr_t done = lf;
+      while (true) {
+        node_sptr_t parent = done->get_parent();
+        if (!parent) break;
+        if (pending_children[parent->get_se()].fetch_sub(1, std::memory_order_acq_rel) != 1) break;
+        dynht_sptr_t acc;
+        const tuint_t nch = parent->get_nchildren();
+        for (tuint_t cix = 0; cix < nch; ++cix) {
+          node_sptr_t child = *std::next(parent->get_children(), cix);
+          dynht_sptr_t ctab = se_to_table[child->get_se()];
+          se_to_table[child->get_se()] = nullptr;
+          if (!ctab) continue;
+          if (!acc) {
+            acc = ctab;
+            continue;
+          }
+          acc->union_table(ctab);
+        }
+        se_to_table[parent->get_se()] = acc;
+#pragma omp critical
+        {
+          std::cerr << "\33[2K\r" << std::flush;
+          std::cerr << "Internal node: " << parent->get_name() << "\tsize: " << (acc ? acc->get_nkmers() : 0)
+                    << "\tprogress: " << (++build_count) << "/" << tree->get_nnodes() << "\r" << std::flush;
+        }
+        done = parent;
+      }
+    }
+  };
+#pragma omp parallel for num_threads(nsl) schedule(static)
+  for (uint32_t six = 0; six < static_cast<uint32_t>(slices.size()); ++six) {
+    fill_slice(slices[six].first, slices[six].second);
+  }
+  dynht_sptr_t root_dynht = se_to_table[tree->get_root()->get_se()];
+  assertm(root_dynht && root_dynht->get_nkmers() > 0, "No k-mers to index!");
+  root_flatht = std::make_shared<FlatHT>(root_dynht);
+}
+
+void IndexMultiple::index_files()
+{
+  record_sptr_t record = std::make_shared<Record>(tree);
+  dynht_sptr_t root_dynht = std::make_shared<DynHT>(nrows, tree, record);
+#if defined(_OPENMP) && _WOPENMP == 1
+  omp_set_num_threads(num_threads);
+  #if _OPENMP >= 202011
+  omp_set_max_active_levels(2);
+  #else
+  omp_set_nested(1);
+  #endif
+#endif
+#pragma omp parallel
+  {
+#pragma omp single
+    {
+      build_for_subtree(tree->get_root(), root_dynht);
+    }
+  }
+  assertm(root_dynht->get_nkmers() > 0, "No k-mers to index!");
+  root_flatht = std::make_shared<FlatHT>(root_dynht);
 }
 
 void QuerySketch::header_dreport(strstream& dreport_stream)
@@ -564,7 +731,10 @@ QuerySketch::QuerySketch(CLI::App& sc)
 IndexMultiple::IndexMultiple(CLI::App& sc)
 {
   set_index_defaults();
-  sc.add_option("-i,--input-file", input, "TSV file <path> mapping reference IDs to (gzip compatible) paths/URLs.")
+  sc.add_option(
+      "-i,--input-file",
+      input,
+      "TSV file <path> mapping reference IDs to (gzip compatible) paths/URLs, or a single (gzip compatible) FASTA/FASTQ.")
     ->required()
     ->check(CLI::ExistingFile);
   sc.add_option("-o,--index-dir", index_dir, "Directory <path> in which the index will be stored.")->required();

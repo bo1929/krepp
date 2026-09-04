@@ -257,9 +257,9 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
     for (uint32_t pix = 0; pix < 2; ++pix) {
       node_sptr_t child = std::make_shared<Node>(tree);
       if (pix) {
-        child->generate_tree(name_first, name_half);
-      } else {
         child->generate_tree(name_half, name_last);
+      } else {
+        child->generate_tree(name_first, name_half);
       }
       child->set_parent(getptr());
     }
