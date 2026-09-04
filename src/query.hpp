@@ -20,6 +20,20 @@ typedef std::shared_ptr<Minfo> minfo_sptr_t;
 typedef std::unique_ptr<Minfo> minfo_uptr_t;
 typedef std::shared_ptr<IMers> imers_sptr_t;
 
+// A single placement of one query onto one edge of the tree.
+// Field order follows the jplace "fields" array krepp reports.
+struct placement_t
+{
+  se_t edge_num = 0;
+  double pendant_length = 0;
+  double distal_length = 0;
+  double likelihood = 0;
+  double like_weight_ratio = 0;
+  double distance = 0;
+  std::string distal_node;
+  node_sptr_t node = nullptr;
+};
+
 class IMers : public std::enable_shared_from_this<IMers>
 {
   friend class IBatch;
@@ -60,10 +74,18 @@ public:
   void estimate_distances(strstream& batch_stream);
   void report_distances(strstream& batch_stream);
   void place_sequences(strstream& batch_stream, bool tabular);
+  // Computes the placements for the current query without formatting them.
+  // search_mers() and summarize_matches() must have run for that query first.
+  // Clears placements either way. Returns false when there were no matches, or
+  // when filtering is on and the closest match fails the tau filter; a true
+  // return can still leave placements empty in multi mode, where the candidate
+  // filters may reject every node.
+  bool collect_placements(vec<placement_t>& placements);
   bool report_placement(strstream& batch_stream, bool tabular, bool has_previous);
   const parallel_flat_phmap<node_sptr_t, double>& get_summary() { return node_to_wcount; }
 
 private:
+  placement_t make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi);
   uint32_t k;
   uint32_t h;
   uint32_t m;
@@ -200,11 +222,12 @@ public:
   void optimize_likelihood(optimize::HDistHistLLH& llhfunc);
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
-#define PP_JPLACE_FIELDS(nd, mi)                                                                                            \
-  "[" << nd->get_en() << ", " << mi->jukes_cantor_dist() - nd->get_midpoint_pendant() << ", " << nd->get_midpoint_pendant() \
-      << ", " << -mi->v_llh << ", " << mi->lwr << ", " << mi->d_llh << "]"
+#define PP_JPLACE_FIELDS(pp)                                                                                                \
+  "[" << (pp).edge_num << ", " << (pp).pendant_length << ", " << (pp).distal_length << ", " << (pp).likelihood              \
+      << ", " << (pp).like_weight_ratio << ", " << (pp).distance << "]"
 
-#define PP_TABULAR_FIELDS(nd, mi) nd->get_name(true) << "\t" << nd->get_en() << "\t" << mi->lwr << "\t" << mi->d_llh
+#define PP_TABULAR_FIELDS(pp)                                                                                               \
+  (pp).distal_node << "\t" << (pp).edge_num << "\t" << (pp).like_weight_ratio << "\t" << (pp).distance
 
 #define MATCH_FIELDS(nd, mi) nd->get_name() << "\t" << mi->get_match_string() << "\n"
 
