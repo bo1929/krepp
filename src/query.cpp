@@ -215,8 +215,23 @@ void IBatch::place_sequences(strstream& batch_stream, bool tabular)
   }
 }
 
-bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_previous)
+placement_t IBatch::make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi)
 {
+  placement_t pp;
+  pp.node = nd;
+  pp.edge_num = nd->get_en();
+  pp.distal_length = nd->get_midpoint_pendant();
+  pp.pendant_length = mi->jukes_cantor_dist() - pp.distal_length;
+  pp.likelihood = -mi->v_llh;
+  pp.like_weight_ratio = mi->lwr;
+  pp.distance = mi->d_llh;
+  pp.distal_node = nd->get_name(true);
+  return pp;
+}
+
+bool IBatch::collect_placements(vec<placement_t>& placements)
+{
+  placements.clear();
   if (node_to_minfo.size() == 0 || !(no_filter || (mi_closest->get_leq_tau(tau) > 1.0))) {
     return false;
   }
@@ -224,20 +239,8 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
   minfo_sptr_t mi_pp = mi_closest;
   mi_pp->chisq = 0;
 
-  if (!tabular && !summarize) {
-    if (has_previous) batch_stream << ",\n";
-    batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [";
-  }
   if (node_to_minfo.size() == 1) {
-    if (summarize) {
-      node_to_wcount[nd_pp] += 1.0;
-    } else {
-      if (tabular) {
-        batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(nd_pp, mi_pp) << "\n";
-      } else {
-        batch_stream << PP_JPLACE_FIELDS(nd_pp, mi_pp) << "]}";
-      }
-    }
+    placements.push_back(make_placement(nd_pp, mi_pp));
     return true;
   }
 
@@ -290,23 +293,12 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
   }
 
   if (multi) {
+    placements.reserve(nd_v.size());
     for (uint32_t i = 0; i < nd_v.size(); ++i) {
       nd_pp = nd_v[i];
       mi_pp = pp_map[nd_pp];
       mi_pp->lwr = mi_pp->lwr / total_lwr;
-      if (summarize) {
-        node_to_wcount[nd_pp] += 1.0 / nd_v.size();
-      } else {
-        if (i > 0 && !tabular) batch_stream << ",";
-        if (tabular) {
-          batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(nd_pp, mi_pp) << "\n";
-        } else {
-          batch_stream << "\n\t\t\t\t" << PP_JPLACE_FIELDS(nd_pp, mi_pp);
-        }
-      }
-    }
-    if (!summarize && !tabular) {
-      batch_stream << "]\n\t\t\t}";
+      placements.push_back(make_placement(nd_pp, mi_pp));
     }
   } else {
     if (nd_v.size() > 1) {
@@ -319,15 +311,48 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
     nd_pp = nd_v.back();
     mi_pp = pp_map[nd_pp];
     mi_pp->lwr = mi_pp->lwr / total_lwr;
-    if (summarize) {
-      node_to_wcount[nd_pp] += 1.0;
-    } else {
-      if (tabular) {
-        batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(nd_pp, mi_pp) << "\n";
-      } else {
-        batch_stream << PP_JPLACE_FIELDS(nd_pp, mi_pp) << "]}";
-      }
+    placements.push_back(make_placement(nd_pp, mi_pp));
+  }
+  return true;
+}
+
+bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_previous)
+{
+  vec<placement_t> placements;
+  if (!collect_placements(placements)) {
+    return false;
+  }
+
+  if (summarize) {
+    for (const placement_t& pp : placements) {
+      node_to_wcount[pp.node] += 1.0 / placements.size();
     }
+    return true;
+  }
+
+  if (tabular) {
+    for (const placement_t& pp : placements) {
+      batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(pp) << "\n";
+    }
+    return true;
+  }
+
+  if (has_previous) batch_stream << ",\n";
+  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [";
+  // Layout follows the shape of the search, not the number of placements: a
+  // single matched node, or single-best mode, prints inline. Multi mode with
+  // more than one match breaks across lines even if only one placement
+  // survives. collect_placements does not insert into or erase from
+  // node_to_minfo, so the branch it took can be re-derived here; both inline
+  // paths push exactly one placement, so front() is safe.
+  if (node_to_minfo.size() == 1 || !multi) {
+    batch_stream << PP_JPLACE_FIELDS(placements.front()) << "]}";
+  } else {
+    for (uint32_t i = 0; i < placements.size(); ++i) {
+      if (i > 0) batch_stream << ",";
+      batch_stream << "\n\t\t\t\t" << PP_JPLACE_FIELDS(placements[i]);
+    }
+    batch_stream << "]\n\t\t\t}";
   }
   return true;
 }
