@@ -705,7 +705,7 @@ SketchSingle::SketchSingle(CLI::App& sc)
       w = k + 6;
     }
     if (!(sc.count("-h") + sc.count("--num-positions"))) {
-      h = k - 16;
+      h = std::max(k - 16, 9);
     }
     if (!validate_configuration()) {
       error_exit("Invalid configuration!");

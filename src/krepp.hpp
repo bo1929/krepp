@@ -35,7 +35,7 @@ public:
   void save_configuration(std::ofstream& cfg_stream);
   void set_sketch_defaults()
   {
-    k = 26;
+    k = 25;
     w = k + 6;
     h = 10;
     m = 4;
@@ -63,8 +63,8 @@ public:
     if ((is_invalid = (w < k))) {
       error_exit("The minimum minimizer window size (-w) is k (-k).");
     }
-    if ((is_invalid = (h < 3))) {
-      error_exit("The minimum number of LSH positions (-h) is 3.");
+    if ((is_invalid = (h < 9))) {
+      error_exit("The minimum number of LSH positions (-h) is 9.");
     }
     if ((is_invalid = (h > 15))) {
       error_exit("The maximum number of LSH positions (-h) is 15.");
