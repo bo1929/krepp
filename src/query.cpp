@@ -383,6 +383,9 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
   std::queue<se_t> se_q;
   std::pair<vec_cmer_it, vec_cmer_it> indices = index->bucket_indices(rix);
   crecord_sptr_t crecord = index->get_crecord(rix);
+  const se_t nsubsets = crecord->get_nsubsets();
+  vec<uint32_t> vnd_v(nsubsets, 0);
+  uint32_t tix = 0;
   for (; indices.first < indices.second; ++indices.first) {
     hdist_curr = popcount_lr32(indices.first->first ^ enc_lr);
     if (hdist_curr > hdist_th) {
@@ -391,10 +394,21 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
     if (hdist_curr < hdist_filt) {
       hdist_filt = hdist_curr;
     }
+    if (++tix == 0) {
+      std::fill(vnd_v.begin(), vnd_v.end(), 0);
+      ++tix;
+    }
     se_q.push(indices.first->second);
     while (!se_q.empty()) {
       se = se_q.front();
       se_q.pop();
+      if (se >= nsubsets) {
+        error_exit("Invalid ID " + std::to_string(se) + " in the index record.");
+      }
+      if (vnd_v[se] == tix) {
+        continue;
+      }
+      vnd_v[se] = tix;
       if (tree->check_node(se)) {
         if (!(nd = tree->get_node(se))) {
           continue;
@@ -407,6 +421,9 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
         }
       }
       pse = crecord->get_pse(se);
+      if (pse.first >= nsubsets || pse.second >= nsubsets) {
+        error_exit("Invalid parent ID in the index record.");
+      }
       se_q.push(pse.first);
       se_q.push(pse.second);
     }

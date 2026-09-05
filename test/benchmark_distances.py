@@ -161,7 +161,18 @@ def dir_size_mb(path):
 
 def ensure_index(krepp, index_dir, index_args):
     """Builds the index if missing; returns (build time in s, size in MB)."""
-    if index_dir.exists() and list(index_dir.glob("cmer-*")):
+    def complete():
+        cmer_files = list(index_dir.glob("cmer-*"))
+        if not cmer_files:
+            return False
+        for cmer in cmer_files:
+            suffix = cmer.name[len("cmer"):]
+            required = ("cmer", "crecord", "inc", "metadata", "tree")
+            if not all((index_dir / f"{prefix}{suffix}").is_file() for prefix in required):
+                return False
+        return True
+
+    if index_dir.exists() and complete():
         return None, dir_size_mb(index_dir)
     ensure_references()
     print(f"Building index at {index_dir} ({index_label(index_args) or 'defaults'}) ...")
@@ -170,7 +181,7 @@ def ensure_index(krepp, index_dir, index_args):
     run_krepp(krepp, ["index"] + index_args + ["-o", str(index_dir), "-i", "input_map.tsv", "-t", "tree_toy.nwk", "--num-threads", "8"])
     build_s = time.perf_counter() - t0
     # A stale/incomplete index dir cannot be loaded by queries.
-    if not list(index_dir.glob("cmer-*")):
+    if not complete():
         sys.exit(f"Index build failed at {index_dir}")
     return build_s, dir_size_mb(index_dir)
 
@@ -183,11 +194,18 @@ def read_fasta(path):
             line = line.strip()
             if line.startswith(">"):
                 if name:
+                    if name in seqs:
+                        raise ValueError(f"Duplicate FASTA record ID {name!r} in {path}")
                     seqs[name] = "".join(chunks)
-                name, chunks = line[1:].split()[0], []
+                fields = line[1:].split()
+                if not fields:
+                    raise ValueError(f"Empty FASTA record ID in {path}")
+                name, chunks = fields[0], []
             elif line:
                 chunks.append(line)
     if name:
+        if name in seqs:
+            raise ValueError(f"Duplicate FASTA record ID {name!r} in {path}")
         seqs[name] = "".join(chunks)
     return seqs
 

@@ -18,28 +18,25 @@
 
   #if defined(__has_builtin) && (defined(__GNUC__) || defined(__clang__))
 
-    #define _GET_CLZ(x, b) (uint8_t) std::min(b, ::__builtin_clzll(x)) + 1
+inline uint8_t _clzll(uint64_t x, uint8_t b)
+{
+  if (x == 0) return static_cast<uint8_t>(b + 1);
+  return static_cast<uint8_t>(std::min<uint32_t>(b, static_cast<uint32_t>(::__builtin_clzll(x))) + 1);
+}
+    #define _GET_CLZ(x, b) _clzll(x, b)
 
   #else
 
-inline uint8_t _get_leading_zero_count(uint64_t x, uint8_t b)
+inline uint8_t _clz(uint64_t x, uint8_t b)
 {
-
-    #if defined(_MSC_VER)
-  uint64_t leading_zero_len = 64;
-  ::_BitScanReverse64(&leading_zero_len, x);
-  --leading_zero_len;
-  return std::min(b, (uint8_t)leading_zero_len);
-    #else
   uint8_t v = 1;
   while (v <= b && !(x & 0x8000000000000000ULL)) {
     v++;
     x <<= 1;
   }
   return v;
-    #endif
 }
-    #define _GET_CLZ(x, b) _get_leading_zero_count(x, b)
+    #define _GET_CLZ(x, b) _clz(x, b)
   #endif /* defined(__GNUC__) */
 
 namespace hll {

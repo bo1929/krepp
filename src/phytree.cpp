@@ -226,13 +226,15 @@ void Node::parse_decoration_en(vec<std::string>& el_v)
   if (tree->atter >= el_v.size()) return;
   if (el_v[tree->atter] != "{") return;
   tree->atter++;
-  if (tree->atter < el_v.size() && el_v[tree->atter] != "}") {
-    edge_num = static_cast<se_t>(std::atol(el_v[tree->atter].c_str()));
-    tree->atter++;
+  if (tree->atter >= el_v.size() || el_v[tree->atter] == "}" || el_v[tree->atter].empty()) {
+    error_exit("A decorated Newick node must contain an edge number in {N}.");
   }
-  if (tree->atter < el_v.size() && el_v[tree->atter] == "}") {
-    tree->atter++;
+  edge_num = static_cast<se_t>(std::atol(el_v[tree->atter].c_str()));
+  tree->atter++;
+  if (tree->atter >= el_v.size() || el_v[tree->atter] != "}") {
+    error_exit("A decorated Newick node is missing the closing brace in {N}.");
   }
+  tree->atter++;
   is_decorated = true;
 }
 
@@ -257,9 +259,9 @@ void Node::generate_tree(vec_str_iter name_first, vec_str_iter name_last)
     for (uint32_t pix = 0; pix < 2; ++pix) {
       node_sptr_t child = std::make_shared<Node>(tree);
       if (pix) {
-        child->generate_tree(name_half, name_last);
-      } else {
         child->generate_tree(name_first, name_half);
+      } else {
+        child->generate_tree(name_half, name_last);
       }
       child->set_parent(getptr());
     }
@@ -429,11 +431,16 @@ void Tree::load(std::ifstream& tree_stream)
   check_unique_labels();
 
   tuint_t ndecorated = 0, ntotal = 0;
+  flat_phmap<se_t, bool> en_to_seen;
   reset_traversal();
   while ((curr = next_post_order())) {
     ntotal++;
     if (curr->check_decorated()) {
       ndecorated++;
+      if (en_to_seen.contains(curr->get_en())) {
+        error_exit("Duplicate decorated edge number " + std::to_string(curr->get_en()) + " in the given Newick tree!");
+      }
+      en_to_seen[curr->get_en()] = true;
     }
   }
   if (ndecorated && (ndecorated != ntotal)) {

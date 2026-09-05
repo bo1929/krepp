@@ -703,6 +703,8 @@ SketchSingle::SketchSingle(CLI::App& sc)
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
+    }
+    if (!(sc.count("-h") + sc.count("--num-positions"))) {
       h = k - 16;
     }
     if (!validate_configuration()) {
@@ -752,6 +754,8 @@ IndexMultiple::IndexMultiple(CLI::App& sc)
   sc.callback([&]() {
     if (!(sc.count("-w") + sc.count("--win-len"))) {
       w = k + 6;
+    }
+    if (!(sc.count("-h") + sc.count("--num-positions"))) {
       h = k - 16;
     }
     if (!validate_configuration()) {
