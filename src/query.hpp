@@ -197,18 +197,6 @@ public:
     }
   }
 
-  std::string get_match_string() const
-  {
-    std::ostringstream oss;
-    // oss << "[";
-    for (size_t i = 0; i < hdisthist_v.size(); ++i) {
-      if (i > 0) oss << "\t";
-      oss << hdisthist_v[i];
-    }
-    // oss << "]";
-    return oss.str();
-  }
-
   double get_leq_tau(uint32_t tau)
   {
     double total_leq_tau = 0.0;
@@ -228,8 +216,6 @@ public:
 
 #define PP_TABULAR_FIELDS(pp)                                                                                               \
   (pp).distal_node << "\t" << (pp).edge_num << "\t" << (pp).like_weight_ratio << "\t" << (pp).distance
-
-#define MATCH_FIELDS(nd, mi) nd->get_name() << "\t" << mi->get_match_string() << "\n"
 
 #define DISTANCE_FIELDS(nd, mi) nd->get_name() << "\t" << mi->d_llh << "\n"
 
