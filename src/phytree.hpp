@@ -18,10 +18,10 @@ public:
   void compute_bdepth();
   bool check_compatible(tree_sptr_t tree);
   void split_nwk(vec<std::string>& n_vec);
-  void parse_lineages(std::ifstream& tree_stream);
+  void parse_lineages(std::istream& lineage_stream);
   void parse(std::filesystem::path nwk_path);
-  void save(std::ofstream& tree_stream);
-  void load(std::ifstream& tree_stream);
+  void save(std::ostream& tree_stream);
+  void load(std::istream& tree_stream);
   void check_unique_labels();
   void generate_tree(vec<std::string>& names_v);
   void map_to_qtree(tree_sptr_t qtree);
