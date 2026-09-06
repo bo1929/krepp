@@ -341,7 +341,7 @@ node_sptr_t Tree::compute_lca(node_sptr_t a, node_sptr_t b)
   return a;
 }
 
-void Tree::parse_lineages(std::ifstream& lineage_stream)
+void Tree::parse_lineages(std::istream& lineage_stream)
 {
   root = std::make_shared<Node>(getptr(), "root", nullptr);
   root->set_rank("root");
@@ -413,13 +413,13 @@ double Tree::compute_distance(node_sptr_t a, node_sptr_t b)
   return distance;
 }
 
-void Tree::save(std::ofstream& tree_stream)
+void Tree::save(std::ostream& tree_stream)
 {
   std::ostream_iterator<char> output_iterator(tree_stream);
   std::copy(nwk_str.begin(), nwk_str.end(), output_iterator);
 }
 
-void Tree::load(std::ifstream& tree_stream)
+void Tree::load(std::istream& tree_stream)
 {
   nwk_str = std::string((std::istreambuf_iterator<char>(tree_stream)), std::istreambuf_iterator<char>());
   vec<std::string> el_v;
