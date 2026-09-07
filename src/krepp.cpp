@@ -378,9 +378,6 @@ void init_sc_index(CLI::App& sc, IndexConfig& config)
   sc.add_flag("--frac,!--no-frac", config.frac, "Include k-mers with r <= LSH(x) mod m. [true]");
   sc.add_option("--sdust-t", config.sdust_t, "SDUST threshold (NCBI dustmasker: 20). [0]")->check(CLI::NonNegativeNumber);
   sc.add_option("--sdust-w", config.sdust_w, "SDUST window (NCBI dustmasker: 64). [0]")->check(CLI::NonNegativeNumber);
-  // Deriving w/h from k, validating, creating the directory and computing the
-  // index suffix are the IndexMultiple constructor's job, so that a caller
-  // building an index without the CLI gets them too.
 }
 
 void QueryIndex::init_sc_place(CLI::App& sc)
@@ -473,7 +470,6 @@ int main(int argc, char** argv)
 {
   PRINT_VERSION
   std::ios::sync_with_stdio(false);
-  // Declared before app so that it outlives the options holding references to it.
   IndexConfig index_config;
   CLI::App app{"krepp: a tool for k-mer-based search, distance estimation & phylogenetic placement."};
   app.set_help_flag("--help");

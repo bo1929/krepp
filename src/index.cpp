@@ -244,8 +244,6 @@ IndexMultiple::IndexMultiple(const IndexConfig& config)
   if (!validate_configuration()) {
     error_exit("Invalid configuration!");
   }
-  // Only now is h known to be in [9, 15], so this cannot overflow uint32_t.
-  // main overwrites it via set_nrows() before the value is ever used.
   nrows = pow(2, 2 * h - 1);
   std::filesystem::create_directory(index_dir);
   suffix = "-";

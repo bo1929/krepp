@@ -42,14 +42,6 @@ private:
   fparallel_flat_phmap<uint32_t, std::string> r_to_info;
 };
 
-// Everything IndexMultiple needs to build an index, with the same defaults the
-// CLI advertises. A plain struct so a caller can drive the builder without
-// constructing a CLI::App; the "index" subcommand binds its options to one.
-//
-// w and h are std::optional so that "not given" stays distinct from "given as
-// 0": unset derives from k, matching the CLI's advertised [k+6] and [k-16],
-// while an explicit 0 is passed through to validate_configuration and rejected
-// there, exactly as it is on the command line today.
 struct IndexConfig
 {
   std::filesystem::path input;     // TSV of reference ID -> path/URL, or one FASTA/FASTQ

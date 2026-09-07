@@ -301,47 +301,18 @@ using btree_phmap = phmap::btree_map<K, V>;
 template<class K, class V>
 using node_phmap = phmap::node_hash_map<K, V>;
 
-// Reporting hook for fatal errors. By default error_exit prints to stderr and
-// calls std::exit, which is right for the CLI but fatal for a library caller:
-// a malformed input file takes the host process down. A handler lets the caller
-// decide instead, typically by throwing so the failure unwinds into its own
-// error type.
-//
-// The handler must not return; if it does, error_exit reports that and aborts.
-//
-// Installation is not synchronised. Install the handler once, before any krepp
-// call, and do not replace or clear it afterwards: error_exit reads the handler
-// without a lock, so replacing it concurrently can free the callable out from
-// under a thread that is invoking it. Passing an empty function restores the
-// default report-and-exit behaviour.
-//
-// The handler may be called from several threads at once and must be thread
-// safe. After it throws, the object whose method called error_exit is left in
-// an unspecified state and must be discarded rather than reused.
-//
-// An exception may not escape an OpenMP structured block, so a throwing handler
-// is only safe where krepp is not executing inside one. Outside krepp.cpp, no
-// error_exit call appears lexically inside such a block. That is not by itself
-// a guarantee: these entry points run library code inside OpenMP regions and
-// must not be used with a throwing handler, nor may anything that calls them -
-// TargetIndex::load_index, IndexMultiple::build_index and the
-// index_sequences, index_files and build_for_subtree it dispatches to,
-// QuerySketch::seek_sequences, QueryIndex::estimate_distances and
-// QueryIndex::place_sequences. The restriction does not apply at all when krepp
-// is built without OpenMP, where the pragmas are ignored.
 using error_handler_t = std::function<void(const std::string& msg, int code)>;
 void set_error_handler(error_handler_t handler);
 
-// Not inline: the definition lives in common.cpp and now reads file-local
-// state, so every caller must reach that one definition.
 [[noreturn]] void error_exit(const std::string& msg, int code = EXIT_FAILURE);
+
 inline void warn_msg(const std::string& msg);
 
 // Macro for concise file stream error checks
 #define CHECK_STREAM_OR_EXIT(stream, msg)                                                                                   \
   if (!(stream).good()) error_exit(msg)
 
-template<typename StreamT>
-inline void check_fstream_or_exit(const StreamT& stream, const std::string& msg, const std::string& path = "");
+template<typename S>
+inline void check_fstream_or_exit(const S& stream, const std::string& msg, const std::string& path = "");
 
 #endif
