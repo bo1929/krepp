@@ -16,14 +16,13 @@ void Index::generate_partial_tree(std::string suffix)
   }
   tree_sptr_t curr_tree = std::make_shared<Tree>();
   curr_tree->generate_tree(names_v);
+  bool compatible = false;
 #pragma omp critical
   {
-    if (curr_tree->check_compatible(tree)) {
-      tree = !tree ? curr_tree : tree;
-    } else {
-      error_exit("Partial libraries are based on different references.");
-    }
+    compatible = curr_tree->check_compatible(tree);
+    if (compatible) tree = !tree ? curr_tree : tree;
   }
+  if (!compatible) error_exit("Partial libraries are based on different references.");
 }
 
 void Index::load_partial_tree(std::string suffix)
@@ -38,14 +37,13 @@ void Index::load_partial_tree(std::string suffix)
   curr_tree->load(tree_stream);
   CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the backbone tree of a partial index!");
   tree_stream.close();
+  bool compatible = false;
 #pragma omp critical
   {
-    if (curr_tree->check_compatible(tree)) {
-      tree = !tree ? curr_tree : tree;
-    } else {
-      error_exit("Partial libraries are based on different trees!");
-    }
+    compatible = curr_tree->check_compatible(tree);
+    if (compatible) tree = !tree ? curr_tree : tree;
   }
+  if (!compatible) error_exit("Partial libraries are based on different trees!");
 }
 
 void Index::load_partial_index(std::string suffix)
@@ -72,18 +70,19 @@ void Index::load_partial_index(std::string suffix)
   metadata_stream.close();
 
   lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_curr, ppos_v, npos_v);
+  bool compatible = false;
 #pragma omp critical
   {
-    if (curr_lshf->check_compatible(lshf)) {
+    compatible = curr_lshf->check_compatible(lshf);
+    if (compatible) {
       lshf = !lshf ? curr_lshf : lshf;
       k = k_curr;
       h = h_curr;
       m = m_curr;
       nrows = pow(2, 2 * h);
-    } else {
-      error_exit("Partial libraries have incompatible hash functions!");
     }
   }
+  if (!compatible) error_exit("Partial libraries have incompatible hash functions!");
 
   crecord_sptr_t curr_crecord;
   flatht_sptr_t curr_flatht;

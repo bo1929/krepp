@@ -17,8 +17,31 @@ const uint64_t nt4_lr_table[4] = {0, 1, 4294967296, 4294967297};
 
 const uint64_t nt4_bp_table[4] = {0, 1, 2, 3};
 
-[[noreturn]] inline void error_exit(const std::string& msg, int code)
+// Function-local static: avoids depending on initialization order between
+// translation units, since error_exit may run before namespace-scope objects
+// in other units are constructed.
+static error_handler_t& error_handler()
 {
+  static error_handler_t handler;
+  return handler;
+}
+
+void set_error_handler(error_handler_t handler) { error_handler() = std::move(handler); }
+
+[[noreturn]] void error_exit(const std::string& msg, int code)
+{
+  // Deliberately a reference, not a copy: see the note on set_error_handler
+  // about not replacing the handler once krepp is running.
+  const error_handler_t& handler = error_handler();
+  if (handler) {
+    handler(msg, code);
+    // The handler returned, which its contract forbids. Report that rather than
+    // falling back silently, since the fallback is indistinguishable from
+    // having installed no handler at all.
+    std::cerr << "[ERROR] error handler returned instead of throwing or exiting; original error (" << code << "): " << msg
+              << std::endl;
+    std::abort();
+  }
   std::cerr << "[ERROR] " << msg << std::endl;
   std::exit(code);
 }
