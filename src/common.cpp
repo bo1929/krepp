@@ -25,6 +25,8 @@ static error_handler_t& error_handler()
 
 void set_error_handler(error_handler_t handler) { error_handler() = std::move(handler); }
 
+void set_num_threads(uint32_t nthreads) { num_threads = nthreads > 0 ? nthreads : 1; }
+
 [[noreturn]] void error_exit(const std::string& msg, int code)
 {
   const error_handler_t& handler = error_handler();

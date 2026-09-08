@@ -483,6 +483,7 @@ int main(int argc, char** argv)
     if (app.count("--seed")) {
       gen.seed(seed);
     }
+    set_num_threads(num_threads);
   });
   app.add_option("--num-threads", num_threads, "Number of threads to use in OpenMP-based parallelism. [1]");
 

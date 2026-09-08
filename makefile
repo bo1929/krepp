@@ -14,6 +14,7 @@ INC = -Iexternal/CLI11/include/CLI \
 # project files
 #--------------------------------------------
 PROGRAM = krepp
+TEST_PROGRAM = build/omp_index_test
 OBJECTS = build/common.o \
 					build/MurmurHash3.o build/lshf.o \
 					build/phytree.o	build/rqseq.o \
@@ -21,10 +22,15 @@ OBJECTS = build/common.o \
 					build/query.o build/seek.o \
 					build/record.o build/table.o \
 					build/krepp.o
+# Everything but the CLI layer, which is what an embedding library links against.
+TEST_OBJECTS = $(filter-out build/krepp.o,$(OBJECTS)) build/omp_index_test.o
+# -MMD -MP writes these next to each object; without them a change to a header
+# rebuilds nothing, and `make test` reports green on code it did not compile.
+DEPS = $(OBJECTS:.o=.d) build/omp_index_test.d
 
 # rules
 #--------------------------------------------
-.PHONY: all dynamic static clean
+.PHONY: all dynamic static clean test
 
 all:
 	$(MAKE) mode=dynamic $(PROGRAM)
@@ -34,6 +40,10 @@ dynamic:
 
 static:
 	$(MAKE) mode=static $(PROGRAM)
+
+test:
+	$(MAKE) mode=dynamic $(TEST_PROGRAM)
+	./$(TEST_PROGRAM)
 
 # Check for -lcurl
 CURL_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) -lcurl -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
@@ -88,12 +98,25 @@ endif
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp
 	@mkdir -p build
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o $(LDLIBS) 
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o $(LDLIBS) 
 
 $(PROGRAM): $(OBJECTS)
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(VARDEF) $(LDFLAGS) $(INC) -o $@ $(LDLIBS) 
 
+# Named explicitly rather than as a second build/%.o pattern rule: with two
+# pattern rules for the same target, make silently takes the first that has a
+# prerequisite, so a test sharing a name with a src file would quietly compile
+# the wrong one.
+build/omp_index_test.o: test/omp_index_test.cpp
+	@mkdir -p build
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c $< -o $@ $(LDLIBS) 
+
+-include $(DEPS)
+
+$(TEST_PROGRAM): $(TEST_OBJECTS)
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(VARDEF) $(LDFLAGS) $(INC) -o $@ $(LDLIBS) 
+
 clean:
-	rm -f $(PROGRAM) $(OBJECTS)
+	rm -f $(PROGRAM) $(OBJECTS) $(TEST_PROGRAM) build/omp_index_test.o $(DEPS)
 	@if [ -d build ]; then rmdir build; fi
 	@echo "Succesfully cleaned."

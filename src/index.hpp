@@ -126,7 +126,7 @@ public:
   void build_index();
   void index_sequences();
   void index_files();
-  void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht);
+  void build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht, ErrorRelay& relay);
   void save_info(std::ofstream& info_stream);
 
 private:
