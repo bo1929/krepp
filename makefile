@@ -24,8 +24,6 @@ OBJECTS = build/common.o \
 					build/krepp.o
 # Everything but the CLI layer, which is what an embedding library links against.
 TEST_OBJECTS = $(filter-out build/krepp.o,$(OBJECTS)) build/omp_index_test.o
-# -MMD -MP writes these next to each object; without them a change to a header
-# rebuilds nothing, and `make test` reports green on code it did not compile.
 DEPS = $(OBJECTS:.o=.d) build/omp_index_test.d
 
 # rules
@@ -103,10 +101,6 @@ build/%.o: src/%.cpp
 $(PROGRAM): $(OBJECTS)
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(VARDEF) $(LDFLAGS) $(INC) -o $@ $(LDLIBS) 
 
-# Named explicitly rather than as a second build/%.o pattern rule: with two
-# pattern rules for the same target, make silently takes the first that has a
-# prerequisite, so a test sharing a name with a src file would quietly compile
-# the wrong one.
 build/omp_index_test.o: test/omp_index_test.cpp
 	@mkdir -p build
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c $< -o $@ $(LDLIBS) 

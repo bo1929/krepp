@@ -307,24 +307,13 @@ using node_phmap = phmap::node_hash_map<K, V>;
 using error_handler_t = std::function<void(const std::string& msg, int code)>;
 void set_error_handler(error_handler_t handler);
 
-/* Sets the thread count used by the OpenMP-based parallelism, so that a library
- * user can raise it without going through the CLI layer. Zero is clamped to one;
- * omp_set_num_threads is only defined for positive counts. */
 void set_num_threads(uint32_t nthreads);
 
 [[noreturn]] void error_exit(const std::string& msg, int code = EXIT_FAILURE);
 
-/* An exception must not leave an OpenMP structured block, so a handler installed
- * with set_error_handler cannot throw its way out of a parallel region on its
- * own: the region has to catch at its own boundary and hand the exception back
- * to the thread that opened it. ErrorRelay is that hand-off. It keeps the first
- * exception any thread raises and rethrows it once the region has closed, which
- * is what makes a throwing handler safe while an index is being built. */
 class ErrorRelay
 {
 public:
-  /* Keeps the first exception and drops the rest; call it from a catch block.
-   * noexcept because callers rely on it to release a lock on the failing path. */
   void capture() noexcept
   {
     if (!has_error.exchange(true)) {
@@ -332,9 +321,6 @@ public:
       published.store(true, std::memory_order_release);
     }
   }
-  /* Runs fn and captures anything it throws, so it never throws itself. Work
-   * queued after a failure is skipped rather than cancelled, because OpenMP has
-   * no portable way to leave a worksharing region or a task graph early. */
   template<typename FuncT>
   void guard(FuncT&& fn) noexcept
   {
@@ -346,13 +332,6 @@ public:
     }
   }
   bool check_error() const { return has_error.load(std::memory_order_relaxed); }
-  /* Call once the region has closed. The acquire pairs with capture()'s release
-   * so that reading first_error is not a data race whatever the caller does, but
-   * it does not make a concurrent call meaningful: capture() sets has_error
-   * before published, and a caller inside that window reports the fallback while
-   * the real exception is already stored. current_exception() is null when no
-   * exception is being handled - capture() called outside a catch - so a
-   * recorded failure without one is reported rather than silently dropped. */
   void rethrow_error() const
   {
     if (published.load(std::memory_order_acquire) && first_error) {

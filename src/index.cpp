@@ -420,16 +420,6 @@ void IndexMultiple::save_index()
   info_stream.close();
 }
 
-/* The rule for the whole build path: every OpenMP construct boundary an
- * exception would have to cross - task, critical, single, worksharing loop -
- * needs its own relay.guard() on the inside of it, because leaving a structured
- * block by throwing is undefined. Plain code between constructs needs nothing;
- * it is already inside whichever guard wraps the enclosing construct. That is
- * why union_table() is guarded inside the task below but not inside the merge
- * loop of fill_slice(), which runs in ordinary code.
- *
- * This method is only ever entered through a guard. It stays public as it was,
- * but calling it from outside one reintroduces the escape. */
 void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht, ErrorRelay& relay)
 {
   if (nd->check_leaf()) {
@@ -440,9 +430,6 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht, ErrorR
       dynht->get_record()->insert_rho(nd->get_sh(), rs->get_rho());
 #pragma omp critical
       {
-        /* Guarded from the inside. A critical region is a structured block too,
-         * so an exception must not leave it either, and this one allocates:
-         * get_name() returns by value and the stream is the caller's to fail. */
         relay.guard([&] {
           std::cerr << "\33[2K\r" << std::flush;
           std::cerr << "Leaf node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
@@ -463,31 +450,17 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht, ErrorR
     assert(nd->get_nchildren() > 0);
     vec<dynht_sptr_t> children_dynht_v;
     children_dynht_v.reserve(nd->get_nchildren());
-    /* After the reserve, so that a failure to allocate cannot leave the lock
-     * initialised and unreachable. */
 #if defined(_OPENMP) && _WOPENMP == 1
     omp_lock_t parent_lock;
     omp_init_lock(&parent_lock);
 #endif
     for (tuint_t i = 0; i < nd->get_nchildren(); ++i) {
-      /* Guarded, and the loop stops rather than unwinding: leaving this frame
-       * early would skip the taskwait below and let tasks that are already
-       * running write into it after it has gone. */
       bool prepared = false;
       relay.guard([&] {
         children_dynht_v.emplace_back(std::make_shared<DynHT>(nrows, tree, dynht->get_record()));
         prepared = true;
       });
       if (!prepared) break;
-      /* Read out here so the task names only these two: naming children_dynht_v
-       * inside the task makes it firstprivate, which deep-copies the vector once
-       * per task and allocates outside every guard. parent_lock has to
-       * be shared - a task firstprivates it by default, and libgomp keeps the
-       * lock state inside omp_lock_t rather than behind a pointer, so siblings
-       * would each take their own copy and union into the parent concurrently.
-       * There is deliberately no #else: with the OpenMP paths compiled out the
-       * locking is gone too, and a live task pragma would leave the unions
-       * racing with nothing to order them. */
       node_sptr_t child = *std::next(nd->get_children(), i);
       dynht_sptr_t child_dynht = children_dynht_v[i];
 #if defined(_OPENMP) && _WOPENMP == 1
@@ -522,8 +495,6 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht, ErrorR
 
 void IndexMultiple::index_sequences()
 {
-  /* Local, not a member: a relay that outlived one build would make the next one
-   * skip all its work and rethrow the old failure. */
   ErrorRelay relay;
   record_sptr_t record = std::make_shared<Record>(tree);
   const uint32_t nrec = static_cast<uint32_t>(fastx_names.size());
