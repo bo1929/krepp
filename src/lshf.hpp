@@ -6,8 +6,8 @@
 class LSHF
 {
 public:
-  LSHF(uint8_t k, uint8_t h, uint32_t m);
-  LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v);
+  LSHF(uint8_t k, uint8_t h, uint32_t m, uint32_t r, bool frac);
+  LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v, uint32_t r, bool frac);
   void set_lshf();
   void get_random_positions();
   uint8_t get_k() { return k; }
@@ -28,6 +28,8 @@ private:
   uint8_t k;
   uint8_t h;
   uint32_t m;
+  uint32_t r;
+  bool frac;
   vec<uint8_t> npos_v;
   vec<uint8_t> ppos_v;
   vec<std::pair<int8_t, int8_t>> glsh_v;

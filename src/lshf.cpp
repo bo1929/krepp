@@ -1,9 +1,11 @@
 #include "lshf.hpp"
 
-LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m)
+LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m, uint32_t r, bool frac)
   : k(k)
   , h(h)
   , m(m)
+  , r(r)
+  , frac(frac)
 {
   get_random_positions();
   set_lshf();
@@ -146,8 +148,10 @@ void LSHF::get_random_positions()
   std::sort(ppos_v.begin(), ppos_v.end(), std::greater<uint8_t>());
 }
 
-LSHF::LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v)
+LSHF::LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v, uint32_t r, bool frac)
   : m(m)
+  , r(r)
+  , frac(frac)
   , ppos_v(ppos_v)
   , npos_v(npos_v)
 {
@@ -159,10 +163,17 @@ LSHF::LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v)
 bool LSHF::check_compatible(lshf_sptr_t lshf)
 {
   if (!lshf) return true;
-  if (!((lshf->m == m) && (lshf->h == h) && (lshf->k == k) && (lshf->npos_v == npos_v) && (lshf->ppos_v == ppos_v))) {
+  bool is_compatible = (lshf->m == m) && (lshf->h == h) && (lshf->k == k) && (lshf->frac == frac) &&
+                       (lshf->npos_v == npos_v) && (lshf->ppos_v == ppos_v);
+  if (is_compatible && frac && (lshf->r != r)) {
+    is_compatible = false;
+  }
+  if (!is_compatible) {
     std::cout << "m: " << static_cast<uint32_t>(m) << "/" << static_cast<uint32_t>(lshf->m) << std::endl;
     std::cout << "h: " << static_cast<uint32_t>(h) << "/" << static_cast<uint32_t>(lshf->h) << std::endl;
     std::cout << "k: " << static_cast<uint32_t>(k) << "/" << static_cast<uint32_t>(lshf->k) << std::endl;
+    std::cout << "frac: " << frac << "/" << lshf->frac << std::endl;
+    std::cout << "r: " << r << "/" << lshf->r << std::endl;
     std::cout << "ppos_v:";
     for (uint8_t i = 0; i < h; ++i) {
       std::cout << " " << static_cast<uint32_t>(ppos_v[i]) << "/" << static_cast<uint32_t>(lshf->ppos_v[i]);

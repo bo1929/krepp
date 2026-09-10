@@ -19,7 +19,7 @@ void Sketch::load_full_sketch()
   CHECK_STREAM_OR_EXIT(sketch_stream, "Failed to read the sketch file!");
   sketch_stream.close();
 
-  lshf = std::make_shared<LSHF>(m, ppos_v, npos_v);
+  lshf = std::make_shared<LSHF>(m, ppos_v, npos_v, r, frac);
 }
 
 void Sketch::make_rho_partial()

@@ -70,7 +70,7 @@ void Index::load_partial_index(std::string suffix)
   CHECK_STREAM_OR_EXIT(metadata_stream, "Failed to read the metadata of a partial skecth!");
   metadata_stream.close();
 
-  lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_curr, ppos_v, npos_v);
+  lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_curr, ppos_v, npos_v, r, frac);
   bool compatible = false;
 #pragma omp critical
   {
@@ -83,7 +83,7 @@ void Index::load_partial_index(std::string suffix)
       nrows = pow(2, 2 * h);
     }
   }
-  if (!compatible) error_exit("Partial libraries have incompatible hash functions!");
+  if (!compatible) error_exit("Partial libraries have incompatible hash configurations!");
 
   crecord_sptr_t curr_crecord;
   flatht_sptr_t curr_flatht;
@@ -200,7 +200,7 @@ void Index::make_rho_partial()
   }
 }
 
-void BaseLSH::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m); }
+void BaseLSH::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m, r, frac); }
 
 void BaseLSH::set_nrows()
 {
