@@ -85,7 +85,7 @@ public:
   const parallel_flat_phmap<node_sptr_t, double>& get_summary() { return node_to_wcount; }
 
 private:
-  placement_t make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi);
+  placement_t make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi, const minfo_sptr_t& mi_parent);
   uint32_t k;
   uint32_t h;
   uint32_t m;

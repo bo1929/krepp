@@ -215,13 +215,25 @@ void IBatch::place_sequences(strstream& batch_stream, bool tabular)
   }
 }
 
-placement_t IBatch::make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi)
+placement_t IBatch::make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi, const minfo_sptr_t& mi_parent)
 {
   placement_t pp;
   pp.node = nd;
   pp.edge_num = nd->get_en();
-  pp.distal_length = nd->get_midpoint_pendant();
-  pp.pendant_length = mi->jukes_cantor_dist() - pp.distal_length;
+  double t = std::isnan(nd->get_blen()) ? 0.0 : nd->get_blen();
+  double d_c = mi->jukes_cantor_dist();
+  double d_p = mi_parent ? mi_parent->jukes_cantor_dist() : std::numeric_limits<double>::quiet_NaN();
+  double x, y;
+  if (std::isfinite(d_p) && (d_p > 0.0)) {
+    double eps = std::numeric_limits<double>::epsilon() * t;
+    x = (t > 0.0) ? std::clamp(t * d_c / d_p, eps, t - eps) : 0.0;
+    y = std::max(0.0, std::min(d_c - x, d_p - t + x));
+  } else {
+    x = std::min(t / 2.0, d_c);
+    y = std::max(0.0, d_c - x);
+  }
+  pp.distal_length = x;
+  pp.pendant_length = y;
   pp.likelihood = -mi->v_llh;
   pp.like_weight_ratio = mi->lwr;
   pp.distance = mi->d_llh;
@@ -240,7 +252,7 @@ bool IBatch::collect_placements(vec<placement_t>& placements)
   mi_pp->chisq = 0;
 
   if (node_to_minfo.size() == 1) {
-    placements.push_back(make_placement(nd_pp, mi_pp));
+    placements.push_back(make_placement(nd_pp, mi_pp, nullptr));
     return true;
   }
 
@@ -266,6 +278,14 @@ bool IBatch::collect_placements(vec<placement_t>& placements)
       pp_map[nd_parent]->add(mi_curr, denom);
     }
   }
+
+  auto parent_minfo = [&pp_map](const node_sptr_t& nd) -> minfo_sptr_t {
+    node_sptr_t nd_parent = nd->get_parent();
+    if (!nd_parent || !pp_map.contains(nd_parent)) {
+      return nullptr;
+    }
+    return pp_map[nd_parent];
+  };
 
   // Collect candidate placements.
   for (auto& [nd_curr, mi_curr] : pp_map) {
@@ -298,7 +318,7 @@ bool IBatch::collect_placements(vec<placement_t>& placements)
       nd_pp = nd_v[i];
       mi_pp = pp_map[nd_pp];
       mi_pp->lwr = mi_pp->lwr / total_lwr;
-      placements.push_back(make_placement(nd_pp, mi_pp));
+      placements.push_back(make_placement(nd_pp, mi_pp, parent_minfo(nd_pp)));
     }
   } else {
     if (nd_v.size() > 1) {
@@ -311,7 +331,7 @@ bool IBatch::collect_placements(vec<placement_t>& placements)
     nd_pp = nd_v.back();
     mi_pp = pp_map[nd_pp];
     mi_pp->lwr = mi_pp->lwr / total_lwr;
-    placements.push_back(make_placement(nd_pp, mi_pp));
+    placements.push_back(make_placement(nd_pp, mi_pp, parent_minfo(nd_pp)));
   }
   return true;
 }
