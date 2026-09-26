@@ -122,6 +122,7 @@ private:
   double dist_max = std::numeric_limits<double>::quiet_NaN();
   bool no_filter = true;
   bool filter = false;
+  bool p_value = false;
   bool tabular = false;
   bool multi = true;
   bool summarize = false;

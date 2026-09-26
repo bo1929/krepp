@@ -116,7 +116,11 @@ void QueryIndex::header_dreport(strstream& dreport_stream)
   if (summarize) {
     dreport_stream << "\nREFERENCE_NAME\tWEIGHTED_COUNT\tSEQUENCE_ABUNDANCE\n";
   } else {
-    dreport_stream << "\nSEQ_ID\tREFERENCE_NAME\tDIST\tP_VALUE\n";
+    dreport_stream << "\nSEQ_ID\tREFERENCE_NAME\tDIST";
+    if (p_value) {
+      dreport_stream << "\tP_VALUE";
+    }
+    dreport_stream << "\n";
   }
 }
 
@@ -167,7 +171,8 @@ void QueryIndex::estimate_distances()
       bool cont_reading = false;
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        auto ib = std::make_shared<IBatch>(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
+        auto ib =
+          std::make_shared<IBatch>(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize, p_value);
 #pragma omp task firstprivate(ib)
         {
           strstream batch_stream;
@@ -269,7 +274,8 @@ void QueryIndex::place_sequences()
       bool cont_reading = false;
       while ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished()) {
         total_qseq += qs->get_cbatch_size();
-        auto ib = std::make_shared<IBatch>(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
+        auto ib =
+          std::make_shared<IBatch>(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize, false);
 #pragma omp task firstprivate(ib)
         {
           strstream batch_stream;
@@ -454,6 +460,9 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
     "--filter,!--no-filter",
     filter,
     "Filter a hit if its distance is too high compared to the best hit (based on the statistical significance). [false]");
+  sc.add_flag("--p-value,!--no-p-value",
+              p_value,
+              "Append a p-value column to compare a reference hit is against the best hit [false]");
   sc.callback([&]() {
     no_filter = !filter;
     if (!output_path.empty()) {

@@ -467,14 +467,15 @@ inline std::string dist_queries(index_sptr_t index,
                                 uint32_t tau = 2,
                                 bool no_filter = true,
                                 bool multi = true,
-                                bool summarize = false)
+                                bool summarize = false,
+                                bool p_value = false)
 {
   auto qs = std::make_shared<QSeq>(query_path);
   strstream out;
   out.precision(STRSTREAM_PRECISION);
   out << std::fixed;
   while (qs->read_next_batch() || !qs->is_batch_finished()) {
-    IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize);
+    IBatch ib(index, qs, hdist_th, chisq_value, dist_max, tau, no_filter, multi, summarize, p_value);
     strstream batch;
     ib.estimate_distances(batch);
     out << batch.rdbuf();
@@ -499,8 +500,16 @@ inline std::string place_queries(index_sptr_t index,
   out.precision(STRSTREAM_PRECISION);
   out << std::fixed;
   while (qs->read_next_batch() || !qs->is_batch_finished()) {
-    IBatch ib(
-      index, qs, hdist_th, chisq_value, std::numeric_limits<double>::quiet_NaN(), tau, no_filter, multi, summarize);
+    IBatch ib(index,
+              qs,
+              hdist_th,
+              chisq_value,
+              std::numeric_limits<double>::quiet_NaN(),
+              tau,
+              no_filter,
+              multi,
+              summarize,
+              false);
     strstream batch;
     ib.place_sequences(batch, tabular);
     out << batch.rdbuf();

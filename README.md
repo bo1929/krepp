@@ -44,16 +44,23 @@ krepp dist -i index_toy -q query_toy.fq --num-threads 4 | tee distances_toy.tsv
 The first few lines of `distances_toy.tsv` are going to look like:
 ```
 # software: krepp	version: v0.10.2	invocation :krepp dist -i index_toy -q query_toy.fq --num-threads 4
+SEQ_ID	REFERENCE_NAME	DIST
+||61435-4122	G000341695	0.04617
+||61435-4949	G000741845	0.02924
+||61435-4949	G000341695	0.03017
+||61435-4949	G001610775	0.03022
+```
+One row is reported per query and reference, up to the `--dist-max` cutoff.
+Add `--p-value` to append a column that says how distinguishable a hit is from the best hit of the same query:
+```
 SEQ_ID	REFERENCE_NAME	DIST	P_VALUE
 ||61435-4122	G000341695	0.04617	0.00000e+00
 ||61435-4949	G000741845	0.02924	0.00000e+00
 ||61435-4949	G000341695	0.03017	6.23556e-02
 ||61435-4949	G001610775	0.03022	6.24924e-02
 ```
-One row is reported per query and reference, up to the `--dist-max` cutoff.
-`P_VALUE` says how distinguishable a hit is from the best hit of the same
-query: it is 0 for anything tied with the best hit (there is no evidence against
-it) and grows towards 1 as the hit becomes clearly worse, so smaller is better.
+It is 0 for anything tied with the best hit (there is no evidence against it) and
+grows towards 1 as the hit becomes clearly worse, so smaller is better.
 The option `--filter` keeps the hits whose statistic is below `--chisq`, i.e.
 the ones with *p*-value is below 0.9 for the default `--chisq 2.706`.
 

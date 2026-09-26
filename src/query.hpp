@@ -86,6 +86,11 @@ inline double chisq_cdf(double chisq)
   return cdf_v[i] + (cdf_v[i + 1] - cdf_v[i]) * (pos - i);
 }
 
+inline void append_p_value(std::ostream& out, double chisq)
+{
+  out << "\t" << std::scientific << chisq_cdf(chisq) << std::fixed;
+}
+
 namespace optimize {
   class HDistHistLLH;
 }
@@ -162,7 +167,8 @@ public:
          uint32_t tau,
          bool no_filter,
          bool multi,
-         bool summarize);
+         bool summarize,
+         bool p_value);
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
   void estimate_distances(strstream& batch_stream);
@@ -183,6 +189,7 @@ private:
   double dist_max;
   bool no_filter;
   bool summarize;
+  bool p_value;
   uint32_t tau;
   tree_sptr_t tree;
   lshf_sptr_t lshf;
@@ -292,8 +299,7 @@ public:
 #define PP_TABULAR_FIELDS(pp)                                                                                               \
   (pp).distal_node << "\t" << (pp).edge_num << "\t" << (pp).like_weight_ratio << "\t" << (pp).distance
 
-#define DISTANCE_FIELDS(nd, mi)                                                                                             \
-  nd->get_name() << "\t" << mi->d_llh << "\t" << std::scientific << chisq_cdf(mi->chisq) << std::fixed << "\n"
+#define DISTANCE_FIELDS(nd, mi) nd->get_name() << "\t" << mi->d_llh
 
 private:
   double nmers = 0;

@@ -26,7 +26,8 @@ IBatch::IBatch(index_sptr_t index,
                uint32_t tau,
                bool no_filter,
                bool multi,
-               bool summarize)
+               bool summarize,
+               bool p_value)
   : index(index)
   , hdist_th(hdist_th)
   , chisq_value(chisq_value)
@@ -35,6 +36,7 @@ IBatch::IBatch(index_sptr_t index,
   , no_filter(no_filter)
   , multi(multi)
   , summarize(summarize)
+  , p_value(p_value)
 {
   lshf = index->get_lshf();
   tree = index->get_tree();
@@ -192,14 +194,20 @@ void IBatch::report_distances(strstream& batch_stream)
     }
   } else {
     if (node_to_minfo.empty() || (!std::isnan(dist_max) && (mi_closest->d_llh > dist_max))) {
-      batch_stream << identifer_batch[bix] << "\tNA\tNaN\tNaN\n";
+      batch_stream << identifer_batch[bix] << "\tNA\tNaN";
+      if (p_value) {
+        batch_stream << "\tNaN";
+      }
+      batch_stream << "\n";
       return;
     }
     if (multi) {
       vec<const std::pair<const node_sptr_t, minfo_sptr_t>*> rows;
       rows.reserve(node_to_minfo.size());
       for (const auto& entry : node_to_minfo) {
-        entry.second->chisq = mi_closest->likelihood_ratio(entry.second->d_llh, llhfunc);
+        if (p_value || !no_filter) {
+          entry.second->chisq = mi_closest->likelihood_ratio(entry.second->d_llh, llhfunc);
+        }
         if (no_filter || entry.second->chisq < chisq_value) {
           if (std::isnan(dist_max) || entry.second->d_llh < dist_max) {
             rows.push_back(&entry);
@@ -212,10 +220,20 @@ void IBatch::report_distances(strstream& batch_stream)
       });
       for (const auto* entry : rows) {
         batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(entry->first, entry->second);
+        if (p_value) {
+          append_p_value(batch_stream, entry->second->chisq);
+        }
+        batch_stream << "\n";
       }
     } else {
-      mi_closest->chisq = mi_closest->likelihood_ratio(mi_closest->d_llh, llhfunc);
+      if (p_value) {
+        mi_closest->chisq = mi_closest->likelihood_ratio(mi_closest->d_llh, llhfunc);
+      }
       batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd_closest, mi_closest);
+      if (p_value) {
+        append_p_value(batch_stream, mi_closest->chisq);
+      }
+      batch_stream << "\n";
     }
   }
 }

@@ -68,11 +68,12 @@ std::vector<DistRow> parse_dist(const std::string& text)
     if (!std::getline(ls, row.id, '\t')) continue;
     if (!std::getline(ls, row.reference, '\t')) continue;
     if (!std::getline(ls, dist, '\t')) continue;
-    if (!std::getline(ls, pval)) continue;
+    // The P_VALUE column is optional.
+    const bool has_p_value = static_cast<bool>(std::getline(ls, pval));
     row.nfields = static_cast<int>(std::count(line.begin(), line.end(), '\t')) + 1;
     row.is_na = (dist == "NaN");
     row.distance = row.is_na ? std::numeric_limits<double>::quiet_NaN() : std::stod(dist);
-    row.p_value = (pval == "NaN") ? std::numeric_limits<double>::quiet_NaN() : std::stod(pval);
+    row.p_value = (!has_p_value || pval == "NaN") ? std::numeric_limits<double>::quiet_NaN() : std::stod(pval);
     rows.push_back(row);
   }
   return rows;
@@ -310,7 +311,8 @@ TEST_CASE("dist reports a p-value column for every row")
 
   const std::filesystem::path fq = dir / "reads.fq";
   write_fastq(fq, {{"q", substr_of(corpus.base, 2000, 1500)}});
-  const std::vector<DistRow> rows = parse_dist(dist_queries(index, fq.string()));
+  const std::vector<DistRow> rows =
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false, true));
   REQUIRE_FALSE(rows.empty());
   for (const DistRow& row : rows) {
     CHECK(row.nfields == 4);
@@ -342,9 +344,9 @@ TEST_CASE("dist p-values agree with the chi-square filter")
   write_fastq(fq, {{"q", substr_of(corpus.base, 2000, 1500)}});
   const double nan = std::numeric_limits<double>::quiet_NaN();
   const std::vector<DistRow> unfiltered =
-    parse_dist(dist_queries(index, fq.string(), 4, 2.706, nan, 2, true, true));
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, nan, 2, true, true, false, true));
   const std::vector<DistRow> filtered =
-    parse_dist(dist_queries(index, fq.string(), 4, 2.706, nan, 2, false, true));
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, nan, 2, false, true, false, true));
   REQUIRE_FALSE(unfiltered.empty());
   REQUIRE_FALSE(filtered.empty());
   // A row survives the filter exactly when its statistic is below the cutoff.
@@ -357,6 +359,32 @@ TEST_CASE("dist p-values agree with the chi-square filter")
       if (kept.id == row.id && kept.reference == row.reference) present = true;
     }
     CHECK(present == (row.p_value < cutoff));
+  }
+}
+
+TEST_CASE("the P_VALUE column is opt-in")
+{
+  TempDir dir("query-no-pvalue");
+  const Corpus corpus = make_corpus();
+  const BuildOptions opt = query_opts();
+  build_index_from_refs(dir / "index", corpus.refs, opt);
+  auto index = load_index_dir(dir / "index");
+
+  const std::filesystem::path fq = dir / "reads.fq";
+  write_fastq(fq, {{"q", substr_of(corpus.base, 2000, 1500)}});
+  const std::vector<DistRow> plain = parse_dist(dist_queries(index, fq.string()));
+  REQUIRE_FALSE(plain.empty());
+  for (const DistRow& row : plain) {
+    CHECK(row.nfields == 3);                          // the old format, by default
+    CHECK(std::isnan(row.p_value));                   // and no value read for it
+  }
+  const std::vector<DistRow> with_column =
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false, true));
+  REQUIRE(with_column.size() == plain.size());
+  for (size_t i = 0; i < plain.size(); ++i) {
+    CHECK(with_column[i].reference == plain[i].reference);
+    CHECK(with_column[i].distance == plain[i].distance);
+    CHECK_FALSE(std::isnan(with_column[i].p_value));
   }
 }
 
@@ -376,9 +404,6 @@ TEST_CASE("queries with no usable k-mers are reported as NA")
   for (const DistRow& row : rows) {
     if (row.is_na) {
       seen_na[row.id] = true;
-      // The NA row carries the p-value column too, as NaN.
-      CHECK(row.nfields == 4);
-      CHECK(std::isnan(row.p_value));
     } else {
       seen_ok[row.id] = true;
     }
@@ -486,7 +511,7 @@ TEST_CASE("summarize mode accumulates weights without printing placements")
   double total = 0;
   uint32_t entries = 0;
   while (qs->read_next_batch() || !qs->is_batch_finished()) {
-    IBatch ib(index, qs, 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, false, true, true);
+    IBatch ib(index, qs, 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, false, true, true, false);
     strstream batch;
     ib.estimate_distances(batch);
     CHECK(batch.str().empty()); // summarize mode prints nothing per batch
@@ -555,7 +580,7 @@ TEST_CASE("IBatch::search_mers counts every valid k-mer")
   // the batch size, not the return value, says whether anything was read.
   qs->read_next_batch();
   REQUIRE(qs->get_cbatch_size() == 1);
-  IBatch ib(index, qs, 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false);
+  IBatch ib(index, qs, 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false, false);
   auto imers_or = std::make_shared<IMers>(index, read.size(), 4);
   auto imers_rc = std::make_shared<IMers>(index, read.size(), 4);
   CHECK_NOTHROW(ib.search_mers(read.data(), read.size(), imers_or, imers_rc));
