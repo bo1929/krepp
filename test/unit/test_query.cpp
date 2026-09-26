@@ -44,13 +44,15 @@ Corpus make_corpus()
 
 std::string substr_of(const std::string& s, size_t start, size_t len) { return s.substr(start, len); }
 
-/* Fields of one distance row: id, reference, distance. */
+/* Fields of one distance row: id, reference, distance, p-value. */
 struct DistRow
 {
   std::string id;
   std::string reference;
   double distance;
+  double p_value;
   bool is_na;
+  int nfields = 0;
 };
 
 std::vector<DistRow> parse_dist(const std::string& text)
@@ -62,12 +64,15 @@ std::vector<DistRow> parse_dist(const std::string& text)
     if (line.empty() || line[0] == '#') continue;
     std::istringstream ls(line);
     DistRow row;
-    std::string dist;
+    std::string dist, pval;
     if (!std::getline(ls, row.id, '\t')) continue;
     if (!std::getline(ls, row.reference, '\t')) continue;
-    if (!std::getline(ls, dist)) continue;
+    if (!std::getline(ls, dist, '\t')) continue;
+    if (!std::getline(ls, pval)) continue;
+    row.nfields = static_cast<int>(std::count(line.begin(), line.end(), '\t')) + 1;
     row.is_na = (dist == "NaN");
     row.distance = row.is_na ? std::numeric_limits<double>::quiet_NaN() : std::stod(dist);
+    row.p_value = (pval == "NaN") ? std::numeric_limits<double>::quiet_NaN() : std::stod(pval);
     rows.push_back(row);
   }
   return rows;
@@ -263,6 +268,98 @@ TEST_CASE("the chi-square filter drops rows that are not distinguishable")
   CHECK(found);
 }
 
+TEST_CASE("the reported P_VALUE matches the lower tail of the one-sided chi-square test")
+{
+  // The column is P(chi2_1 < x) = erf(sqrt(x / 2)); the table is allowed 1.6e-4
+  // absolute and 4.2e-4 relative deviation, so the test uses looser bounds.
+  double worst_abs = 0;
+  double worst_rel = 0;
+  for (double chisq = 0.0; chisq <= 100.0; chisq += 0.0005) {
+    const double exact = std::erf(std::sqrt(chisq / 2.0));
+    const double got = chisq_cdf(chisq);
+    worst_abs = std::max(worst_abs, std::fabs(got - exact));
+    if (exact > 1e-9) {
+      worst_rel = std::max(worst_rel, std::fabs(got - exact) / exact);
+    }
+  }
+  CHECK(worst_abs < 2e-4);
+  CHECK(worst_rel < 5e-4);
+
+  CHECK(chisq_cdf(0.0) == 0.0);       // tied with the best hit
+  CHECK(chisq_cdf(-1.0) == 0.0);      // a statistic cannot be negative
+  CHECK(std::isnan(chisq_cdf(std::numeric_limits<double>::quiet_NaN())));
+  CHECK(chisq_cdf(2.706) == doctest::Approx(0.9).epsilon(0.01));  // the default --chisq
+  CHECK(chisq_cdf(3.841) == doctest::Approx(0.95).epsilon(0.01)); // chi2_1 at 0.05
+  CHECK(chisq_cdf(100.0) == 1.0);  // beyond this the two are indistinguishable
+  CHECK(chisq_cdf(101.0) == 1.0);  // beyond the table
+  double previous = 0.0;
+  for (double chisq = 0.0; chisq <= 100.0; chisq += 0.1) {
+    const double got = chisq_cdf(chisq);
+    CHECK(got >= previous);
+    previous = got;
+  }
+}
+
+TEST_CASE("dist reports a p-value column for every row")
+{
+  TempDir dir("query-pvalue");
+  const Corpus corpus = make_corpus();
+  const BuildOptions opt = query_opts();
+  build_index_from_refs(dir / "index", corpus.refs, opt);
+  auto index = load_index_dir(dir / "index");
+
+  const std::filesystem::path fq = dir / "reads.fq";
+  write_fastq(fq, {{"q", substr_of(corpus.base, 2000, 1500)}});
+  const std::vector<DistRow> rows = parse_dist(dist_queries(index, fq.string()));
+  REQUIRE_FALSE(rows.empty());
+  for (const DistRow& row : rows) {
+    CHECK(row.nfields == 4);
+    CHECK_FALSE(row.is_na);
+    CHECK(row.p_value >= 0.0);
+    CHECK(row.p_value <= 1.0);
+  }
+  // The closest hit is compared with itself, so it is not distinguishable.
+  const DistRow* best = best_row(rows);
+  REQUIRE(best != nullptr);
+  CHECK(best->p_value == 0.0);
+  const DistRow* worst = nullptr;
+  for (const DistRow& row : rows) {
+    if (!worst || row.distance > worst->distance) worst = &row;
+  }
+  REQUIRE(worst != nullptr);
+  CHECK(worst->p_value > 0.9);
+}
+
+TEST_CASE("dist p-values agree with the chi-square filter")
+{
+  TempDir dir("query-pvalue-filter");
+  const Corpus corpus = make_corpus();
+  const BuildOptions opt = query_opts();
+  build_index_from_refs(dir / "index", corpus.refs, opt);
+  auto index = load_index_dir(dir / "index");
+
+  const std::filesystem::path fq = dir / "reads.fq";
+  write_fastq(fq, {{"q", substr_of(corpus.base, 2000, 1500)}});
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const std::vector<DistRow> unfiltered =
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, nan, 2, true, true));
+  const std::vector<DistRow> filtered =
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, nan, 2, false, true));
+  REQUIRE_FALSE(unfiltered.empty());
+  REQUIRE_FALSE(filtered.empty());
+  // A row survives the filter exactly when its statistic is below the cutoff.
+  // The default 2.706 is the rounded 90% quantile, so the cutoff P_VALUE is
+  // 0.90003.
+  const double cutoff = chisq_cdf(2.706);
+  for (const DistRow& row : unfiltered) {
+    bool present = false;
+    for (const DistRow& kept : filtered) {
+      if (kept.id == row.id && kept.reference == row.reference) present = true;
+    }
+    CHECK(present == (row.p_value < cutoff));
+  }
+}
+
 TEST_CASE("queries with no usable k-mers are reported as NA")
 {
   TempDir dir("query-short");
@@ -279,6 +376,9 @@ TEST_CASE("queries with no usable k-mers are reported as NA")
   for (const DistRow& row : rows) {
     if (row.is_na) {
       seen_na[row.id] = true;
+      // The NA row carries the p-value column too, as NaN.
+      CHECK(row.nfields == 4);
+      CHECK(std::isnan(row.p_value));
     } else {
       seen_ok[row.id] = true;
     }

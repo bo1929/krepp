@@ -11,7 +11,7 @@ See [this tutorial for metagenomic analysis of a toy marine sample](https://alis
 ### Using `conda` (recommended)
 The easiest way to install krepp is by using [conda](https://anaconda.org/bioconda/krepp)
 ```bash
-conda install bioconda::krepp 
+conda install bioconda::krepp
 ```
 This will install the latest available version. Simply run `krepp --help` to test.
 
@@ -41,16 +41,21 @@ Once you have your index (e.g., the one we built above: `index_toy`), you can es
 ```bash
 krepp dist -i index_toy -q query_toy.fq --num-threads 4 | tee distances_toy.tsv
 ```
-The first five lines of `distances_toy.tsv` are going to look like:
+The first few lines of `distances_toy.tsv` are going to look like:
 ```
-#software: krepp	#version: v0.6.0	#invocation :krepp dist -i index_toy -q query_toy.fq --num-threads 4
-SEQ_ID	REFERENCE_NAME	DIST
-||61435-4122	G000341695	0.0898062
-||61435-4949	G000830905	0.147048
-||61435-4949	G000341695	0.0740587
-||61435-4949	G000025025	0.131182
-||61435-4949	G000741845	0.0395985
+# software: krepp	version: v0.10.2	invocation :krepp dist -i index_toy -q query_toy.fq --num-threads 4
+SEQ_ID	REFERENCE_NAME	DIST	P_VALUE
+||61435-4122	G000341695	0.04617	0.00000e+00
+||61435-4949	G000741845	0.02924	0.00000e+00
+||61435-4949	G000341695	0.03017	6.23556e-02
+||61435-4949	G001610775	0.03022	6.24924e-02
 ```
+One row is reported per query and reference, up to the `--dist-max` cutoff.
+`P_VALUE` says how distinguishable a hit is from the best hit of the same
+query: it is 0 for anything tied with the best hit (there is no evidence against
+it) and grows towards 1 as the hit becomes clearly worse, so smaller is better.
+The option `--filter` keeps the hits whose statistic is below `--chisq`, i.e.
+the ones with *p*-value is below 0.9 for the default `--chisq 2.706`.
 
 Quite similarly, you can place reads by running:
 ```bash
@@ -83,20 +88,20 @@ head -n20 placements_toy.jplace
                                 [41, -0.1333, 0.1497, -22.2532, 0.0821, 0.0162]]
                         },
 ```
-Here, `n` field is for the read ID as it appeared in `query_toy.fq`, and `p` is for the placement information, with the following fields:
+Here, the `n` field is for the read ID as it appeared in `query_toy.fq`, and `p` is for the placement information, with the following fields:
 ```
 ["edge_num", "pendant_length", "distal_length", "likelihood", "like_weight_ratio", "distance"]
 ```
 At the end of the jplace file, you can find the phylogeny decorated with edge numbers, which corresponds to the first field of `p`.
 
-You can proceed with your downstream analysis using other tools, such as [`gappa`](https://github.com/lczech/gappa). e.g., by generating a heat tree, colored based on placement densities across the backbone tree:
+You can proceed with your downstream analysis using other tools, such as [`gappa`](https://github.com/lczech/gappa), e.g., by generating a heat tree, colored based on placement densities across the backbone tree:
 ```bash
 gappa examine heat-tree --jplace-path placements_toy.jplace --write-svg-tree
 ```
 
 Alternatively, for a simpler format, give the `--tabular` flag. Then, the first 20 lines would look like:
 ```
-# software: krepp       version: v0.6.0 invocation :krepp --num-threads 8 place -i index_toy -q query_toy.fq --tabular
+# software: krepp       version: v0.10.2 invocation :krepp --num-threads 8 place -i index_toy -q query_toy.fq --tabular
 # (G001917855:0.4290{0},(G001918235:0.5280{1},(((((G000526415:0.1764{2},G001306135:0.2276{3})N1779:0.0365{4},(G000016665:0.1683{5},(G000735195:0.0276{6},G000018865:0.0229{7})N2640:0.1610{8})N1780:0.0609{9})N1532:0.1058{10},G000021685:0.3879{11})N1303:0.0337{12},(G002010545:0.3919{13},((G001050235:0.1711{14},G001306055:0.1635{15})N5461:0.1783{16},G001567105:0.2932{17})N2355:0.1933{18})N1304:0.0560{19})N1099:0.0288{20},(G000702505:0.1445{21},G001914715:0.1983{22})N1305:0.2353{23},(G001796575:0.3977{24},G001795015:0.4213{25},((G001796415:0.2756{26},(G002010445:0.3607{27},G001795205:0.3152{28})N3984:0.0458{29})N3292:0.0233{30},(((G000025025:0.0115{31},G001889305:0.0109{32})N4334:0.0068{33},G000830905:0.0305{34})N3987:0.0117{35},((G000741845:0.0039{36},G001610775:0.0001{37})N5905:0.0014{38},G000341695:0.0022{39})N4337:0.0167{40})N3634:0.2994{41})N2954:0.1317{42})N1788:0.1622{43})N916:0.0295{44})N736:0.0348{45})N432:0.0257{46};
 SEQ_ID  DISTAL_NODE     EDGE_NUM        LWR     DIST
 ||61435-4122    G000341695      39      1.0000  0.0933

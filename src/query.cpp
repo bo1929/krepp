@@ -192,16 +192,14 @@ void IBatch::report_distances(strstream& batch_stream)
     }
   } else {
     if (node_to_minfo.empty() || (!std::isnan(dist_max) && (mi_closest->d_llh > dist_max))) {
-      batch_stream << identifer_batch[bix] << "\tNA\tNaN\n";
+      batch_stream << identifer_batch[bix] << "\tNA\tNaN\tNaN\n";
       return;
     }
     if (multi) {
       vec<const std::pair<const node_sptr_t, minfo_sptr_t>*> rows;
       rows.reserve(node_to_minfo.size());
       for (const auto& entry : node_to_minfo) {
-        if (!no_filter) {
-          entry.second->chisq = mi_closest->likelihood_ratio(entry.second->d_llh, llhfunc);
-        }
+        entry.second->chisq = mi_closest->likelihood_ratio(entry.second->d_llh, llhfunc);
         if (no_filter || entry.second->chisq < chisq_value) {
           if (std::isnan(dist_max) || entry.second->d_llh < dist_max) {
             rows.push_back(&entry);
@@ -216,6 +214,7 @@ void IBatch::report_distances(strstream& batch_stream)
         batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(entry->first, entry->second);
       }
     } else {
+      mi_closest->chisq = mi_closest->likelihood_ratio(mi_closest->d_llh, llhfunc);
       batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd_closest, mi_closest);
     }
   }

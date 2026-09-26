@@ -116,7 +116,7 @@ void QueryIndex::header_dreport(strstream& dreport_stream)
   if (summarize) {
     dreport_stream << "\nREFERENCE_NAME\tWEIGHTED_COUNT\tSEQUENCE_ABUNDANCE\n";
   } else {
-    dreport_stream << "\nSEQ_ID\tREFERENCE_NAME\tDIST\n";
+    dreport_stream << "\nSEQ_ID\tREFERENCE_NAME\tDIST\tP_VALUE\n";
   }
 }
 
@@ -479,7 +479,7 @@ QueryIndex::QueryIndex(CLI::App& sc)
   sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")->check(CLI::NonNegativeNumber);
   sc.add_option("--chisq",
                 chisq_value,
-                "Chi-square value for statistical distinguishability test, default correspons to alpha=90%. [2.706]")
+                "Chi-square value for the distinguishability test; --filter keeps the hits with a smaller statistic [2.706]")
     ->check(CLI::PositiveNumber);
   sc.add_flag(
     "--summarize,!--no-summarize",

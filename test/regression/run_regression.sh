@@ -60,6 +60,10 @@ fi
 # ---------------------------------------------------------------- normalize
 
 norm_tsv() { grep -v '^#' "$1" | grep -v '^$' | LC_ALL=C sort; }
+# dist gained a p-value column; the goldens were produced before it existed and
+# pin the query, the reference and the distance, so that column is dropped here
+# and checked on its own below.
+norm_dist_tsv() { norm_tsv "$1" | awk -F'\t' 'NF>=4 {print $1"\t"$2"\t"$3; next} {print}'; }
 # The release version and the build date are metadata, not behaviour: masking
 # them keeps the goldens valid across a version bump. Everything else in these
 # dumps - the configuration, the counts, the paths - is compared as it is.
@@ -180,7 +184,7 @@ run_dist() { # run_dist <golden-name> <label> [extra args...]
   local name="$1" label="$2"
   shift 2
   "${KREPP[@]}" dist -i idx "$@" -o out.tsv 2>/dev/null
-  check "$label" norm_tsv out.tsv "$name"
+  check "$label" norm_dist_tsv out.tsv "$name"
 }
 
 run_dist dist_reads.tsv "dist reads" -q query_reads.fq
@@ -190,8 +194,8 @@ run_dist dist_reads.tsv "dist reads" -q query_reads.fq
 # per query, and a distance that matches the best distance of the multi output.
 "${KREPP[@]}" dist -i idx -q query_reads.fq --no-multi -o out_single.tsv 2>/dev/null
 if awk -F'\t' '
-  FNR==NR && $0 !~ /^#/ && NF==3 { if (!($1 in best) || $3+0 < best[$1]) best[$1] = $3+0; next }
-  $0 !~ /^#/ && NF==3 {
+  FNR==NR && $0 !~ /^#/ && $1 != "SEQ_ID" && NF==4 { if (!($1 in best) || $3+0 < best[$1]) best[$1] = $3+0; next }
+  $0 !~ /^#/ && $1 != "SEQ_ID" && NF==4 {
     rows++
     if (!($1 in best)) { print "unknown query " $1 > "/dev/stderr"; bad = 1; next }
     if (($3+0) - best[$1] > 1e-9) { print "distance mismatch for " $1 > "/dev/stderr"; bad = 1 }
@@ -218,6 +222,39 @@ run_dist dist_reads_max.tsv "dist reads --dist-max" -q query_reads.fq --dist-max
 run_dist dist_reads_summary.tsv "dist reads --summarize" -q query_reads.fq --summarize
 run_dist dist_contigs.tsv "dist contigs --hdist-th 2" -q query_contigs.fa --hdist-th 2
 
+# The p-value column: four fields per row, a probability in [0, 1], zero for the
+# closest hit of each query (it is compared with itself), and above zero for at
+# least one row of a query whose hits span more than one distance.
+"${KREPP[@]}" dist -i idx -q query_reads.fq -o out.tsv 2>/dev/null
+if awk -F'\t' '
+  /^#/ { next }
+  $1 == "SEQ_ID" { if (NF != 4) { print "header has " NF " fields" > "/dev/stderr"; bad = 1 } next }
+  NF != 4 { print "row with " NF " fields: " $0 > "/dev/stderr"; bad = 1; next }
+  {
+    p = $4 + 0
+    if (!(p >= 0 && p <= 1)) { print "p-value out of range: " $0 > "/dev/stderr"; bad = 1 }
+    if ($3 == "NaN") next
+    if (!($1 in best) || ($3 + 0) < best[$1]) { best[$1] = $3 + 0; best_p[$1] = p }
+    distinct[$1 "\t" ($3 + 0)] = 1
+    if (p > 0) { above_zero[$1] = 1 }
+  }
+  END {
+    # Tied distances are not distinguishable from the best hit, so only a query
+    # whose rows span more than one distance must have a row above zero.
+    for (k in distinct) { split(k, a, "\t"); ndist[a[1]]++ }
+    for (q in best_p) {
+      if (best_p[q] != 0) { print "closest hit of " q " has P_VALUE " best_p[q] > "/dev/stderr"; bad = 1 }
+      if (ndist[q] > 1 && !(q in above_zero)) { print "no row above P_VALUE 0 for " q > "/dev/stderr"; bad = 1 }
+    }
+    if (!length(best_p)) { print "no rows" > "/dev/stderr"; bad = 1 }
+    exit bad
+  }' out.tsv 2> "$tmp/awk.err"; then
+  note_ok
+else
+  note_bad "dist p-value column"
+  cat "$tmp/awk.err" >&2
+fi
+
 # An index built by an older release must stay readable and match the same
 # k-mers. test/index_bench was written by krepp v0.8.5 but is gitignored (it is
 # a benchmark artefact, not a source file), so the check is skipped when it is
@@ -225,7 +262,7 @@ run_dist dist_contigs.tsv "dist contigs --hdist-th 2" -q query_contigs.fa --hdis
 # above, which were produced by the previous release.
 if [ -d "$root/test/index_bench" ]; then
   "${KREPP[@]}" dist -i "$root/test/index_bench" -q "$root/test/query_toy.fq" -o out.tsv 2>/dev/null
-  check "dist over a legacy index" norm_tsv out.tsv "dist_legacy.tsv"
+  check "dist over a legacy index" norm_dist_tsv out.tsv "dist_legacy.tsv"
 else
   note_skip "test/index_bench is absent, so the legacy-index query is not compared"
 fi
