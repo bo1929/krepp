@@ -5,7 +5,7 @@
 #include "lshf.hpp"
 #include "table.hpp"
 
-typedef std::vector<enc_t>::const_iterator vec_enc_it;
+typedef const enc_t* vec_enc_it;
 
 class Sketch
 {

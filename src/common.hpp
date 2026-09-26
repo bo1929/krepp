@@ -50,10 +50,11 @@
 
 #define STRSTREAM_PRECISION 5
 
-#define VERSION "v0.10.1"
+#define VERSION "v0.10.2"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
+extern bool use_mmap;
 extern std::string invocation;
 extern std::string leave_out_ref;
 extern thread_local std::random_device rd;

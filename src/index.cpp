@@ -94,21 +94,9 @@ void Index::load_partial_index(std::string suffix)
     curr_flatht = std::make_shared<FlatHT>(tree, curr_crecord);
   }
 
-  std::filesystem::path mer_path = index_dir / ("cmer" + suffix);
-  std::ifstream mer_stream(mer_path, std::ifstream::binary);
-  if (!mer_stream.is_open()) {
-    error_exit(std::string("Failed to open ") + mer_path.string());
-  }
-  std::filesystem::path inc_path = index_dir / ("inc" + suffix);
-  std::ifstream inc_stream(inc_path, std::ifstream::binary);
-  if (!inc_stream.is_open()) {
-    error_exit(std::string("Failed to open ") + inc_path.string());
-  }
-  curr_flatht->load(mer_stream, inc_stream);
-  CHECK_STREAM_OR_EXIT(mer_stream, "Failed to read the k-mer vector of a partial index!");
-  mer_stream.close();
-  CHECK_STREAM_OR_EXIT(inc_stream, "Failed to read the offset array of a partial index!");
-  inc_stream.close();
+  const std::filesystem::path mer_path = index_dir / ("cmer" + suffix);
+  const std::filesystem::path inc_path = index_dir / ("inc" + suffix);
+  curr_flatht->load(mer_path, inc_path);
 
   std::filesystem::path crecord_path = index_dir / ("crecord" + suffix);
   std::ifstream crecord_stream(crecord_path, std::ifstream::binary);

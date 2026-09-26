@@ -375,6 +375,25 @@ inline index_sptr_t load_index_dir(const std::filesystem::path& index_dir)
   return index;
 }
 
+/* ------------------------------------------------------------- load modes */
+
+/* Selects the array load path (file mapping or reading) for a scope. */
+class UseMmap
+{
+public:
+  explicit UseMmap(bool enabled)
+    : previous(use_mmap)
+  {
+    use_mmap = enabled;
+  }
+  ~UseMmap() { use_mmap = previous; }
+  UseMmap(const UseMmap&) = delete;
+  UseMmap& operator=(const UseMmap&) = delete;
+
+private:
+  bool previous;
+};
+
 /* ---------------------------------------------------------- error handling */
 
 /* Turns error_exit() into an exception so failure paths are testable. */

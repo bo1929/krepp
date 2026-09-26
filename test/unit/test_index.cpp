@@ -441,4 +441,88 @@ TEST_CASE("duplicate FASTX record names are rejected")
   CHECK(msg.find("Duplicate reference ID") != std::string::npos);
 }
 
+TEST_CASE("mapping and reading an index give the same table")
+{
+  TempDir dir("index-mapped");
+  const std::vector<Reference> refs = make_refs();
+  const BuildOptions opt = small_opts();
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  const uint32_t nrows = 1u << (2 * opt.h);
+  std::string mapped;
+  {
+    UseMmap use(true);
+    auto index = load_index_dir(dir / "index");
+    mapped = index_fingerprint(index, opt.m, opt.r, opt.frac, nrows);
+  }
+  std::string read;
+  {
+    UseMmap use(false);
+    auto index = load_index_dir(dir / "index");
+    read = index_fingerprint(index, opt.m, opt.r, opt.frac, nrows);
+  }
+  CHECK_FALSE(mapped.empty());
+  CHECK(mapped == read);
+}
+
+TEST_CASE("query results do not depend on how the index is loaded")
+{
+  TempDir dir("index-mapped-query");
+  const std::vector<Reference> refs = make_refs();
+  const BuildOptions opt = small_opts();
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  const std::filesystem::path q = dir / "query.fna";
+  write_fasta(q, "query", mutate(refs[1].seq.substr(0, 3000), 0.03, 21));
+
+  std::string mapped_dist, read_dist, mapped_place, read_place;
+  {
+    UseMmap use(true);
+    auto index = load_index_dir(dir / "index");
+    mapped_dist = dist_queries(index, q.string());
+    mapped_place = place_queries(index, q.string());
+  }
+  {
+    UseMmap use(false);
+    auto index = load_index_dir(dir / "index");
+    read_dist = dist_queries(index, q.string());
+    read_place = place_queries(index, q.string());
+  }
+  CHECK_FALSE(mapped_dist.empty());
+  CHECK(mapped_dist == read_dist);
+  CHECK(mapped_place == read_place);
+}
+
+TEST_CASE("a truncated index file is rejected on load")
+{
+  TempDir dir("index-truncated");
+  const std::vector<Reference> refs = make_refs();
+  const BuildOptions opt = small_opts();
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  const std::string suffix = index_suffix(opt.m, opt.r, opt.frac);
+  for (const bool mapped : {true, false}) {
+    for (const std::string& part : {"cmer", "inc"}) {
+      TempDir forged("index-truncated-copy");
+      std::filesystem::copy(dir / "index", forged / "index", std::filesystem::copy_options::recursive);
+      const std::filesystem::path file = forged / "index" / (part + suffix);
+      const std::string full = slurp(file);
+      REQUIRE(full.size() > 64);
+      spit(file, full.substr(0, full.size() - 32));
+      CAPTURE(part);
+      CAPTURE(mapped);
+      UseMmap use(mapped);
+      ThrowingErrorHandler handler;
+      const std::string msg = ThrowingErrorHandler::catches([&] { load_index_dir(forged / "index"); });
+      CHECK(msg.find("Truncated") != std::string::npos);
+    }
+  }
+}
+
 TEST_SUITE_END();

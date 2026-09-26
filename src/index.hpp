@@ -8,7 +8,7 @@
 #include "table.hpp"
 #include <optional>
 
-typedef std::vector<cmer_t>::const_iterator vec_cmer_it;
+typedef const cmer_t* vec_cmer_it;
 
 class Index
 {

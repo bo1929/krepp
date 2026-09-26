@@ -1,51 +1,98 @@
 #include "table.hpp"
 
+namespace {
+  /* Reads exactly count bytes; a short read means the file was truncated. */
+  void read_exact(std::ifstream& stream, void* dst, size_t count, const std::string& what)
+  {
+    stream.read(reinterpret_cast<char*>(dst), static_cast<std::streamsize>(count));
+    if (static_cast<size_t>(stream.gcount()) != count) {
+      error_exit("Truncated " + what);
+    }
+  }
+} // namespace
+
 SFlatHT::SFlatHT(sdynht_sptr_t source)
 {
   nkmers = source->nkmers;
   nrows = source->enc_vvec.size();
-  inc_v.resize(nrows);
-  enc_v.reserve(nkmers);
+  inc_owned.resize(nrows);
+  enc_owned.reserve(nkmers);
   inc_t limit_inc = std::numeric_limits<inc_t>::max();
   inc_t copy_inc;
   inc_t lix = 0;
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, static_cast<inc_t>(source->enc_vvec[rix].size()));
     for (inc_t i = 0; i < copy_inc; ++i) {
-      enc_v.push_back(source->enc_vvec[rix][i]);
+      enc_owned.push_back(source->enc_vvec[rix][i]);
     }
     lix += copy_inc;
-    inc_v[rix] = lix;
+    inc_owned[rix] = lix;
     source->enc_vvec[rix].clear();
   }
+  enc_v = enc_owned.data();
+  inc_bytes = reinterpret_cast<const char*>(inc_owned.data());
 }
 
-void SFlatHT::load(std::ifstream& sketch_stream)
+size_t SFlatHT::load(std::ifstream& sketch_stream)
 {
-  sketch_stream.read(reinterpret_cast<char*>(&nkmers), sizeof(uint64_t));
-  enc_v.resize(nkmers);
-  sketch_stream.read(reinterpret_cast<char*>(enc_v.data()), nkmers * sizeof(enc_t));
-  assert(nkmers == enc_v.size());
-  sketch_stream.read(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
-  inc_v.resize(nrows);
-  sketch_stream.read(reinterpret_cast<char*>(inc_v.data()), nrows * sizeof(inc_t));
-  assert(nrows == inc_v.size());
+  read_exact(sketch_stream, &nkmers, sizeof(uint64_t), "sketch file");
+  enc_owned.resize(nkmers);
+  read_exact(sketch_stream, enc_owned.data(), nkmers * sizeof(enc_t), "sketch file");
+  assert(nkmers == enc_owned.size());
+  read_exact(sketch_stream, &nrows, sizeof(uint32_t), "sketch file");
+  inc_owned.resize(nrows);
+  read_exact(sketch_stream, inc_owned.data(), nrows * sizeof(inc_t), "sketch file");
+  assert(nrows == inc_owned.size());
+  enc_v = enc_owned.data();
+  inc_bytes = reinterpret_cast<const char*>(inc_owned.data());
+  return static_cast<size_t>(sketch_stream.tellg());
+}
+
+size_t SFlatHT::load(std::ifstream& sketch_stream, const std::filesystem::path& path)
+{
+  if (use_mmap) {
+    map = krepp::FileMap(path);
+    if (map.is_open()) {
+      size_t offset = 0;
+      uint64_t nk = 0;
+      std::memcpy(&nk, map.data() + offset, sizeof(nk));
+      offset += sizeof(nk);
+      const size_t enc_bytes = static_cast<size_t>(nk) * sizeof(enc_t);
+      if (map.size() < offset + enc_bytes + sizeof(uint32_t)) {
+        error_exit("Truncated sketch file: " + path.string());
+      }
+      enc_v = reinterpret_cast<const enc_t*>(map.data() + offset);
+      offset += enc_bytes;
+      uint32_t nr = 0;
+      std::memcpy(&nr, map.data() + offset, sizeof(nr));
+      offset += sizeof(nr);
+      if (map.size() < offset + static_cast<size_t>(nr) * sizeof(inc_t) + sizeof(uint32_t) + 3 * sizeof(uint8_t)) {
+        error_exit("Truncated sketch file: " + path.string());
+      }
+      nkmers = nk;
+      nrows = nr;
+      inc_bytes = map.data() + offset;
+      offset += static_cast<size_t>(nr) * sizeof(inc_t);
+      return offset;
+    }
+  }
+  return load(sketch_stream);
 }
 
 void SFlatHT::save(std::ofstream& sketch_stream)
 {
   sketch_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
-  sketch_stream.write(reinterpret_cast<const char*>(enc_v.data()), sizeof(enc_t) * nkmers);
+  sketch_stream.write(reinterpret_cast<const char*>(enc_v), sizeof(enc_t) * nkmers);
   sketch_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
-  sketch_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * nrows);
+  sketch_stream.write(inc_bytes, sizeof(inc_t) * nrows);
 }
 
 FlatHT::FlatHT(dynht_sptr_t source)
 {
   nkmers = source->nkmers;
   nrows = source->nrows;
-  inc_v.resize(nrows);
-  cmer_v.reserve(nkmers);
+  inc_owned.resize(nrows);
+  cmer_owned.reserve(nkmers);
   tree = source->tree;
   crecord = std::make_shared<CRecord>(source->get_record());
   inc_t limit_inc = std::numeric_limits<inc_t>::max();
@@ -54,32 +101,80 @@ FlatHT::FlatHT(dynht_sptr_t source)
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, static_cast<inc_t>(source->mer_vvec[rix].size()));
     for (inc_t i = 0; i < copy_inc; ++i) {
-      cmer_v.emplace_back(source->conv_mer_cmer(source->mer_vvec[rix][i]));
+      cmer_owned.emplace_back(source->conv_mer_cmer(source->mer_vvec[rix][i]));
     }
     lix += copy_inc;
-    inc_v[rix] = lix;
+    inc_owned[rix] = lix;
     source->mer_vvec[rix].clear();
   }
+  bind();
+}
+
+void FlatHT::bind()
+{
+  cmer_v = cmer_owned.data();
+  inc_bytes = reinterpret_cast<const char*>(inc_owned.data());
 }
 
 void FlatHT::load(std::ifstream& mer_stream, std::ifstream& inc_stream)
 {
-  mer_stream.read(reinterpret_cast<char*>(&nkmers), sizeof(uint64_t));
-  cmer_v.resize(nkmers);
-  mer_stream.read(reinterpret_cast<char*>(cmer_v.data()), nkmers * sizeof(cmer_t));
-  assert(nkmers == cmer_v.size());
-  inc_stream.read(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
-  inc_v.resize(nrows);
-  inc_stream.read(reinterpret_cast<char*>(inc_v.data()), nrows * sizeof(inc_t));
-  assert(nrows == inc_v.size());
+  read_exact(mer_stream, &nkmers, sizeof(uint64_t), "k-mer array");
+  cmer_owned.resize(nkmers);
+  read_exact(mer_stream, cmer_owned.data(), nkmers * sizeof(cmer_t), "k-mer array");
+  assert(nkmers == cmer_owned.size());
+  read_exact(inc_stream, &nrows, sizeof(uint32_t), "offset array");
+  inc_owned.resize(nrows);
+  read_exact(inc_stream, inc_owned.data(), nrows * sizeof(inc_t), "offset array");
+  assert(nrows == inc_owned.size());
+  bind();
+}
+
+void FlatHT::load(const std::filesystem::path& mer_path, const std::filesystem::path& inc_path)
+{
+  if (!use_mmap) {
+    std::ifstream mer_stream(mer_path, std::ifstream::binary);
+    std::ifstream inc_stream(inc_path, std::ifstream::binary);
+    if (!mer_stream.is_open() || !inc_stream.is_open()) {
+      error_exit("Failed to open " + mer_path.string() + " or " + inc_path.string());
+    }
+    load(mer_stream, inc_stream);
+    return;
+  }
+  mer_map = krepp::FileMap(mer_path);
+  inc_map = krepp::FileMap(inc_path);
+  if (!mer_map.is_open() || !inc_map.is_open()) {
+    // Some filesystems cannot map: fall back to reading.
+    std::ifstream mer_stream(mer_path, std::ifstream::binary);
+    std::ifstream inc_stream(inc_path, std::ifstream::binary);
+    if (!mer_stream.is_open() || !inc_stream.is_open()) {
+      error_exit("Failed to open " + mer_path.string() + " or " + inc_path.string());
+    }
+    load(mer_stream, inc_stream);
+    return;
+  }
+  uint64_t nk = 0;
+  std::memcpy(&nk, mer_map.data(), sizeof(nk));
+  uint32_t nr = 0;
+  std::memcpy(&nr, inc_map.data(), sizeof(nr));
+  // Validate before touching the arrays.
+  if (mer_map.size() < sizeof(nk) + static_cast<size_t>(nk) * sizeof(cmer_t)) {
+    error_exit("Truncated k-mer array in " + mer_path.string());
+  }
+  if (inc_map.size() < sizeof(nr) + static_cast<size_t>(nr) * sizeof(inc_t)) {
+    error_exit("Truncated offset array in " + inc_path.string());
+  }
+  nkmers = nk;
+  nrows = nr;
+  cmer_v = reinterpret_cast<const cmer_t*>(mer_map.data() + sizeof(nk));
+  inc_bytes = inc_map.data() + sizeof(nr);
 }
 
 void FlatHT::save(std::ofstream& mer_stream, std::ofstream& inc_stream)
 {
   mer_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
-  mer_stream.write(reinterpret_cast<const char*>(cmer_v.data()), sizeof(cmer_t) * nkmers);
+  mer_stream.write(reinterpret_cast<const char*>(cmer_v), sizeof(cmer_t) * nkmers);
   inc_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
-  inc_stream.write(reinterpret_cast<const char*>(inc_v.data()), sizeof(inc_t) * nrows);
+  inc_stream.write(inc_bytes, sizeof(inc_t) * nrows);
 }
 
 void DynHT::print_info()

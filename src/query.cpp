@@ -5,6 +5,19 @@
 /* #define CHISQ_THRESHOLD 2.706 */
 /* #define CHISQ_THRESHOLD 1.642 */
 
+namespace {
+  constexpr size_t kPendingBlock = 64;
+
+  inline void prefetch(const void* ptr)
+  {
+#if defined(__GNUC__) || defined(__clang__)
+    __builtin_prefetch(ptr);
+#else
+    (void)ptr;
+#endif
+  }
+} // namespace
+
 IBatch::IBatch(index_sptr_t index,
                qseq_sptr_t qs,
                uint32_t hdist_th,
@@ -80,27 +93,17 @@ void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, i
     }
 #else
     orrix = lshf->compute_hash(orenc64_bp);
-    if (index->check_partial_view(orrix)) {
-      imers_or->add_matching_mer_view(i - k,
-                                      orrix,
-                                      lshf->drop_ppos_lr(orenc64_lr),
-                                      index->get_flatht_view(orrix),
-                                      index->get_crecord_view(orrix),
-                                      index->get_numerator_view(orrix));
+    if (imers_or->stage_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr))) {
       wnmers_or++;
     }
     rcrix = lshf->compute_hash(rcenc64_bp);
-    if (index->check_partial_view(rcrix)) {
-      imers_rc->add_matching_mer_view(len - i,
-                                      rcrix,
-                                      lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)),
-                                      index->get_flatht_view(rcrix),
-                                      index->get_crecord_view(rcrix),
-                                      index->get_numerator_view(rcrix));
+    if (imers_rc->stage_mer(len - i, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)))) {
       wnmers_rc++;
     }
 #endif /* CANONICAL */
   }
+  imers_or->flush_mers();
+  imers_rc->flush_mers();
 }
 
 void IBatch::widen_hdist_filter(uint32_t& hdist_filt)
@@ -410,6 +413,7 @@ IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
   tree = index->get_tree();
   k = lshf->get_k();
   h = lshf->get_h();
+  pending_v.reserve(kPendingBlock);
   if (len) {
     enmers = len - k + 1;
   } else {
@@ -423,29 +427,67 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
     pos, rix, enc_lr, index->get_flatht_view(rix), index->get_crecord_view(rix), index->get_numerator_view(rix));
 }
 
-inline void IMers::add_matching_mer_view(uint32_t pos,
-                                         uint32_t rix,
-                                         enc_t enc_lr,
-                                         const FlatHT* flatht,
-                                         CRecord* crecord,
-                                         uint32_t numerator)
+bool IMers::stage_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
 {
-  se_t se;
-  pse_t pse;
-  node_sptr_t nd;
-  uint32_t hdist_curr;
+  if (!index->check_partial_view(rix)) {
+    return false;
+  }
+  const FlatHT* flatht = index->get_flatht_view(rix);
+  const uint32_t m = lshf->get_m();
+  uint32_t row = rix / m;
+  const uint32_t numerator = index->get_numerator_view(rix);
+  if (numerator > 1) {
+    row = row * numerator + (rix % m);
+  }
+  pending_v.push_back({pos, enc_lr, flatht->bucket_data(row), flatht->bucket_data(row + 1), index->get_crecord_view(rix)});
+  const PendingMer& mer = pending_v.back();
+  prefetch(mer.first);
+  prefetch(mer.first + 8);
+  prefetch(mer.crecord);
+  if (pending_v.size() >= kPendingBlock) {
+    flush_mers();
+  }
+  return true;
+}
+
+void IMers::flush_mers()
+{
+  for (const PendingMer& mer : pending_v) {
+    process_mer(mer);
+  }
+  pending_v.clear();
+}
+
+void IMers::add_matching_mer_view(uint32_t pos,
+                                  uint32_t rix,
+                                  enc_t enc_lr,
+                                  const FlatHT* flatht,
+                                  CRecord* crecord,
+                                  uint32_t numerator)
+{
   const uint32_t m = lshf->get_m();
   uint32_t row = rix / m;
   if (numerator > 1) {
     row = row * numerator + (rix % m);
   }
-  const cmer_t* first = flatht->bucket_data(row);
-  const cmer_t* last = flatht->bucket_data(row + 1);
+  const PendingMer mer{pos, enc_lr, flatht->bucket_data(row), flatht->bucket_data(row + 1), crecord};
+  process_mer(mer);
+}
+
+void IMers::process_mer(const PendingMer& mer)
+{
+  se_t se;
+  pse_t pse;
+  node_sptr_t nd;
+  uint32_t hdist_curr;
+  const enc_t enc_lr = mer.enc_lr;
+  const uint32_t pos = mer.pos;
+  CRecord* crecord = mer.crecord;
   const se_t nsubsets = crecord->get_nsubsets();
   if (vnd_v.size() < nsubsets) {
     vnd_v.resize(nsubsets, 0);
   }
-  for (; first < last; ++first) {
+  for (const cmer_t* first = mer.first; first < mer.last; ++first) {
     hdist_curr = popcount_lr32(first->first ^ enc_lr);
     if (hdist_curr > hdist_th) {
       continue;

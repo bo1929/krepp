@@ -43,8 +43,21 @@ public:
   void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
   inline void
   add_matching_mer_view(uint32_t pos, uint32_t rix, enc_t enc_lr, const FlatHT* flatht, CRecord* crecord, uint32_t numerator);
+  bool stage_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
+  void flush_mers();
 
 private:
+  /* A queued lookup with its bucket already resolved. */
+  struct PendingMer
+  {
+    uint32_t pos;
+    enc_t enc_lr;
+    const cmer_t* first;
+    const cmer_t* last;
+    CRecord* crecord;
+  };
+
+  void process_mer(const PendingMer& mer);
   uint32_t k;
   uint32_t h;
   uint32_t len;
@@ -59,6 +72,7 @@ private:
   vec<uint32_t> vnd_v;
   vec<se_t> se_v;
   uint32_t tix = 0;
+  vec<PendingMer> pending_v;
 };
 
 class IBatch

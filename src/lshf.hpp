@@ -3,8 +3,7 @@
 
 #include "common.hpp"
 
-  inline uint64_t
-  compress_mv(uint64_t x, const uint64_t* mv)
+inline uint64_t compress_mv(uint64_t x, const uint64_t* mv)
 {
   uint64_t t;
   t = x & mv[0];

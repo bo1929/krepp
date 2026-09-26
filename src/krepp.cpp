@@ -499,6 +499,8 @@ int main(int argc, char** argv)
 
   bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
+  app.add_flag(
+    "--mmap,!--no-mmap", use_mmap, "View index/sketch arrays through a file mapping instead of reading them into memory.");
   app.require_subcommand();
   app.add_option("--seed", seed, "Random seed for the LSH and other parts that require randomness. [0]");
   app.callback([&]() {

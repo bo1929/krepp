@@ -4,7 +4,9 @@ void Sketch::load_full_sketch()
 {
   std::ifstream sketch_stream(sketch_path, std::ifstream::binary);
   sflatht = std::make_shared<SFlatHT>();
-  sflatht->load(sketch_stream);
+  const size_t config_offset = sflatht->load(sketch_stream, sketch_path);
+  sketch_stream.clear();
+  sketch_stream.seekg(static_cast<std::streamoff>(config_offset));
   sketch_stream.read(reinterpret_cast<char*>(&k), sizeof(uint8_t));
   sketch_stream.read(reinterpret_cast<char*>(&w), sizeof(uint8_t));
   sketch_stream.read(reinterpret_cast<char*>(&h), sizeof(uint8_t));

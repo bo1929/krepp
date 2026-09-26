@@ -197,6 +197,55 @@ TEST_CASE("a sketch with an impossible configuration is rejected on load")
   }
 }
 
+TEST_CASE("seek is unaffected by how the sketch is loaded")
+{
+  TempDir dir("sketch-mapped");
+  const std::string seq = rand_dna(30000, 206);
+  const std::filesystem::path fa = dir / "ref.fna";
+  write_fasta(fa, "ref", seq);
+  const std::filesystem::path path = write_sketch(dir / "ref.sketch", fa.string(), sketch_opts());
+  const std::filesystem::path q = dir / "query.fna";
+  write_fasta(q, "query", mutate(seq.substr(0, 15000), 0.05, 207));
+
+  std::string mapped, read;
+  {
+    UseMmap use(true);
+    auto sketch = std::make_shared<Sketch>(path);
+    sketch->load_full_sketch();
+    mapped = seek_queries(sketch, q.string());
+  }
+  {
+    UseMmap use(false);
+    auto sketch = std::make_shared<Sketch>(path);
+    sketch->load_full_sketch();
+    read = seek_queries(sketch, q.string());
+  }
+  CHECK_FALSE(mapped.empty());
+  CHECK(mapped == read);
+}
+
+TEST_CASE("a sketch truncated in its arrays is rejected on load")
+{
+  TempDir dir("sketch-trunc-arrays");
+  const std::string seq = rand_dna(5000, 208);
+  const std::filesystem::path fa = dir / "ref.fna";
+  write_fasta(fa, "ref", seq);
+  const std::filesystem::path path = write_sketch(dir / "ref.sketch", fa.string(), sketch_opts());
+  // The configuration block follows the arrays, so cut inside the arrays.
+  const size_t arrays_end = sketch_config_offset(path);
+  REQUIRE(arrays_end > 8);
+  const std::filesystem::path truncated = dir / "trunc.sketch";
+  spit(truncated, slurp(path).substr(0, arrays_end - 8));
+  for (const bool mapped : {true, false}) {
+    CAPTURE(mapped);
+    UseMmap use(mapped);
+    auto sketch = std::make_shared<Sketch>(truncated);
+    ThrowingErrorHandler handler;
+    const std::string msg = ThrowingErrorHandler::catches([&] { sketch->load_full_sketch(); });
+    CHECK(msg.find("Truncated") != std::string::npos);
+  }
+}
+
 TEST_SUITE_END();
 
 TEST_SUITE_BEGIN("seek");
