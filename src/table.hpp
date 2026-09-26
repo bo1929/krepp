@@ -40,9 +40,7 @@ public:
   void clear_rows();
   void make_unique();
   void sort_columns();
-  void update_nkmers();
   void update_size_hist();
-  void ensure_sorted_columns();
   void fill_table(sh_t sh, rseq_sptr_t rqseq, bool curr = false);
   void prune_columns(size_t max_size);
   void union_table(dynht_sptr_t source);
@@ -118,6 +116,12 @@ public:
   tree_sptr_t get_tree() { return tree; }
   crecord_sptr_t get_crecord() { return crecord; }
   inc_t get_inc(uint32_t rix) { return inc_v[rix]; }
+  const cmer_t* bucket_data(uint32_t rix) const
+  {
+    if (rix == 0) return cmer_v.data();
+    if (rix <= inc_v.size()) return cmer_v.data() + inc_v[rix - 1];
+    return cmer_v.data() + cmer_v.size();
+  }
   std::vector<cmer_t>::const_iterator bucket_start(uint32_t rix)
   {
     if (rix) {

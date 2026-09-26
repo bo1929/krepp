@@ -25,7 +25,15 @@ static error_handler_t& error_handler()
 
 void set_error_handler(error_handler_t handler) { error_handler() = std::move(handler); }
 
-void set_num_threads(uint32_t nthreads) { num_threads = nthreads > 0 ? nthreads : 1; }
+void set_num_threads(uint32_t nthreads)
+{
+  num_threads = nthreads > 0 ? nthreads : 1;
+#if !defined(_OPENMP) || _WOPENMP != 1
+  if (num_threads > 1) {
+    warn_msg("No OpenMP support, so --num-threads is ignored; rebuild against an OpenMP runtime to use it.");
+  }
+#endif
+}
 
 [[noreturn]] void error_exit(const std::string& msg, int code)
 {
@@ -41,18 +49,3 @@ void set_num_threads(uint32_t nthreads) { num_threads = nthreads > 0 ? nthreads 
 }
 
 inline void warn_msg(const std::string& msg) { std::cerr << "[WARNING] " << msg << std::endl; }
-
-template<typename StreamT>
-inline void check_fstream_or_exit(const StreamT& stream, const std::string& msg, const std::string& path)
-{
-  if (!stream.good()) {
-    if (!path.empty()) {
-      error_exit(msg + ": " + path);
-    } else {
-      error_exit(msg);
-    }
-  }
-}
-
-template void check_fstream_or_exit<std::ifstream>(const std::ifstream&, const std::string&, const std::string&);
-template void check_fstream_or_exit<std::ofstream>(const std::ofstream&, const std::string&, const std::string&);

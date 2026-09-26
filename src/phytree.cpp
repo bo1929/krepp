@@ -41,7 +41,7 @@ void Tree::generate_tree(vec<std::string>& names_v)
   root->generate_tree(names_v.begin(), names_v.end());
   se_to_node.push_back(root);
   subtree_root = root;
-  // compute_bdepth();
+  compute_bdepth();
 }
 
 void Tree::stream_nwk_jplace(strstream& nwk_strstream, node_sptr_t nd)
@@ -395,6 +395,7 @@ void Tree::parse_lineages(std::istream& lineage_stream)
     se_to_node.push_back(curr);
     curr->set_se(nnodes);
   }
+  compute_bdepth();
 }
 
 double Tree::compute_distance(node_sptr_t a, node_sptr_t b)
@@ -447,7 +448,7 @@ void Tree::load(std::istream& tree_stream)
     error_exit("The given Newick tree is only partially decorated with edge numbers ({N}); decorate all " +
                std::to_string(ntotal) + " nodes or none, so that the output does not edge numbering schemes.");
   }
-  // compute_bdepth();
+  compute_bdepth();
 }
 
 void Tree::check_unique_labels()
@@ -466,15 +467,19 @@ void Tree::check_unique_labels()
 
 void Tree::compute_bdepth()
 {
+  if (!root) return;
   std::queue<node_sptr_t> nd_q;
-  node_sptr_t nd_curr;
+  root->ldepth = 0;
+  root->bdepth = 0;
   nd_q.push(root);
   while (!nd_q.empty()) {
-    nd_curr = nd_q.front();
+    node_sptr_t nd_curr = nd_q.front();
     nd_q.pop();
     for (tuint_t i = 0; i < nd_curr->get_nchildren(); ++i) {
-      nd_q.push((*std::next(nd_curr->get_children(), i)));
-      (nd_q.front())->bdepth = nd_curr->bdepth + (nd_q.front())->blen;
+      node_sptr_t child = *std::next(nd_curr->get_children(), i);
+      child->ldepth = nd_curr->ldepth + 1;
+      child->bdepth = nd_curr->bdepth + (std::isnan(child->blen) ? 0.0 : child->blen);
+      nd_q.push(child);
     }
   }
 }

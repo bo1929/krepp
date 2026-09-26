@@ -30,14 +30,6 @@ Record::Record(tree_sptr_t tree)
   sh_to_subset[0] = std::make_shared<Subset>(0, 0, 0);
 }
 
-Record::Record(record_sptr_t source1, record_sptr_t source2)
-{
-  union_record(source1);
-  union_record(source2);
-  node_sptr_t root = Tree::compute_lca(source1->get_tree()->get_root(), source2->get_tree()->get_root());
-  tree = root->get_tree();
-}
-
 bool Record::check_tree_collision()
 {
   bool collision_free = true;
@@ -104,16 +96,6 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
       sh, subset1->card > subset2->card ? subset1->sh : subset2->sh, subset1->card + subset2->card, nonce);
   }
   return sh;
-}
-
-void Record::union_record(record_sptr_t source)
-{
-  // TODO: check conflicts and resolve.
-  // TODO: check if either of the records is empty.
-  sh_to_node.insert(source->sh_to_node.begin(), source->sh_to_node.end());
-  sh_to_subset.insert(source->sh_to_subset.begin(), source->sh_to_subset.end());
-  node_sptr_t root = Tree::compute_lca(tree->get_root(), source->get_tree()->get_root());
-  tree = root->get_tree();
 }
 
 bool Record::check_subset_collision(subset_sptr_t s, subset_sptr_t s1, subset_sptr_t s2)
@@ -229,11 +211,11 @@ void CRecord::print_info()
 CRecord::CRecord(tree_sptr_t tree)
   : tree(tree)
 {
-  se_t curr_senum = 1;
   tree->reset_traversal();
   nnodes = tree->get_nnodes() + 1;
   nsubsets = nnodes;
   se_to_rho.resize(nnodes, 0);
+  se_to_pse.assign(nnodes, std::make_pair(se_t{0}, se_t{0}));
   tree->reset_traversal();
 }
 
@@ -258,36 +240,50 @@ void CRecord::save(std::ofstream& crecord_stream)
 void Record::decode_sh(sh_t sh, vec<node_sptr_t>& subset_v)
 {
   std::queue<sh_t> qsubset;
-  qsubset.push(sh);
-  subset_sptr_t subset;
+  if (sh) qsubset.push(sh);
   while (!qsubset.empty()) {
     sh = qsubset.front();
     qsubset.pop();
-    if (sh_to_node.contains(sh)) {
-      subset_v.push_back(sh_to_node[sh]);
-    } else {
-      subset = sh_to_subset[sh];
-      qsubset.push(subset->ch);
-      qsubset.push(subset->sh - subset->ch - subset->nonce);
+    // 0 is the reserved empty colour and has no decomposition.
+    if (sh == 0) continue;
+    auto nd_it = sh_to_node.find(sh);
+    if (nd_it != sh_to_node.end()) {
+      subset_v.push_back(nd_it->second);
+      continue;
     }
+    auto subset_it = sh_to_subset.find(sh);
+    if (subset_it == sh_to_subset.end() || !subset_it->second) {
+      error_exit("Unknown colour " + std::to_string(sh) + " in the index record.");
+    }
+    subset_sptr_t subset = subset_it->second;
+    qsubset.push(subset->ch);
+    qsubset.push(subset->sh - subset->ch - subset->nonce);
   }
 }
 
 void CRecord::decode_se(se_t se, vec<node_sptr_t>& subset_v)
 {
   std::queue<se_t> qsubset;
-  qsubset.push(se);
+  if (se) qsubset.push(se);
   pse_t pse;
   while (!qsubset.empty()) {
     se = qsubset.front();
     qsubset.pop();
-    if (tree->get_node(se)) {
-      subset_v.push_back(tree->get_node(se));
-    } else {
-      pse = se_to_pse[se];
-      qsubset.push(pse.first);
-      qsubset.push(pse.second);
+    // 0 is the reserved empty colour.
+    if (se == 0) continue;
+    if (tree->check_node(se)) {
+      node_sptr_t nd = tree->get_node(se);
+      if (nd) {
+        subset_v.push_back(nd);
+        continue;
+      }
     }
+    if (se >= se_to_pse.size()) {
+      error_exit("Invalid colour ID " + std::to_string(se) + " in the index record.");
+    }
+    pse = se_to_pse[se];
+    qsubset.push(pse.first);
+    qsubset.push(pse.second);
   }
 }
 

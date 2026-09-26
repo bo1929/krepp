@@ -80,16 +80,34 @@ void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, i
     }
 #else
     orrix = lshf->compute_hash(orenc64_bp);
-    if (index->check_partial(orrix)) {
-      imers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
+    if (index->check_partial_view(orrix)) {
+      imers_or->add_matching_mer_view(i - k,
+                                      orrix,
+                                      lshf->drop_ppos_lr(orenc64_lr),
+                                      index->get_flatht_view(orrix),
+                                      index->get_crecord_view(orrix),
+                                      index->get_numerator_view(orrix));
       wnmers_or++;
     }
     rcrix = lshf->compute_hash(rcenc64_bp);
-    if (index->check_partial(rcrix)) {
-      imers_rc->add_matching_mer(len - i, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
+    if (index->check_partial_view(rcrix)) {
+      imers_rc->add_matching_mer_view(len - i,
+                                      rcrix,
+                                      lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)),
+                                      index->get_flatht_view(rcrix),
+                                      index->get_crecord_view(rcrix),
+                                      index->get_numerator_view(rcrix));
       wnmers_rc++;
     }
 #endif /* CANONICAL */
+  }
+}
+
+void IBatch::widen_hdist_filter(uint32_t& hdist_filt)
+{
+  const uint32_t unset = std::numeric_limits<uint32_t>::max();
+  if (hdist_filt != unset) {
+    hdist_filt = 2 * hdist_filt + 1;
   }
 }
 
@@ -98,8 +116,8 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
   nd_closest = tree->get_root();
   mi_closest = std::make_shared<Minfo>(hdist_th);
   node_to_minfo.clear();
-  imers_or->hdist_filt = 2 * imers_or->hdist_filt + 1;
-  imers_rc->hdist_filt = 2 * imers_rc->hdist_filt + 1;
+  widen_hdist_filter(imers_or->hdist_filt);
+  widen_hdist_filter(imers_rc->hdist_filt);
   for (auto [nd, mi] : imers_or->leaf_to_minfo) {
     mi->mismatch_count = onmers - mi->match_count;
     // mi->compute_gamma();
@@ -175,19 +193,24 @@ void IBatch::report_distances(strstream& batch_stream)
       return;
     }
     if (multi) {
-      if (no_filter) {
-        for (const auto& [nd, mi] : node_to_minfo) {
-          if (std::isnan(dist_max) || mi->d_llh < dist_max) {
-            batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd, mi);
+      vec<const std::pair<const node_sptr_t, minfo_sptr_t>*> rows;
+      rows.reserve(node_to_minfo.size());
+      for (const auto& entry : node_to_minfo) {
+        if (!no_filter) {
+          entry.second->chisq = mi_closest->likelihood_ratio(entry.second->d_llh, llhfunc);
+        }
+        if (no_filter || entry.second->chisq < chisq_value) {
+          if (std::isnan(dist_max) || entry.second->d_llh < dist_max) {
+            rows.push_back(&entry);
           }
         }
-      } else {
-        for (auto& [nd, mi] : node_to_minfo) {
-          mi->chisq = mi_closest->likelihood_ratio(mi->d_llh, llhfunc);
-          if (mi->chisq < chisq_value && (std::isnan(dist_max) || mi->d_llh < dist_max)) {
-            batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd, mi);
-          }
-        }
+      }
+      std::sort(rows.begin(), rows.end(), [](const auto* lhs, const auto* rhs) {
+        if (lhs->second->d_llh != rhs->second->d_llh) return lhs->second->d_llh < rhs->second->d_llh;
+        return lhs->first->get_se() < rhs->first->get_se();
+      });
+      for (const auto* entry : rows) {
+        batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(entry->first, entry->second);
       }
     } else {
       batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd_closest, mi_closest);
@@ -396,18 +419,34 @@ IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
 
 void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
 {
+  add_matching_mer_view(
+    pos, rix, enc_lr, index->get_flatht_view(rix), index->get_crecord_view(rix), index->get_numerator_view(rix));
+}
+
+inline void IMers::add_matching_mer_view(uint32_t pos,
+                                         uint32_t rix,
+                                         enc_t enc_lr,
+                                         const FlatHT* flatht,
+                                         CRecord* crecord,
+                                         uint32_t numerator)
+{
   se_t se;
   pse_t pse;
   node_sptr_t nd;
   uint32_t hdist_curr;
-  std::queue<se_t> se_q;
-  std::pair<vec_cmer_it, vec_cmer_it> indices = index->bucket_indices(rix);
-  crecord_sptr_t crecord = index->get_crecord(rix);
+  const uint32_t m = lshf->get_m();
+  uint32_t row = rix / m;
+  if (numerator > 1) {
+    row = row * numerator + (rix % m);
+  }
+  const cmer_t* first = flatht->bucket_data(row);
+  const cmer_t* last = flatht->bucket_data(row + 1);
   const se_t nsubsets = crecord->get_nsubsets();
-  vec<uint32_t> vnd_v(nsubsets, 0);
-  uint32_t tix = 0;
-  for (; indices.first < indices.second; ++indices.first) {
-    hdist_curr = popcount_lr32(indices.first->first ^ enc_lr);
+  if (vnd_v.size() < nsubsets) {
+    vnd_v.resize(nsubsets, 0);
+  }
+  for (; first < last; ++first) {
+    hdist_curr = popcount_lr32(first->first ^ enc_lr);
     if (hdist_curr > hdist_th) {
       continue;
     }
@@ -418,10 +457,10 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
       std::fill(vnd_v.begin(), vnd_v.end(), 0);
       ++tix;
     }
-    se_q.push(indices.first->second);
-    while (!se_q.empty()) {
-      se = se_q.front();
-      se_q.pop();
+    se_v.push_back(first->second);
+    while (!se_v.empty()) {
+      se = se_v.back();
+      se_v.pop_back();
       if (se >= nsubsets) {
         error_exit("Invalid ID " + std::to_string(se) + " in the index record.");
       }
@@ -436,7 +475,7 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
           if (!leaf_to_minfo.contains(nd)) {
             leaf_to_minfo[nd] = std::make_shared<Minfo>(hdist_th, enmers, crecord->get_rho(se));
           }
-          leaf_to_minfo[nd]->update_match(indices.first->first, pos, hdist_curr);
+          leaf_to_minfo[nd]->update_match(first->first, pos, hdist_curr);
           continue;
         }
       }
@@ -444,8 +483,8 @@ void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
       if (pse.first >= nsubsets || pse.second >= nsubsets) {
         error_exit("Invalid parent ID in the index record.");
       }
-      se_q.push(pse.first);
-      se_q.push(pse.second);
+      se_v.push_back(pse.first);
+      se_v.push_back(pse.second);
     }
   }
   onmers++;

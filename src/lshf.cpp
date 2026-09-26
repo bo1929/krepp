@@ -11,33 +11,55 @@ LSHF::LSHF(uint8_t k, uint8_t h, uint32_t m, uint32_t r, bool frac)
   set_lshf();
 }
 
+bool LSHF::check_configuration(uint8_t k, uint8_t w, uint8_t h, uint32_t m, uint32_t r, bool frac)
+{
+  (void)frac;
+  bool is_invalid = true;
+  if ((is_invalid = (w < k))) {
+    error_exit("The minimizer window (-w) must be at least the k-mer length (-k).");
+  }
+  if ((is_invalid = (h < 9))) {
+    error_exit("The number of LSH positions (-h) must be at least 9.");
+  }
+  if ((is_invalid = (h > 15))) {
+    error_exit("The number of LSH positions (-h) must be at most 15.");
+  }
+  if ((is_invalid = (k > 31))) {
+    error_exit("The k-mer length (-k) must be at most 31.");
+  }
+  if ((is_invalid = (k < 19))) {
+    error_exit("The k-mer length (-k) must be at least 19.");
+  }
+  if ((is_invalid = ((k - h) > 16))) {
+    error_exit("For compact k-mer encodings, h must be >= k-16.");
+  }
+  if ((is_invalid = (m == 0))) {
+    error_exit("The modulo value (-m) must be positive.");
+  }
+  if ((is_invalid = (r >= m))) {
+    error_exit("The LSH residue (-r) must be smaller than the modulo value (-m).");
+  }
+  return !is_invalid;
+}
+
+static void gen_compress_mv(uint64_t m, uint64_t* mv)
+{
+  uint64_t mk = ~m << 1;
+  for (uint32_t i = 0; i < 6; ++i) {
+    uint64_t mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    mv[i] = mp & m;
+    m = (m ^ mv[i]) | (mv[i] >> (1u << i));
+    mk &= ~mp;
+  }
+}
+
 void LSHF::set_lshf()
 {
-  std::vector<int8_t> v;
-  std::vector<int8_t> g;
-  int8_t lp = 31;
-  int8_t jp = 0;
-  for (size_t j = 0; j < ppos_v.size(); j++) {
-    if (j == 0) {
-      v.push_back((lp - ppos_v[j]) * 2);
-      lp = ppos_v[j];
-      jp += 2;
-    } else if ((ppos_v[j - 1] - ppos_v[j]) != 1) {
-      v.push_back((lp - ppos_v[j]) * 2);
-      lp = ppos_v[j];
-      g.push_back(jp);
-      jp = 2;
-    } else {
-      jp += 2;
-    }
-  }
-  g.push_back(jp);
-  v.push_back(-1);
-  g.push_back(-1);
-  glsh_v.resize(v.size() < g.size() ? v.size() : g.size());
-  for (unsigned int i = 0; i < glsh_v.size(); i++) {
-    glsh_v[i] = std::make_pair(v[i], g[i]);
-  }
   for (int i = npos_v.size() - 1; i >= 0; --i) {
     mask_drop_lr += (0x0000000100000001ull << npos_v[i]);
     mask_drop_bp += (0x0000000000000003ull << (npos_v[i] * 2));
@@ -46,84 +68,35 @@ void LSHF::set_lshf()
     mask_drop_lr += 0x0000000000000001ull << (i + k);
   }
   for (int i = ppos_v.size() - 1; i >= 0; --i) {
-    mask_hash_lr += (0x0000000100000001ull << ppos_v[i]);
     mask_hash_bp += (0x0000000000000003ull << (ppos_v[i] * 2));
   }
-  for (uint32_t i = 2 * h + 1; i < 32; ++i) {
-    mask_hash_lr += (0x0000000000000001ull << i);
-  }
-  mask_drop_l = (mask_drop_lr & 0xffffffff00000000ull);
-  mask_drop_r = (mask_drop_lr & 0x00000000ffffffffull);
-  // __builtin_cpu_init ();
-  // if (!__builtin_cpu_supports("bmi2")) {
-  //   std::cerr << "BMI2 is not supported, PEXT will not be used.\n";
-  // }
+  gen_compress_mv(mask_hash_bp, mv_hash_bp);
+  gen_compress_mv(mask_drop_lr, mv_drop_lr);
+  gen_compress_mv(mask_drop_bp, mv_drop_bp);
 }
 
 #if defined(__BMI2__)
 uint32_t LSHF::compute_hash(uint64_t enc64_bp) { return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_hash_bp)); }
 
-uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
-{
-  /* return (static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_l)) << 16) + */
-  /*        static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_r)); */
-  return static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_lr));
-}
+uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr) { return static_cast<uint32_t>(_pext_u64(enc64_lr, mask_drop_lr)); }
 
 uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp) { return static_cast<uint32_t>(_pext_u64(enc64_bp, mask_drop_bp)); }
 #else
 uint32_t LSHF::compute_hash(uint64_t enc64_bp)
 {
-  #if defined(__aarch64__)
-  return static_cast<uint32_t>(extract_bits(enc64_bp, mask_hash_bp));
-  #else
-  uint64_t res = 0;
-  unsigned int i = 0;
-  while (glsh_v[i].first != -1) {
-    enc64_bp = enc64_bp << glsh_v[i].first;
-    asm("shld %b3, %2, %0" : "=rm"(res) : "0"(res), "r"(enc64_bp), "ic"(glsh_v[i].second) : "cc");
-    i++;
-  }
-  return static_cast<uint32_t>(res);
-  #endif
+  return static_cast<uint32_t>(compress_mv(enc64_bp & mask_hash_bp, mv_hash_bp));
 }
 
 uint32_t LSHF::drop_ppos_lr(uint64_t enc64_lr)
 {
-  uint32_t enc32_lr = 0;
-  for (int i = npos_v.size() - 1; i >= 0; --i) {
-    enc32_lr <<= 1;
-    enc32_lr += static_cast<uint32_t>((enc64_lr >> npos_v[i]) & 1);
-    enc32_lr += static_cast<uint32_t>((enc64_lr >> (npos_v[i] + 32)) & 1) << 16;
-  }
-  return enc32_lr;
+  return static_cast<uint32_t>(compress_mv(enc64_lr & mask_drop_lr, mv_drop_lr));
 }
 
 uint32_t LSHF::drop_ppos_bp(uint64_t enc64_bp)
 {
-  uint32_t enc32_bp = 0;
-  for (int i = npos_v.size() - 1; i >= 0; --i) {
-    enc32_bp += static_cast<uint32_t>((enc64_bp >> (npos_v[i] * 2)) & 3);
-    enc32_bp <<= 2 * (i & 0x00000001);
-  }
-  return enc32_bp;
+  return static_cast<uint32_t>(compress_mv(enc64_bp & mask_drop_bp, mv_drop_bp));
 }
 #endif
-
-uint32_t LSHF::get_npos_diff(uint32_t zc)
-{
-  uint32_t i = __builtin_ctz(zc);
-  zc = zc >> (i + 1);
-  return npos_v[i];
-}
-
-uint32_t LSHF::get_npos_accdiff(uint32_t& zc, uint32_t& i)
-{
-  uint32_t j = __builtin_ctz(zc) + 1;
-  i += j;
-  zc >>= j;
-  return npos_v.rbegin()[i - 1];
-}
 
 void LSHF::get_random_positions()
 {

@@ -18,34 +18,6 @@ namespace optimize {
     std::vector<uint64_t> binom_coef_hnk;
 
   public:
-    double prob_elude(const uint32_t x)
-    {
-      /* return (1.0 - pow(1.0 - static_cast<double>(x) / static_cast<double>(k), h)); */
-      return 1.0 - static_cast<double>(binom_coef_hnk[x]) / static_cast<double>(binom_coef_k[x]);
-    }
-
-    double prob_collide(const uint32_t x)
-    {
-      /* return pow(1.0 - static_cast<double>(x) / static_cast<double>(k), h); */
-      return static_cast<double>(binom_coef_hnk[x]) / static_cast<double>(binom_coef_k[x]);
-    }
-
-    double prob_mutate(const double d, const uint32_t x) { return pow((1.0 - d), (k - x)) * pow(d, x) * binom_coef_k[x]; }
-
-    double prob_miss(const double d)
-    {
-      double p = 0;
-      for (uint32_t x = 0; x <= hdist_th; ++x) {
-        p += prob_elude(x) * prob_mutate(d, x);
-      }
-      for (uint32_t x = hdist_th + 1; x <= k; ++x) {
-        p += prob_mutate(d, x);
-      }
-      return rho * p + 1.0 - rho;
-    }
-
-    double prob_hit(const double d, const uint32_t x) { return rho * prob_collide(x) * prob_mutate(d, x); }
-
     HDistHistLLH() {}
 
     HDistHistLLH(uint32_t h, uint32_t k, uint32_t hdist_th)
@@ -81,7 +53,7 @@ namespace optimize {
           sum -= (logdn + x * logdp) * (*(mc_ptr + x));
           lv_m += binom_coef_hnk[x] * powdc;
         } else {
-          lv_m += powdc * binom_coef_k[x];
+          lv_m += (binom_coef_k[x] * powdc);
         }
         powdc *= dratio;
       }

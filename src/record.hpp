@@ -55,12 +55,10 @@ class Record : public std::enable_shared_from_this<Record>
 
 public:
   Record(tree_sptr_t tree);
-  Record(record_sptr_t source1, record_sptr_t source2);
   bool check_tree_collision();
   void rehash_tree();
   void make_compact();
   sh_t add_subset(sh_t sh1, sh_t sh2);
-  void union_record(record_sptr_t source);
   void decode_sh(sh_t sh, vec<node_sptr_t>& subset_v);
   bool check_subset_collision(subset_sptr_t s, subset_sptr_t s1, subset_sptr_t s2);
   uint64_t get_size() { return sh_to_subset.size(); }

@@ -64,6 +64,7 @@ void Index::load_partial_index(std::string suffix)
   metadata_stream.read(reinterpret_cast<char*>(&r), sizeof(uint32_t));
   metadata_stream.read(reinterpret_cast<char*>(&frac), sizeof(bool));
   metadata_stream.read(reinterpret_cast<char*>(&nrows_partial), sizeof(uint32_t));
+  LSHF::check_configuration(k_curr, w, h_curr, m_curr, r, frac);
   vec<uint8_t> ppos_v(h_curr), npos_v(k_curr - h_curr);
   metadata_stream.read(reinterpret_cast<char*>(ppos_v.data()), ppos_v.size() * sizeof(uint8_t));
   metadata_stream.read(reinterpret_cast<char*>(npos_v.data()), npos_v.size() * sizeof(uint8_t));
@@ -80,7 +81,7 @@ void Index::load_partial_index(std::string suffix)
       k = k_curr;
       h = h_curr;
       m = m_curr;
-      nrows = pow(2, 2 * h);
+      nrows = nrows_partial ? nrows_partial : BaseLSH::compute_nrows(h, m, r, frac);
     }
   }
   if (!compatible) error_exit("Partial libraries have incompatible hash configurations!");
@@ -154,6 +155,30 @@ void Index::load_partial_index(std::string suffix)
       r_to_numerator[r] = 1;
       r_to_info[r] = info_str;
     }
+    // Residues provided by another partial index stay in the view.
+    build_res_tables(m);
+  }
+}
+
+void Index::build_res_tables(uint32_t nm)
+{
+  if (res_flatht.size() < nm) {
+    res_flatht.resize(nm, nullptr);
+    res_crecord.resize(nm, nullptr);
+    res_numerator.resize(nm, 0);
+  }
+
+  for (uint32_t ix = 0; ix < nm; ++ix) {
+    auto it = r_to_flatht.find(ix);
+    if (it == r_to_flatht.end() || !it->second) {
+      res_flatht[ix] = nullptr;
+      res_crecord[ix] = nullptr;
+      res_numerator[ix] = 0;
+      continue;
+    }
+    res_flatht[ix] = it->second.get();
+    res_crecord[ix] = it->second->get_crecord().get();
+    res_numerator[ix] = r_to_numerator[ix];
   }
 }
 
@@ -178,7 +203,14 @@ void Index::display_info(std::ostream* output_stream)
   } else {
     (*output_stream) << "Backbone tree: NA\n";
   }
+
+  vec<uint32_t> keys;
+  keys.reserve(r_to_info.size());
   for (auto const& [key, val] : r_to_info) {
+    keys.push_back(key);
+  }
+  std::sort(keys.begin(), keys.end());
+  for (uint32_t key : keys) {
     (*output_stream) << "======= Partial index: " << key << " =======\n";
     (*output_stream) << r_to_info[key];
     r_to_flatht[key]->display_info(output_stream, key);
@@ -202,18 +234,25 @@ void Index::make_rho_partial()
 
 void BaseLSH::set_lshf() { lshf = std::make_shared<LSHF>(k, h, m, r, frac); }
 
-void BaseLSH::set_nrows()
+uint32_t BaseLSH::compute_nrows(uint8_t h, uint32_t m, uint32_t r, bool frac)
 {
-  uint32_t hash_size = pow(2, 2 * h);
-  uint32_t full_residue = hash_size % m;
+  const uint64_t hash_size = uint64_t{1} << (2 * h);
+  const uint64_t full_residue = hash_size % m;
+  uint64_t rows = 0;
   if (frac) {
-    nrows = (hash_size / m) * (r + 1);
-    nrows = full_residue > r ? nrows + (r + 1) : nrows + full_residue;
+    rows = (hash_size / m) * (static_cast<uint64_t>(r) + 1);
+    rows = full_residue > r ? rows + (static_cast<uint64_t>(r) + 1) : rows + full_residue;
   } else {
-    nrows = (hash_size / m);
-    nrows = full_residue > r ? nrows + 1 : nrows;
+    rows = (hash_size / m);
+    rows = full_residue > r ? rows + 1 : rows;
   }
+  if (rows > std::numeric_limits<uint32_t>::max()) {
+    error_exit("The requested configuration does not fit in a 32-bit row index, reduce -h.");
+  }
+  return static_cast<uint32_t>(rows);
 }
+
+void BaseLSH::set_nrows() { nrows = compute_nrows(h, m, r, frac); }
 
 void BaseLSH::save_configuration(std::ofstream& cfg_stream)
 {

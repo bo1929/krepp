@@ -61,6 +61,10 @@ void TargetIndex::load_index()
   for (auto const& [suffix, ltypes] : suffix_to_ltype) {
     suffixes.push_back(suffix);
   }
+  if (suffixes.empty()) {
+    error_exit("No index found in " + index_dir.string() +
+               " (expected cmer/inc/crecord/metadata files, optionally with tree/reflist).");
+  }
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
     const std::set<std::string>& ltype = suffix_to_ltype[suffixes[lix]];
@@ -185,7 +189,16 @@ void QueryIndex::estimate_distances()
     }
   }
   if (summarize) {
-    for (auto& [nd, wcount] : node_to_wcount) {
+    vec<node_sptr_t> nd_v;
+    nd_v.reserve(node_to_wcount.size());
+    for (const auto& [nd, wcount] : node_to_wcount) {
+      nd_v.push_back(nd);
+    }
+    std::sort(nd_v.begin(), nd_v.end(), [](const node_sptr_t& lhs, const node_sptr_t& rhs) {
+      return lhs->get_en() < rhs->get_en();
+    });
+    for (const node_sptr_t& nd : nd_v) {
+      const double wcount = node_to_wcount[nd];
       dreport_stream << nd->get_name() << "\t" << wcount << "\t" << wcount / twcount << "\n";
     }
     (*output_stream) << dreport_stream.rdbuf();
@@ -290,7 +303,16 @@ void QueryIndex::place_sequences()
   preport_stream.str("");
   preport_stream.clear();
   if (summarize) {
-    for (auto& [nd, wcount] : node_to_wcount) {
+    vec<node_sptr_t> nd_v;
+    nd_v.reserve(node_to_wcount.size());
+    for (const auto& [nd, wcount] : node_to_wcount) {
+      nd_v.push_back(nd);
+    }
+    std::sort(nd_v.begin(), nd_v.end(), [](const node_sptr_t& lhs, const node_sptr_t& rhs) {
+      return lhs->get_en() < rhs->get_en();
+    });
+    for (const node_sptr_t& nd : nd_v) {
+      const double wcount = node_to_wcount[nd];
       preport_stream << nd->get_name(true) << "\t" << nd->get_en() << "\t" << wcount << "\t" << wcount / twcount << "\n";
     }
     (*output_stream) << preport_stream.rdbuf();

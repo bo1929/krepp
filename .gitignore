@@ -6,3 +6,4 @@ test/references*
 
 krepp
 __pycache__
+*PLAN.md

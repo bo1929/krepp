@@ -12,6 +12,7 @@ void Sketch::load_full_sketch()
   sketch_stream.read(reinterpret_cast<char*>(&r), sizeof(uint32_t));
   sketch_stream.read(reinterpret_cast<char*>(&frac), sizeof(bool));
   sketch_stream.read(reinterpret_cast<char*>(&nrows), sizeof(uint32_t));
+  LSHF::check_configuration(k, w, h, m, r, frac);
   vec<uint8_t> ppos_v(h), npos_v(k - h);
   sketch_stream.read(reinterpret_cast<char*>(ppos_v.data()), ppos_v.size() * sizeof(uint8_t));
   sketch_stream.read(reinterpret_cast<char*>(npos_v.data()), npos_v.size() * sizeof(uint8_t));

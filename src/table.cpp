@@ -116,23 +116,6 @@ void DynHT::sort_columns()
   }
 }
 
-void DynHT::ensure_sorted_columns()
-{
-  for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
-    if ((!mer_vvec[i].empty()) && !std::is_sorted(mer_vvec[i].begin(), mer_vvec[i].end(), comp_encoding)) {
-      std::sort(mer_vvec[i].begin(), mer_vvec[i].end(), comp_encoding);
-    }
-  }
-}
-
-void DynHT::update_nkmers()
-{
-  nkmers = 0;
-  for (uint32_t i = 0; i < mer_vvec.size(); ++i) {
-    nkmers += mer_vvec[i].size();
-  }
-}
-
 void DynHT::update_size_hist()
 {
   size_hist.clear();
@@ -188,6 +171,8 @@ void DynHT::union_table(dynht_sptr_t source)
     mer_vvec = std::move(source->mer_vvec);
     size_hist = std::move(source->size_hist);
     nkmers = source->nkmers;
+    source->nkmers = 0;
+    source->size_hist.clear();
     return;
   } else {
     nkmers = 0;

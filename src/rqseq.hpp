@@ -133,7 +133,6 @@ public:
   QSeq& operator=(QSeq&&) = delete;
   bool read_next_batch();
   bool is_batch_finished();
-  void clear_curr_batch();
   uint64_t get_cbatch_size() { return cbatch_size; }
 
 private:

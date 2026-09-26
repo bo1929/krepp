@@ -28,6 +28,16 @@ public:
   bool check_partial(uint32_t rix) { return r_to_flatht.contains(rix % m); }
   flatht_sptr_t get_flatht_sptr(uint32_t rix) { return r_to_flatht[rix % m]; };
 
+  void build_res_tables(uint32_t nm);
+  bool check_partial_view(uint32_t rix) const
+  {
+    const uint32_t res = rix % m;
+    return res < res_flatht.size() && res_flatht[res] != nullptr;
+  }
+  FlatHT* get_flatht_view(uint32_t rix) const { return res_flatht[rix % m]; }
+  CRecord* get_crecord_view(uint32_t rix) const { return res_crecord[rix % m]; }
+  uint32_t get_numerator_view(uint32_t rix) const { return res_numerator[rix % m]; }
+
 private:
   uint8_t k;
   uint8_t h;
@@ -40,6 +50,10 @@ private:
   fparallel_flat_phmap<uint32_t, flatht_sptr_t> r_to_flatht;
   fparallel_flat_phmap<uint32_t, uint32_t> r_to_numerator;
   fparallel_flat_phmap<uint32_t, std::string> r_to_info;
+  // Non-owning views, indexed by rix % m.
+  vec<FlatHT*> res_flatht;
+  vec<CRecord*> res_crecord;
+  vec<uint32_t> res_numerator;
 };
 
 struct IndexConfig
@@ -62,6 +76,7 @@ class BaseLSH
 public:
   void set_lshf();
   void set_nrows();
+  static uint32_t compute_nrows(uint8_t h, uint32_t m, uint32_t r, bool frac);
   void save_configuration(std::ofstream& cfg_stream);
   void set_sketch_defaults()
   {
@@ -77,30 +92,12 @@ public:
   }
   bool validate_configuration()
   {
-    bool is_invalid = true;
-    if ((is_invalid = (w < k))) {
-      error_exit("The minimum minimizer window size (-w) is k (-k).");
-    }
-    if ((is_invalid = (h < 9))) {
-      error_exit("The minimum number of LSH positions (-h) is 9.");
-    }
-    if ((is_invalid = (h > 15))) {
-      error_exit("The maximum number of LSH positions (-h) is 15.");
-    }
-    if ((is_invalid = (k > 31))) {
-      error_exit("The maximum allowed k-mer length (-k) is 31.");
-    }
-    if ((is_invalid = (k < 19))) {
-      error_exit("The minimum allowed k-mer length (-k) is 19.");
-    }
-    if ((is_invalid = ((k - h) > 16))) {
-      error_exit("For compact k-mer encodings, h must be >= k-16.");
-    }
+    const bool is_valid = LSHF::check_configuration(k, w, h, m, r, frac);
     if ((sdust_t != 0) && (sdust_w != 0)) {
       std::cerr << "Setting --sdust-w and --sdust-t to >0 will enable dustmasker." << std::endl;
       std::cerr << "With dustmasker, krepp might fail to model subsampling and be slightly inaccurate." << std::endl;
     }
-    return !is_invalid;
+    return is_valid;
   }
 
 protected:

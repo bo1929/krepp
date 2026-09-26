@@ -50,7 +50,7 @@
 
 #define STRSTREAM_PRECISION 5
 
-#define VERSION "v0.10.0"
+#define VERSION "v0.10.1"
 #define PRINT_VERSION std::cerr << "krepp version: " << VERSION << std::endl;
 
 extern uint32_t num_threads;
@@ -253,19 +253,6 @@ static inline void update_encoding(const char* s1, uint64_t& enc_lr, uint64_t& e
   enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
 }
 
-template<typename Integral>
-constexpr Integral extract_bits(Integral x, Integral mask)
-{
-  Integral res = 0;
-  for (Integral bb = 1; mask != 0; bb += bb) {
-    if (x & mask & -mask) {
-      res |= bb;
-    }
-    mask &= (mask - 1);
-  }
-  return res;
-}
-
 static std::string vec_to_str(const std::vector<uint8_t>& v)
 {
   std::ostringstream oss;
@@ -353,8 +340,5 @@ inline void warn_msg(const std::string& msg);
 // Macro for concise file stream error checks
 #define CHECK_STREAM_OR_EXIT(stream, msg)                                                                                   \
   if (!(stream).good()) error_exit(msg)
-
-template<typename S>
-inline void check_fstream_or_exit(const S& stream, const std::string& msg, const std::string& path = "");
 
 #endif

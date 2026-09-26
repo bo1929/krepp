@@ -158,12 +158,6 @@ QSeq::~QSeq()
   }
 }
 
-void QSeq::clear_curr_batch()
-{
-  seq_batch.clear();
-  identifer_batch.clear();
-}
-
 QSeq::QSeq(std::string input)
 {
   is_url = std::regex_match(input, url_regexp);

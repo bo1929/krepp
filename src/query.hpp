@@ -21,7 +21,6 @@ typedef std::unique_ptr<Minfo> minfo_uptr_t;
 typedef std::shared_ptr<IMers> imers_sptr_t;
 
 // A single placement of one query onto one edge of the tree.
-// Field order follows the jplace "fields" array krepp reports.
 struct placement_t
 {
   se_t edge_num = 0;
@@ -42,6 +41,8 @@ public:
   IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th);
   imers_sptr_t getptr() { return shared_from_this(); }
   void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
+  inline void
+  add_matching_mer_view(uint32_t pos, uint32_t rix, enc_t enc_lr, const FlatHT* flatht, CRecord* crecord, uint32_t numerator);
 
 private:
   uint32_t k;
@@ -55,6 +56,9 @@ private:
   index_sptr_t index = nullptr;
   uint32_t hdist_filt = std::numeric_limits<uint32_t>::max();
   parallel_flat_phmap<node_sptr_t, minfo_sptr_t> leaf_to_minfo = {};
+  vec<uint32_t> vnd_v;
+  vec<se_t> se_v;
+  uint32_t tix = 0;
 };
 
 class IBatch
@@ -74,18 +78,13 @@ public:
   void estimate_distances(strstream& batch_stream);
   void report_distances(strstream& batch_stream);
   void place_sequences(strstream& batch_stream, bool tabular);
-  // Computes the placements for the current query without formatting them.
-  // search_mers() and summarize_matches() must have run for that query first.
-  // Clears placements either way. Returns false when there were no matches, or
-  // when filtering is on and the closest match fails the tau filter; a true
-  // return can still leave placements empty in multi mode, where the candidate
-  // filters may reject every node.
   bool collect_placements(vec<placement_t>& placements);
   bool report_placement(strstream& batch_stream, bool tabular, bool has_previous);
   const parallel_flat_phmap<node_sptr_t, double>& get_summary() { return node_to_wcount; }
 
 private:
   placement_t make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi, const minfo_sptr_t& mi_parent);
+  static void widen_hdist_filter(uint32_t& hdist_filt);
   uint32_t k;
   uint32_t h;
   uint32_t m;
@@ -144,20 +143,6 @@ public:
     hdisthist_v.resize(hdist_th + 1, 0);
   }
   Minfo(uint32_t hdist_th) { hdisthist_v.resize(hdist_th + 1, 0); }
-  void join(minfo_sptr_t minfo)
-  {
-    double denom = nmers ? 0.5 : 1.0;
-    /* gamma = (gamma + minfo->gamma) * denom; */
-    match_count = (match_count + minfo->match_count) * denom;
-    mismatch_count = (mismatch_count + minfo->mismatch_count) * denom;
-    for (uint32_t x = 0; x < hdisthist_v.size(); ++x) {
-      hdisthist_v[x] = (hdisthist_v[x] + minfo->hdisthist_v[x]) * denom;
-    }
-    hdist_min = std::min(hdist_min, minfo->hdist_min);
-    nmers = std::max(nmers, minfo->nmers);
-    rho = std::max(rho, minfo->rho);
-    rmatch_count += minfo->rmatch_count;
-  }
   void add(const minfo_sptr_t& minfo, double denom)
   {
     // gamma = gamma + minfo->gamma * denom;
@@ -211,8 +196,8 @@ public:
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
 #define PP_JPLACE_FIELDS(pp)                                                                                                \
-  "[" << (pp).edge_num << ", " << (pp).pendant_length << ", " << (pp).distal_length << ", " << (pp).likelihood              \
-      << ", " << (pp).like_weight_ratio << ", " << (pp).distance << "]"
+  "[" << (pp).edge_num << ", " << (pp).pendant_length << ", " << (pp).distal_length << ", " << (pp).likelihood << ", "      \
+      << (pp).like_weight_ratio << ", " << (pp).distance << "]"
 
 #define PP_TABULAR_FIELDS(pp)                                                                                               \
   (pp).distal_node << "\t" << (pp).edge_num << "\t" << (pp).like_weight_ratio << "\t" << (pp).distance
