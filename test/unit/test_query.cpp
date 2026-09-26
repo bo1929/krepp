@@ -429,6 +429,87 @@ TEST_CASE("dist with hdist-th 0 still matches an exact copy")
   CHECK(best->reference == "refA");
 }
 
+TEST_CASE("compute_branch_lengths splits the edge by the distance ratio")
+{
+  // d_x = 0.3 and d_y = 0.2 on a b = 0.1 edge: distal = 0.1 * 0.3 / 0.5 = 0.06
+  // and pendant = max(0.3 - 0.06, 0.2 - 0.04) = 0.24. A split that admits a
+  // pendant must not ask for the leaf fallback.
+  bool fallback_used = false;
+  const branch_lengths_t split = compute_branch_lengths(0.1, 0.3, 0.2, [&]() {
+    fallback_used = true;
+    return 0.5;
+  });
+  CHECK(split.distal == doctest::Approx(0.06));
+  CHECK(split.pendant == doctest::Approx(0.24));
+  CHECK_FALSE(fallback_used);
+}
+
+TEST_CASE("compute_branch_lengths falls back to the closest leaf below x")
+{
+  // b = 1 is longer than d_x + d_y, so both excesses are negative and the
+  // split cannot host a pendant: use the supplied leaf distance.
+  bool fallback_used = false;
+  const branch_lengths_t split = compute_branch_lengths(1.0, 0.1, 0.1, [&]() {
+    fallback_used = true;
+    return 0.07;
+  });
+  CHECK(fallback_used);
+  CHECK(split.distal == doctest::Approx(0.5));
+  CHECK(split.pendant == doctest::Approx(0.07));
+
+  // No scored leaf below x: the pendant collapses to zero rather than negative.
+  const branch_lengths_t empty = compute_branch_lengths(1.0, 0.1, 0.1, []() {
+    return std::numeric_limits<double>::quiet_NaN();
+  });
+  CHECK(empty.distal == doctest::Approx(0.5));
+  CHECK(empty.pendant == doctest::Approx(0.0));
+}
+
+TEST_CASE("compute_branch_lengths uses 0.33 only for the ratio when the parent is missing")
+{
+  bool fallback_used = false;
+  const branch_lengths_t split = compute_branch_lengths(0.1, 0.03, std::numeric_limits<double>::quiet_NaN(), [&]() {
+    fallback_used = true;
+    return 0.0;
+  });
+  // The substitute still positions the split ...
+  const double expected_distal = 0.1 * 0.03 / (0.03 + kDefaultParentDistance);
+  CHECK(split.distal == doctest::Approx(expected_distal));
+  // ... but it must not feed the y-side excess and inflate the pendant.
+  const double expected_pendant = 0.03 - expected_distal;
+  CHECK(split.pendant == doctest::Approx(expected_pendant));
+  CHECK(split.pendant < kDefaultParentDistance - (0.1 - expected_distal));
+  CHECK_FALSE(fallback_used);
+}
+
+TEST_CASE("compute_branch_lengths takes the larger excess when both distances are real")
+{
+  // d_x = 0.1 and d_y = 0.5 on a b = 0.1 edge: distal = 0.1 * 0.1 / 0.6.
+  // The y-side excess (0.5 - 0.08333 = 0.41667) is larger than the x-side
+  // excess (0.1 - 0.01667 = 0.08333), so the pendant comes from d_y.
+  bool fallback_used = false;
+  const branch_lengths_t split = compute_branch_lengths(0.1, 0.1, 0.5, [&]() {
+    fallback_used = true;
+    return 0.0;
+  });
+  CHECK(split.distal == doctest::Approx(0.1 * 0.1 / 0.6));
+  CHECK(split.pendant == doctest::Approx(0.5 - (0.1 - 0.1 * 0.1 / 0.6)));
+  CHECK_FALSE(fallback_used);
+}
+
+TEST_CASE("compute_branch_lengths splits evenly when both distances vanish")
+{
+  bool fallback_used = false;
+  const branch_lengths_t split = compute_branch_lengths(0.4, 0.0, 0.0, [&]() {
+    fallback_used = true;
+    return 0.0;
+  });
+  CHECK(split.distal == doctest::Approx(0.2));
+  CHECK(split.pendant == doctest::Approx(0.0));
+  // Both excesses are negative, so the fallback is what produced the zero.
+  CHECK(fallback_used);
+}
+
 TEST_CASE("place reports valid edges and normalised weights")
 {
   TempDir dir("query-place");
@@ -468,6 +549,41 @@ TEST_CASE("place reports valid edges and normalised weights")
   for (const PlaceRow& row : single) single_rows[row.id] += 1;
   CHECK(single_rows["q1"] == 1);
   CHECK(single_rows["q2"] == 1);
+}
+
+TEST_CASE("reported placements keep a non-negative pendant and a distal on the edge")
+{
+  TempDir dir("query-branch-lengths");
+  const Corpus corpus = make_corpus();
+  BuildOptions opt = query_opts();
+  const std::filesystem::path nwk = dir / "guide.nwk";
+  spit(nwk, "((refA:0.05,refB:0.05)AB:0.1,(refC:0.2,refD:0.2)CD:0.1)root;");
+  opt.nwk_path = nwk;
+  build_index_from_refs(dir / "index", corpus.refs, opt);
+  auto index = load_index_dir(dir / "index");
+
+  const std::string read = substr_of(corpus.base, 1000, 600);
+  const std::filesystem::path fq = dir / "reads.fq";
+  write_fastq(fq, {{"q", read}});
+  auto qs = std::make_shared<QSeq>(fq.string());
+  qs->read_next_batch();
+  REQUIRE(qs->get_cbatch_size() == 1);
+  IBatch ib(index, qs, 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false, false);
+  auto imers_or = std::make_shared<IMers>(index, read.size(), 4);
+  auto imers_rc = std::make_shared<IMers>(index, read.size(), 4);
+  ib.search_mers(read.data(), read.size(), imers_or, imers_rc);
+  ib.summarize_matches(imers_or, imers_rc);
+
+  vec<placement_t> placements;
+  REQUIRE(ib.collect_placements(placements));
+  REQUIRE_FALSE(placements.empty());
+  for (const placement_t& pp : placements) {
+    const double b = std::isnan(pp.node->get_blen()) ? 0.0 : pp.node->get_blen();
+    INFO("edge " << pp.edge_num << " distal " << pp.distal_length << " pendant " << pp.pendant_length);
+    CHECK(pp.pendant_length >= 0.0);
+    CHECK(pp.distal_length >= 0.0);
+    CHECK(pp.distal_length <= b + 1e-9);
+  }
 }
 
 TEST_CASE("place emits a jplace-shaped fragment per query")

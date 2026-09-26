@@ -16,6 +16,16 @@ namespace {
     (void)ptr;
 #endif
   }
+
+  inline bool is_descendant_of(node_sptr_t nd, node_sptr_t anc)
+  {
+    for (node_sptr_t curr = nd; curr; curr = curr->get_parent()) {
+      if (curr == anc) {
+        return true;
+      }
+    }
+    return false;
+  }
 } // namespace
 
 IBatch::IBatch(index_sptr_t index,
@@ -263,20 +273,30 @@ placement_t IBatch::make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi
   placement_t pp;
   pp.node = nd;
   pp.edge_num = nd->get_en();
-  double t = std::isnan(nd->get_blen()) ? 0.0 : nd->get_blen();
-  double d_c = mi->jukes_cantor_dist();
-  double d_p = mi_parent ? mi_parent->jukes_cantor_dist() : std::numeric_limits<double>::quiet_NaN();
-  double x, y;
-  if (std::isfinite(d_p) && (d_p > 0.0)) {
-    double eps = std::numeric_limits<double>::epsilon() * t;
-    x = (t > 0.0) ? std::clamp(t * d_c / d_p, eps, t - eps) : 0.0;
-    y = std::max(0.0, std::min(d_c - x, d_p - t + x));
-  } else {
-    x = std::min(t / 2.0, d_c);
-    y = std::max(0.0, d_c - x);
+  const double b = std::isnan(nd->get_blen()) ? 0.0 : nd->get_blen();
+  const double d_x = mi->jukes_cantor_dist();
+  double d_y = std::numeric_limits<double>::quiet_NaN();
+  if (mi_parent) {
+    if (std::isnan(mi_parent->v_llh) && (mi_parent->match_count > 0.0)) {
+      mi_parent->optimize_likelihood(llhfunc);
+    }
+    d_y = mi_parent->jukes_cantor_dist();
   }
-  pp.distal_length = x;
-  pp.pendant_length = y;
+  const branch_lengths_t lengths = compute_branch_lengths(b, d_x, d_y, [this, &nd]() {
+    double d_prime = std::numeric_limits<double>::quiet_NaN();
+    for (const auto& [nd_leaf, mi_leaf] : node_to_minfo) {
+      if (!nd_leaf->check_leaf() || !is_descendant_of(nd_leaf, nd)) {
+        continue;
+      }
+      const double d = mi_leaf->jukes_cantor_dist();
+      if (std::isfinite(d) && (!std::isfinite(d_prime) || (d < d_prime))) {
+        d_prime = d;
+      }
+    }
+    return d_prime;
+  });
+  pp.distal_length = lengths.distal;
+  pp.pendant_length = lengths.pendant;
   pp.likelihood = -mi->v_llh;
   pp.like_weight_ratio = mi->lwr;
   pp.distance = mi->d_llh;

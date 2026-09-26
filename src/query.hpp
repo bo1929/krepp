@@ -101,6 +101,37 @@ typedef std::shared_ptr<Minfo> minfo_sptr_t;
 typedef std::unique_ptr<Minfo> minfo_uptr_t;
 typedef std::shared_ptr<IMers> imers_sptr_t;
 
+constexpr double d_impute = 0.33;
+
+struct branch_lengths_t
+{
+  double distal = 0;
+  double pendant = 0;
+};
+
+template<typename Fn>
+branch_lengths_t compute_branch_lengths(double b, double d_x, double d_y, Fn&& d_prime_fn)
+{
+  const bool has_d_y = std::isfinite(d_y);
+  if (!has_d_y) {
+    d_y = d_impute;
+  }
+  branch_lengths_t lengths;
+  const double denom = d_x + d_y;
+  lengths.distal = (denom > 0.0) ? std::clamp(d_x / denom, 0.0, 1.0) * b : 0.5 * b;
+  double pendant = d_x - lengths.distal;
+  if (has_d_y) {
+    pendant = std::max(pendant, d_y - (b - lengths.distal));
+  }
+  if (pendant >= 0.0) {
+    lengths.pendant = pendant;
+  } else {
+    const double d_prime = d_prime_fn();
+    lengths.pendant = std::isfinite(d_prime) ? d_prime : 0.0;
+  }
+  return lengths;
+}
+
 // A single placement of one query onto one edge of the tree.
 struct placement_t
 {
