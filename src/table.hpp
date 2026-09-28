@@ -127,6 +127,7 @@ public:
   void set_tree(tree_sptr_t source) { tree = source; }
   uint64_t get_nkmers() { return nkmers; }
   uint32_t get_nrows() { return nrows; }
+  bool is_mapped() const { return mer_map.is_open() || inc_map.is_open(); }
   tree_sptr_t get_tree() { return tree; }
   crecord_sptr_t get_crecord() { return crecord; }
   inc_t get_inc(uint32_t rix) const { return inc_at(rix); }

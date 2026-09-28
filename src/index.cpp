@@ -1,10 +1,55 @@
 #include "index.hpp"
 #include <atomic>
+#include <chrono>
+
+namespace {
+  double countsec(const std::chrono::steady_clock::time_point& start)
+  {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+  }
+
+  uint64_t digest_file(const std::filesystem::path& path)
+  {
+    std::ifstream stream(path, std::ifstream::binary);
+    if (!stream.is_open()) {
+      return 0;
+    }
+    uint64_t digest = 14695981039346656037ULL;
+    char buffer[1 << 16];
+    while (stream.read(buffer, sizeof(buffer)) || stream.gcount() > 0) {
+      const std::streamsize got = stream.gcount();
+      for (std::streamsize i = 0; i < got; ++i) {
+        digest ^= static_cast<uint8_t>(buffer[i]);
+        digest *= 1099511628211ULL;
+      }
+      if (!stream) {
+        break;
+      }
+    }
+    if (!stream.eof()) {
+      return 0;
+    }
+    return digest == 0 ? 1 : digest;
+  }
+} // namespace
 
 void Index::generate_partial_tree(std::string suffix)
 {
   wbackbone = false;
-  std::ifstream reflist_file(index_dir / ("reflist" + suffix));
+  const std::filesystem::path reflist_path = index_dir / ("reflist" + suffix);
+  const uint64_t digest = digest_file(reflist_path);
+  bool cached = false;
+#pragma omp critical
+  {
+    cached = tree && digest != 0 && digest == reflist_digest;
+    if (cached) {
+      n_tree_reused++;
+    }
+  }
+  if (cached) {
+    return;
+  }
+  std::ifstream reflist_file(reflist_path);
   std::string name;
   std::vector<std::string> names_v;
   if (reflist_file.is_open()) {
@@ -15,6 +60,7 @@ void Index::generate_partial_tree(std::string suffix)
   } else {
     error_exit("Unable to open reference list file for an index without a tree.");
   }
+  const auto started = std::chrono::steady_clock::now();
   tree_sptr_t curr_tree = std::make_shared<Tree>();
   curr_tree->generate_tree(names_v);
   bool compatible = false;
@@ -22,6 +68,8 @@ void Index::generate_partial_tree(std::string suffix)
   {
     compatible = curr_tree->check_compatible(tree);
     if (compatible) tree = !tree ? curr_tree : tree;
+    t_tree += countsec(started);
+    reflist_digest = digest;
   }
   if (!compatible) error_exit("Partial libraries are based on different references.");
 }
@@ -29,12 +77,25 @@ void Index::generate_partial_tree(std::string suffix)
 void Index::load_partial_tree(std::string suffix)
 {
   wbackbone = true;
+  const std::filesystem::path nwk_path = index_dir / ("tree" + suffix);
+  const uint64_t digest = digest_file(nwk_path);
+  bool cached = false;
+#pragma omp critical
+  {
+    cached = tree && digest != 0 && digest == tree_digest;
+    if (cached) {
+      n_tree_reused++;
+    }
+  }
+  if (cached) {
+    return;
+  }
   tree_sptr_t curr_tree = std::make_shared<Tree>();
-  std::filesystem::path nwk_path = index_dir / ("tree" + suffix);
   std::ifstream tree_stream(nwk_path);
   if (!tree_stream.is_open()) {
     error_exit(std::string("Failed to open ") + nwk_path.string());
   }
+  const auto started = std::chrono::steady_clock::now();
   curr_tree->load(tree_stream);
   CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the backbone tree of a partial index!");
   tree_stream.close();
@@ -43,12 +104,15 @@ void Index::load_partial_tree(std::string suffix)
   {
     compatible = curr_tree->check_compatible(tree);
     if (compatible) tree = !tree ? curr_tree : tree;
+    t_tree += countsec(started);
+    tree_digest = digest;
   }
   if (!compatible) error_exit("Partial libraries are based on different trees!");
 }
 
 void Index::load_partial_index(std::string suffix)
 { // TODO: Split for each file (e.g, metadata, crecord etc.)
+  const auto t_metadata_start = std::chrono::steady_clock::now();
   std::filesystem::path metadata_path = index_dir / ("metadata" + suffix);
   std::ifstream metadata_stream(metadata_path, std::ifstream::binary);
   if (!metadata_stream.is_open()) {
@@ -94,18 +158,23 @@ void Index::load_partial_index(std::string suffix)
     curr_flatht = std::make_shared<FlatHT>(tree, curr_crecord);
   }
 
+  const double d_metadata = countsec(t_metadata_start);
+  const auto t_cmer_start = std::chrono::steady_clock::now();
   const std::filesystem::path mer_path = index_dir / ("cmer" + suffix);
   const std::filesystem::path inc_path = index_dir / ("inc" + suffix);
   curr_flatht->load(mer_path, inc_path);
 
+  const double d_cmer = countsec(t_cmer_start);
+  const auto t_crecord_start = std::chrono::steady_clock::now();
   std::filesystem::path crecord_path = index_dir / ("crecord" + suffix);
   std::ifstream crecord_stream(crecord_path, std::ifstream::binary);
   if (!crecord_stream.is_open()) {
     error_exit(std::string("Failed to open ") + crecord_path.string());
   }
-  curr_crecord->load(crecord_stream);
+  curr_crecord->load(crecord_stream, crecord_path);
   CHECK_STREAM_OR_EXIT(crecord_stream, "Failed to read the color array of a partial index!");
   crecord_stream.close();
+  const double d_crecord = countsec(t_crecord_start);
 
   std::string info_str;
   std::filesystem::path info_path = index_dir / ("metadata" + suffix + ".txt");
@@ -130,21 +199,39 @@ void Index::load_partial_index(std::string suffix)
     info_str += "sdust-w: ?\n";
   }
 
+  std::string overlap;
 #pragma omp critical
   {
     if (frac) {
       for (uint32_t ix = 0; ix <= r; ++ix) {
-        r_to_flatht[ix] = curr_flatht;
-        r_to_numerator[ix] = r + 1;
-        r_to_info[ix] = info_str;
+        if (r_to_flatht.contains(ix)) {
+          overlap =
+            "Residue " + std::to_string(ix) + " of " + std::to_string(m) + " is provided by more than one partial index.";
+        } else {
+          r_to_flatht[ix] = curr_flatht;
+          r_to_numerator[ix] = r + 1;
+          r_to_info[ix] = info_str;
+        }
       }
     } else {
-      r_to_flatht[r] = curr_flatht;
-      r_to_numerator[r] = 1;
-      r_to_info[r] = info_str;
+      if (r_to_flatht.contains(r)) {
+        overlap =
+          "Residue " + std::to_string(r) + " of " + std::to_string(m) + " is provided by more than one partial index.";
+      } else {
+        r_to_flatht[r] = curr_flatht;
+        r_to_numerator[r] = 1;
+        r_to_info[r] = info_str;
+      }
     }
     // Residues provided by another partial index stay in the view.
     build_res_tables(m);
+    t_metadata += d_metadata;
+    t_cmer += d_cmer;
+    t_crecord += d_crecord;
+    n_partials++;
+  }
+  if (!overlap.empty()) {
+    error_exit(overlap);
   }
 }
 
@@ -203,6 +290,15 @@ void Index::display_info(std::ostream* output_stream)
     (*output_stream) << r_to_info[key];
     r_to_flatht[key]->display_info(output_stream, key);
   }
+}
+
+void Index::report_load_stats(std::ostream& output_stream)
+{
+  output_stream.precision(2);
+  output_stream << std::fixed;
+  output_stream << "[verbose] loaded " << n_partials << " partial librar" << (n_partials == 1 ? "y" : "ies") << ": metadata "
+                << t_metadata << " s, cmer/inc " << t_cmer << " s, crecord " << t_crecord << " s, tree " << t_tree << " s, "
+                << n_tree_reused << " tree(s) reused (summed over partials)" << std::endl;
 }
 
 void Index::make_rho_partial()

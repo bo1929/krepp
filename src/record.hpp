@@ -2,6 +2,7 @@
 #define _RECORD_H
 
 #include "common.hpp"
+#include "filemap.hpp"
 #include "phytree.hpp"
 
 class Subset : public std::enable_shared_from_this<Subset>
@@ -85,22 +86,29 @@ public:
   void apply_rho_coef(double coef);
   void decode_se(se_t se, vec<node_sptr_t>& subset_v);
   void load(std::ifstream& crecord_stream);
+  void load(std::ifstream& crecord_stream, const std::filesystem::path& path);
   void save(std::ofstream& crecord_stream);
   se_t get_nsubsets() { return nsubsets; }
+  se_t get_nnodes() { return nnodes; }
+  bool is_mapped() const { return map.is_open(); }
   crecord_sptr_t getptr() { return shared_from_this(); }
-  pse_t get_pse(se_t se) const { return se_to_pse[se]; }
+  pse_t get_pse(se_t se) const { return se_to_pse_v[se]; }
   double get_rho(se_t se) const { return se_to_rho[se]; }
   void display_info(std::ostream* output_stream, uint32_t r, vec<uint64_t>& se_to_count);
   // TODO: void merge(crecord_sptr_t rhs);
 
 private:
+  void bind() { se_to_pse_v = se_to_pse_owned.data(); }
+
   se_t nnodes = 0;
   se_t nsubsets = 0;
   uint32_t num_partials = 1;
   // Remove tree from this completely or make it a star tree.
   tree_sptr_t tree = nullptr;
-  std::vector<pse_t> se_to_pse = {};
-  std::vector<double> se_to_rho = {};
+  const pse_t* se_to_pse_v = nullptr;
+  vec<pse_t> se_to_pse_owned = {};
+  vec<double> se_to_rho = {};
+  krepp::FileMap map;
 };
 
 #endif

@@ -441,6 +441,44 @@ TEST_CASE("duplicate FASTX record names are rejected")
   CHECK(msg.find("Duplicate reference ID") != std::string::npos);
 }
 
+/* Every colour and every node weight of a loaded record, as a comparable blob. */
+std::string crecord_fingerprint(crecord_sptr_t crecord)
+{
+  std::string out;
+  for (se_t se = 0; se < crecord->get_nsubsets(); ++se) {
+    const pse_t pse = crecord->get_pse(se);
+    out += std::to_string(pse.first) + ":" + std::to_string(pse.second) + ";";
+  }
+  for (se_t se = 0; se < crecord->get_nnodes(); ++se) {
+    out += std::to_string(crecord->get_rho(se)) + ";";
+  }
+  return out;
+}
+
+/* A balanced guide tree file covering exactly these references. Tree::save only
+ * writes the text of a tree that was loaded from a file, so this builds the
+ * newick text directly. */
+std::filesystem::path write_guide_tree(const std::filesystem::path& path, const std::vector<Reference>& refs)
+{
+  std::vector<std::string> level;
+  level.reserve(refs.size());
+  for (const Reference& ref : refs) {
+    level.push_back(ref.name + ":0.1");
+  }
+  while (level.size() > 2) {
+    std::vector<std::string> next;
+    for (size_t i = 0; i + 1 < level.size(); i += 2) {
+      next.push_back("(" + level[i] + "," + level[i + 1] + ")");
+    }
+    if (level.size() % 2 == 1) {
+      next.push_back(level.back());
+    }
+    level = std::move(next);
+  }
+  spit(path, "(" + level[0] + "," + level[1] + ");\n");
+  return path;
+}
+
 TEST_CASE("mapping and reading an index give the same table")
 {
   TempDir dir("index-mapped");
@@ -455,12 +493,14 @@ TEST_CASE("mapping and reading an index give the same table")
   {
     UseMmap use(true);
     auto index = load_index_dir(dir / "index");
+    CHECK(index->get_flatht_sptr(opt.r)->is_mapped());
     mapped = index_fingerprint(index, opt.m, opt.r, opt.frac, nrows);
   }
   std::string read;
   {
     UseMmap use(false);
     auto index = load_index_dir(dir / "index");
+    CHECK_FALSE(index->get_flatht_sptr(opt.r)->is_mapped());
     read = index_fingerprint(index, opt.m, opt.r, opt.frac, nrows);
   }
   CHECK_FALSE(mapped.empty());
@@ -523,6 +563,137 @@ TEST_CASE("a truncated index file is rejected on load")
       CHECK(msg.find("Truncated") != std::string::npos);
     }
   }
+}
+
+TEST_CASE("mapping and reading the colour array give the same record")
+{
+  TempDir dir("crecord-mapped");
+  const std::vector<Reference> refs = make_refs();
+  const BuildOptions opt = small_opts();
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  std::string mapped;
+  {
+    UseMmap use(true);
+    auto index = load_index_dir(dir / "index");
+    CHECK(index->get_crecord(opt.r)->is_mapped());
+    for (uint32_t rix = 0; rix < opt.m; ++rix) {
+      if (index->check_partial(rix)) mapped += crecord_fingerprint(index->get_crecord(rix));
+    }
+  }
+  std::string read;
+  {
+    UseMmap use(false);
+    auto index = load_index_dir(dir / "index");
+    CHECK_FALSE(index->get_crecord(opt.r)->is_mapped());
+    for (uint32_t rix = 0; rix < opt.m; ++rix) {
+      if (index->check_partial(rix)) read += crecord_fingerprint(index->get_crecord(rix));
+    }
+  }
+  CHECK_FALSE(mapped.empty());
+  CHECK(mapped == read);
+}
+
+TEST_CASE("a truncated colour array is rejected on load")
+{
+  TempDir dir("crecord-truncated");
+  const std::vector<Reference> refs = make_refs();
+  const BuildOptions opt = small_opts();
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  const std::filesystem::path source = dir / "index" / ("crecord" + index_suffix(opt.m, opt.r, opt.frac));
+  const std::string full = slurp(source);
+  REQUIRE(full.size() > 64);
+  for (const bool mapped : {true, false}) {
+    TempDir forged("crecord-truncated-copy");
+    std::filesystem::copy(dir / "index", forged / "index", std::filesystem::copy_options::recursive);
+    const std::filesystem::path file = forged / "index" / source.filename();
+    spit(file, full.substr(0, full.size() - 32));
+    CAPTURE(mapped);
+    UseMmap use(mapped);
+    ThrowingErrorHandler handler;
+    const std::string msg = ThrowingErrorHandler::catches([&] { load_index_dir(forged / "index"); });
+    CHECK_FALSE(msg.empty());
+    if (mapped) {
+      CHECK(msg.find("Truncated colour array") != std::string::npos);
+    }
+  }
+}
+
+TEST_CASE("two partial indexes may not claim the same residue")
+{
+  TempDir dir("index-overlap");
+  const std::vector<Reference> refs = make_refs();
+  BuildOptions opt = small_opts();
+  opt.frac = false;
+  opt.r = 0;
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  // A second fileset under another suffix, still claiming residue 0.
+  const std::string from = index_suffix(opt.m, 0, false);
+  const std::string to = index_suffix(opt.m, 2, false);
+  for (const std::string& part : {"cmer", "inc", "crecord", "metadata", "reflist"}) {
+    std::filesystem::copy_file(dir / "index" / (part + from), dir / "index" / (part + to));
+  }
+  ThrowingErrorHandler handler;
+  const std::string msg = ThrowingErrorHandler::catches([&] { load_index_dir(dir / "index"); });
+  CHECK(msg.find("more than one partial") != std::string::npos);
+}
+
+TEST_CASE("partial indexes that share a backbone load together")
+{
+  TempDir dir("index-shared-tree");
+  const std::vector<Reference> refs = make_refs();
+  const std::filesystem::path guide = write_guide_tree(dir / "guide.nwk", refs);
+  BuildOptions first = small_opts();
+  first.frac = false;
+  first.r = 0;
+  first.nwk_path = guide;
+  BuildOptions second = first;
+  second.r = 3;
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, first);
+    build_index_from_refs(dir / "index", refs, second);
+  }
+  auto index = load_index_dir(dir / "index");
+  CHECK(index->check_wbackbone());
+  CHECK(index->check_partial(0));
+  CHECK(index->check_partial(3));
+  CHECK_FALSE(index->check_partial(1));
+  CHECK(index->get_flatht_sptr(0) != index->get_flatht_sptr(3));
+  // Both partials are attached to the one backbone the loader parsed, and the
+  // second one was recognised by its content instead of being parsed again.
+  CHECK(index->get_flatht_sptr(0)->get_tree() == index->get_flatht_sptr(3)->get_tree());
+  std::ostringstream out;
+  index->report_load_stats(out);
+  CHECK(out.str().find("1 tree(s) reused") != std::string::npos);
+}
+
+TEST_CASE("the load accounting names every phase")
+{
+  TempDir dir("index-load-stats");
+  const std::vector<Reference> refs = make_refs();
+  const BuildOptions opt = small_opts();
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  auto index = load_index_dir(dir / "index");
+  std::ostringstream out;
+  index->report_load_stats(out);
+  const std::string text = out.str();
+  CHECK(text.find("1 partial library") != std::string::npos);
+  CHECK(text.find("metadata") != std::string::npos);
+  CHECK(text.find("cmer/inc") != std::string::npos);
+  CHECK(text.find("crecord") != std::string::npos);
+  CHECK(text.find("tree") != std::string::npos);
 }
 
 TEST_SUITE_END();

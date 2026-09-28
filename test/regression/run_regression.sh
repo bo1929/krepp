@@ -174,6 +174,19 @@ if "${KREPP[@]}" inspect -i idx > inspect.txt 2>/dev/null; then note_ok; else no
 grep -v '^0\sMER_COUNT' inspect.txt | grep -v '^0\sOUTDEGREE' | grep -v '^0\sNUM_COLORS' > inspect.filtered
 check "inspect output" norm_text inspect.filtered "inspect.txt"
 
+# --verbose adds the per-phase load accounting on stderr; it must not touch the
+# report itself and must not require a query.
+if "${KREPP[@]}" --verbose inspect -i idx > verbose.txt 2> verbose.err && grep -q '^\[verbose\] loaded .* partial librar' verbose.err; then
+  if diff -q <(grep -v '^date:' inspect.txt) <(grep -v '^date:' verbose.txt) > /dev/null; then
+    note_ok
+  else
+    note_bad "--verbose changes the inspect report"
+  fi
+else
+  note_bad "--verbose load accounting"
+  cat verbose.err >&2
+fi
+
 # ------------------------------------------------------------------- dist
 
 run_dist() { # run_dist <golden-name> <label> [extra args...]

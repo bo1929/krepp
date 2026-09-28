@@ -152,13 +152,13 @@ CRecord::CRecord(record_sptr_t record)
   while ((nd_curr = tree->next_post_order())) {
     se_to_rho[nd_curr->get_se()] = record->sh_to_rho[nd_curr->get_sh()];
   }
-  se_to_pse.resize(nsubsets);
+  se_to_pse_owned.resize(nsubsets);
   tree->reset_traversal();
   while ((nd_curr = tree->next_post_order())) {
     se_t nd_se = record->sh_to_se[nd_curr->get_sh()];
     tuint_t nchildren = nd_curr->get_nchildren();
     if (nchildren == 0) {
-      se_to_pse[nd_se] = std::make_pair(0, 0);
+      se_to_pse_owned[nd_se] = std::make_pair(0, 0);
       continue;
     }
     if (nchildren == 1) {
@@ -168,14 +168,14 @@ CRecord::CRecord(record_sptr_t record)
     for (tuint_t ix = 1; ix < nchildren; ++ix) {
       se_t child_se = record->sh_to_se[(*std::next(nd_curr->get_children(), ix))->get_sh()];
       if (ix + 1 == nchildren) {
-        se_to_pse[nd_se] = std::make_pair(acc_se, child_se);
+        se_to_pse_owned[nd_se] = std::make_pair(acc_se, child_se);
       } else {
-        se_to_pse.push_back(std::make_pair(acc_se, child_se));
-        acc_se = static_cast<se_t>(se_to_pse.size() - 1);
+        se_to_pse_owned.push_back(std::make_pair(acc_se, child_se));
+        acc_se = static_cast<se_t>(se_to_pse_owned.size() - 1);
       }
     }
   }
-  nsubsets = static_cast<se_t>(se_to_pse.size());
+  nsubsets = static_cast<se_t>(se_to_pse_owned.size());
 
   for (auto& [sh, subset] : record->sh_to_subset) {
     if (record->sh_to_node.contains(sh)) {
@@ -189,9 +189,10 @@ CRecord::CRecord(record_sptr_t record)
     if ((subset->ch && !xse) || ((sh - subset->ch - subset->nonce) && !yse)) {
       error_exit("Failed to decompose a color into its recorded partitions.");
     }
-    se_to_pse[se] = std::make_pair(xse, yse);
+    se_to_pse_owned[se] = std::make_pair(xse, yse);
   }
-  se_to_pse[0] = std::make_pair(0, 0);
+  se_to_pse_owned[0] = std::make_pair(0, 0);
+  bind();
 }
 
 void CRecord::print_info()
@@ -203,7 +204,7 @@ void CRecord::print_info()
     std::cout << se << ": " << nd->get_name() << "(" << nd->get_card() << ")" << std::endl;
   }
   for (uint32_t se = 1; se < nsubsets; ++se) {
-    pse_t& pse = se_to_pse[se];
+    const pse_t& pse = se_to_pse_v[se];
     std::cout << se << ": " << pse.first << "+" << pse.second << std::endl;
   }
 }
@@ -215,7 +216,8 @@ CRecord::CRecord(tree_sptr_t tree)
   nnodes = tree->get_nnodes() + 1;
   nsubsets = nnodes;
   se_to_rho.resize(nnodes, 0);
-  se_to_pse.assign(nnodes, std::make_pair(se_t{0}, se_t{0}));
+  se_to_pse_owned.assign(nnodes, std::make_pair(se_t{0}, se_t{0}));
+  bind();
   tree->reset_traversal();
 }
 
@@ -223,17 +225,46 @@ void CRecord::load(std::ifstream& crecord_stream)
 {
   crecord_stream.read(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
   crecord_stream.read(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
-  se_to_pse.resize(nsubsets);
-  crecord_stream.read(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
+  se_to_pse_owned.resize(nsubsets);
+  crecord_stream.read(reinterpret_cast<char*>(se_to_pse_owned.data()), sizeof(pse_t) * nsubsets);
   se_to_rho.resize(nnodes);
   crecord_stream.read(reinterpret_cast<char*>(se_to_rho.data()), sizeof(double) * nnodes);
+  bind();
+}
+
+void CRecord::load(std::ifstream& crecord_stream, const std::filesystem::path& path)
+{
+  if (use_mmap) {
+    map = krepp::FileMap(path);
+    if (map.is_open()) {
+      // Validate first
+      if (map.size() < 2 * sizeof(se_t)) {
+        error_exit("Truncated colour array in " + path.string());
+      }
+      se_t nn = 0;
+      se_t nr = 0;
+      std::memcpy(&nn, map.data(), sizeof(nn));
+      std::memcpy(&nr, map.data() + sizeof(se_t), sizeof(nr));
+      const size_t pse_bytes = static_cast<size_t>(nr) * sizeof(pse_t);
+      if (map.size() < 2 * sizeof(se_t) + pse_bytes + static_cast<size_t>(nn) * sizeof(double)) {
+        error_exit("Truncated colour array in " + path.string());
+      }
+      nnodes = nn;
+      nsubsets = nr;
+      se_to_pse_v = reinterpret_cast<const pse_t*>(map.data() + 2 * sizeof(se_t));
+      se_to_rho.resize(nnodes);
+      std::memcpy(se_to_rho.data(), map.data() + 2 * sizeof(se_t) + pse_bytes, static_cast<size_t>(nnodes) * sizeof(double));
+      return;
+    }
+  }
+  load(crecord_stream);
 }
 
 void CRecord::save(std::ofstream& crecord_stream)
 {
   crecord_stream.write(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
   crecord_stream.write(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
-  crecord_stream.write(reinterpret_cast<char*>(se_to_pse.data()), sizeof(pse_t) * nsubsets);
+  crecord_stream.write(reinterpret_cast<const char*>(se_to_pse_v), sizeof(pse_t) * nsubsets);
   crecord_stream.write(reinterpret_cast<char*>(se_to_rho.data()), sizeof(double) * nnodes);
 }
 
@@ -278,10 +309,10 @@ void CRecord::decode_se(se_t se, vec<node_sptr_t>& subset_v)
         continue;
       }
     }
-    if (se >= se_to_pse.size()) {
+    if (se >= nsubsets) {
       error_exit("Invalid colour ID " + std::to_string(se) + " in the index record.");
     }
-    pse = se_to_pse[se];
+    pse = se_to_pse_v[se];
     qsubset.push(pse.first);
     qsubset.push(pse.second);
   }
@@ -290,14 +321,14 @@ void CRecord::decode_se(se_t se, vec<node_sptr_t>& subset_v)
 void CRecord::display_info(std::ostream* output_stream, uint32_t r, vec<uint64_t>& se_to_count)
 {
   (*output_stream) << r << "\tNUM_COLORS\t" << nsubsets - 1 << "\n";
-  vec<uint64_t> se_to_outdegree(se_to_pse.size());
-  for (int ix = 1; ix < se_to_pse.size(); ++ix) {
-    se_to_outdegree[se_to_pse[ix].first]++;
-    se_to_outdegree[se_to_pse[ix].second]++;
+  vec<uint64_t> se_to_outdegree(nsubsets);
+  for (uint32_t ix = 1; ix < nsubsets; ++ix) {
+    se_to_outdegree[se_to_pse_v[ix].first]++;
+    se_to_outdegree[se_to_pse_v[ix].second]++;
   }
   flat_phmap<uint64_t, uint32_t> outdegree_hist;
   flat_phmap<uint64_t, uint32_t> count_hist;
-  for (uint64_t ix = 1; ix < se_to_pse.size(); ++ix) {
+  for (uint32_t ix = 1; ix < nsubsets; ++ix) {
     count_hist[se_to_count[ix]]++;
     outdegree_hist[se_to_outdegree[ix]]++;
   }
@@ -311,7 +342,7 @@ void CRecord::display_info(std::ostream* output_stream, uint32_t r, vec<uint64_t
   // uint64_t se;
   // uint32_t depth;
   // std::pair<se_t, se_t> pse;
-  // for (uint64_t ix = 1; ix < se_to_pse.size(); ++ix) {
+  // for (uint64_t ix = 1; ix < se_to_pse_owned.size(); ++ix) {
   //   depth = 0;
   //   if (!tree->check_node(ix)) {
   //     se_q.push(ix);
@@ -322,7 +353,7 @@ void CRecord::display_info(std::ostream* output_stream, uint32_t r, vec<uint64_t
   //         se = se_q.front();
   //         se_q.pop();
   //         if (!tree->check_node(se)) {
-  //           pse = se_to_pse[se];
+  //          pse = se_to_pse_owned[se];
   //           se_q.push(pse.first);
   //           se_q.push(pse.second);
   //         }

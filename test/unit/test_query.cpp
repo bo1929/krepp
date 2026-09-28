@@ -473,12 +473,12 @@ TEST_CASE("compute_branch_lengths uses 0.33 only for the ratio when the parent i
     return 0.0;
   });
   // The substitute still positions the split ...
-  const double expected_distal = 0.1 * 0.03 / (0.03 + kDefaultParentDistance);
+  const double expected_distal = 0.1 * 0.03 / (0.03 + d_impute);
   CHECK(split.distal == doctest::Approx(expected_distal));
   // ... but it must not feed the y-side excess and inflate the pendant.
   const double expected_pendant = 0.03 - expected_distal;
   CHECK(split.pendant == doctest::Approx(expected_pendant));
-  CHECK(split.pendant < kDefaultParentDistance - (0.1 - expected_distal));
+  CHECK(split.pendant < d_impute - (0.1 - expected_distal));
   CHECK_FALSE(fallback_used);
 }
 

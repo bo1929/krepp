@@ -21,6 +21,8 @@ public:
   void load_partial_index(std::string suffix);
   void generate_partial_tree(std::string suffix);
   void display_info(std::ostream* output_stream);
+  /* Per-phase load accounting, printed by --verbose. */
+  void report_load_stats(std::ostream& output_stream);
   std::pair<vec_cmer_it, vec_cmer_it> bucket_indices(uint32_t rix);
   lshf_sptr_t get_lshf() { return lshf; }
   tree_sptr_t get_tree() { return tree; }
@@ -54,6 +56,14 @@ private:
   vec<FlatHT*> res_flatht;
   vec<CRecord*> res_crecord;
   vec<uint32_t> res_numerator;
+  uint64_t tree_digest = 0;
+  uint64_t reflist_digest = 0;
+  double t_tree = 0;
+  double t_metadata = 0;
+  double t_cmer = 0;
+  double t_crecord = 0;
+  uint32_t n_partials = 0;
+  uint32_t n_tree_reused = 0;
 };
 
 struct IndexConfig

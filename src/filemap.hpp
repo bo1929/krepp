@@ -2,8 +2,11 @@
 #define KREPP_FILEMAP_HPP
 
 #include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <string_view>
 #include <utility>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -12,10 +15,29 @@
 
 namespace krepp {
 
-  /* A read-only mapping of a whole file, used to view index arrays in place
- * instead of reading them into private buffers. The mapping keeps the data valid
- * until the FileMap dies; when the file cannot be opened or mapped the object
- * stays empty, which makes the loaders fall back to reading it. */
+  enum class MmapAdvice : uint8_t
+  {
+    none,
+    random,
+    willneed
+  };
+
+  inline MmapAdvice mmap_advice_from_env()
+  {
+    const char* value = std::getenv("KREPP_MMAP_ADVICE");
+    if (value == nullptr) {
+      return MmapAdvice::none;
+    }
+    const std::string_view name(value);
+    if (name == "random") {
+      return MmapAdvice::random;
+    }
+    if (name == "willneed") {
+      return MmapAdvice::willneed;
+    }
+    return MmapAdvice::none;
+  }
+
   class FileMap
   {
   public:
@@ -64,6 +86,25 @@ namespace krepp {
         return;
       }
       base_ = static_cast<const char*>(base);
+      advise(base_, size_);
+    }
+
+    void advise(const void* base, size_t size)
+    {
+      switch (mmap_advice_from_env()) {
+#if defined(MADV_RANDOM)
+        case MmapAdvice::random:
+          ::madvise(const_cast<void*>(base), size, MADV_RANDOM);
+          break;
+#endif
+#if defined(MADV_WILLNEED)
+        case MmapAdvice::willneed:
+          ::madvise(const_cast<void*>(base), size, MADV_WILLNEED);
+          break;
+#endif
+        default:
+          break;
+      }
     }
 
     void close()

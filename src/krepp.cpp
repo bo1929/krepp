@@ -81,6 +81,9 @@ void TargetIndex::load_index()
     }
   }
   index->make_rho_partial();
+  if (verbose) {
+    index->report_load_stats(std::cerr);
+  }
 }
 
 void SketchSingle::create_sketch()
@@ -506,7 +509,6 @@ int main(int argc, char** argv)
   app.set_help_flag("--help");
   app.fallthrough();
 
-  bool verbose = false;
   app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.add_flag(
     "--mmap,!--no-mmap", use_mmap, "View index/sketch arrays through a file mapping instead of reading them into memory.");
