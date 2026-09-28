@@ -82,7 +82,7 @@ void TargetIndex::load_index()
   }
   index->make_rho_partial();
   if (verbose) {
-    index->report_load_stats(std::cerr);
+    index->display_load_stats(std::cerr);
   }
 }
 

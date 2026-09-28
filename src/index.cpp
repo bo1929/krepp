@@ -1,6 +1,7 @@
 #include "index.hpp"
 #include <atomic>
 #include <chrono>
+#include <sstream>
 
 namespace {
   double countsec(const std::chrono::steady_clock::time_point& start)
@@ -43,7 +44,7 @@ void Index::generate_partial_tree(std::string suffix)
   {
     cached = tree && digest != 0 && digest == reflist_digest;
     if (cached) {
-      n_tree_reused++;
+      tree_reused_count++;
     }
   }
   if (cached) {
@@ -63,12 +64,14 @@ void Index::generate_partial_tree(std::string suffix)
   const auto started = std::chrono::steady_clock::now();
   tree_sptr_t curr_tree = std::make_shared<Tree>();
   curr_tree->generate_tree(names_v);
+  const double d_tree = countsec(started);
   bool compatible = false;
 #pragma omp critical
   {
+    const auto t_compare = std::chrono::steady_clock::now();
     compatible = curr_tree->check_compatible(tree);
     if (compatible) tree = !tree ? curr_tree : tree;
-    t_tree += countsec(started);
+    t_tree += d_tree + countsec(t_compare);
     reflist_digest = digest;
   }
   if (!compatible) error_exit("Partial libraries are based on different references.");
@@ -84,7 +87,7 @@ void Index::load_partial_tree(std::string suffix)
   {
     cached = tree && digest != 0 && digest == tree_digest;
     if (cached) {
-      n_tree_reused++;
+      tree_reused_count++;
     }
   }
   if (cached) {
@@ -99,12 +102,14 @@ void Index::load_partial_tree(std::string suffix)
   curr_tree->load(tree_stream);
   CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the backbone tree of a partial index!");
   tree_stream.close();
+  const double d_tree = countsec(started);
   bool compatible = false;
 #pragma omp critical
   {
+    const auto t_compare = std::chrono::steady_clock::now();
     compatible = curr_tree->check_compatible(tree);
     if (compatible) tree = !tree ? curr_tree : tree;
-    t_tree += countsec(started);
+    t_tree += d_tree + countsec(t_compare);
     tree_digest = digest;
   }
   if (!compatible) error_exit("Partial libraries are based on different trees!");
@@ -228,7 +233,7 @@ void Index::load_partial_index(std::string suffix)
     t_metadata += d_metadata;
     t_cmer += d_cmer;
     t_crecord += d_crecord;
-    n_partials++;
+    npartials++;
   }
   if (!overlap.empty()) {
     error_exit(overlap);
@@ -292,13 +297,16 @@ void Index::display_info(std::ostream* output_stream)
   }
 }
 
-void Index::report_load_stats(std::ostream& output_stream)
+void Index::display_load_stats(std::ostream& output_stream)
 {
-  output_stream.precision(2);
-  output_stream << std::fixed;
-  output_stream << "[verbose] loaded " << n_partials << " partial librar" << (n_partials == 1 ? "y" : "ies") << ": metadata "
-                << t_metadata << " s, cmer/inc " << t_cmer << " s, crecord " << t_crecord << " s, tree " << t_tree << " s, "
-                << n_tree_reused << " tree(s) reused (summed over partials)" << std::endl;
+  // Formatted locally so the caller's stream state is left as it was.
+  std::ostringstream line;
+  line.precision(2);
+  line << std::fixed;
+  line << "[verbose] loaded " << npartials << " partial librar" << (npartials == 1 ? "y" : "ies") << ": metadata "
+       << t_metadata << " s, cmer/inc " << t_cmer << " s, crecord " << t_crecord << " s, tree " << t_tree << " s, "
+       << tree_reused_count << " tree(s) reused (summed over partials)";
+  output_stream << line.str() << std::endl;
 }
 
 void Index::make_rho_partial()

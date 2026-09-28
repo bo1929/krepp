@@ -92,21 +92,21 @@ public:
   se_t get_nnodes() { return nnodes; }
   bool is_mapped() const { return map.is_open(); }
   crecord_sptr_t getptr() { return shared_from_this(); }
-  pse_t get_pse(se_t se) const { return se_to_pse_v[se]; }
+  pse_t get_pse(se_t se) const { return se_to_pse_vv[se]; }
   double get_rho(se_t se) const { return se_to_rho[se]; }
   void display_info(std::ostream* output_stream, uint32_t r, vec<uint64_t>& se_to_count);
   // TODO: void merge(crecord_sptr_t rhs);
 
 private:
-  void bind() { se_to_pse_v = se_to_pse_owned.data(); }
+  void bind() { se_to_pse_vv = se_to_pse_ov.data(); }
 
   se_t nnodes = 0;
   se_t nsubsets = 0;
   uint32_t num_partials = 1;
   // Remove tree from this completely or make it a star tree.
   tree_sptr_t tree = nullptr;
-  const pse_t* se_to_pse_v = nullptr;
-  vec<pse_t> se_to_pse_owned = {};
+  const pse_t* se_to_pse_vv = nullptr;
+  vec<pse_t> se_to_pse_ov = {};
   vec<double> se_to_rho = {};
   krepp::FileMap map;
 };

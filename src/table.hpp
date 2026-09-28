@@ -79,17 +79,17 @@ public:
   const enc_t* bucket_start(uint32_t rix) const
   {
     if (rix) {
-      return enc_v + inc_at(rix - 1);
+      return enc_vv + inc_at(rix - 1);
     } else {
-      return enc_v;
+      return enc_vv;
     }
   }
   const enc_t* bucket_next(uint32_t rix) const
   {
     if (rix < nrows) {
-      return enc_v + inc_at(rix);
+      return enc_vv + inc_at(rix);
     } else {
-      return enc_v + nkmers;
+      return enc_vv + nkmers;
     }
   }
 
@@ -97,16 +97,16 @@ private:
   inc_t inc_at(uint32_t rix) const
   {
     inc_t value = 0;
-    std::memcpy(&value, inc_bytes + static_cast<size_t>(rix) * sizeof(inc_t), sizeof(inc_t));
+    std::memcpy(&value, inc_vv + static_cast<size_t>(rix) * sizeof(inc_t), sizeof(inc_t));
     return value;
   }
 
   uint32_t nrows = 0;
   uint64_t nkmers = 0;
-  const enc_t* enc_v = nullptr;
-  const char* inc_bytes = nullptr;
-  vec<inc_t> inc_owned;
-  vec<enc_t> enc_owned;
+  const enc_t* enc_vv = nullptr;
+  const char* inc_vv = nullptr;
+  vec<inc_t> inc_ov;
+  vec<enc_t> enc_ov;
   krepp::FileMap map;
 };
 
@@ -133,9 +133,9 @@ public:
   inc_t get_inc(uint32_t rix) const { return inc_at(rix); }
   const cmer_t* bucket_data(uint32_t rix) const
   {
-    if (rix == 0) return cmer_v;
-    if (rix <= nrows) return cmer_v + inc_at(rix - 1);
-    return cmer_v + nkmers;
+    if (rix == 0) return cmer_vv;
+    if (rix <= nrows) return cmer_vv + inc_at(rix - 1);
+    return cmer_vv + nkmers;
   }
   const cmer_t* bucket_start(uint32_t rix) const { return bucket_data(rix); }
   const cmer_t* bucket_next(uint32_t rix) const { return bucket_data(rix + 1); }
@@ -145,17 +145,17 @@ private:
   inc_t inc_at(uint32_t rix) const
   {
     inc_t value = 0;
-    std::memcpy(&value, inc_bytes + static_cast<size_t>(rix) * sizeof(inc_t), sizeof(inc_t));
+    std::memcpy(&value, inc_vv + static_cast<size_t>(rix) * sizeof(inc_t), sizeof(inc_t));
     return value;
   }
   void bind();
 
   uint32_t nrows = 0;
   uint64_t nkmers = 0;
-  const cmer_t* cmer_v = nullptr;
-  const char* inc_bytes = nullptr;
-  vec<cmer_t> cmer_owned;
-  vec<inc_t> inc_owned;
+  const cmer_t* cmer_vv = nullptr;
+  const char* inc_vv = nullptr;
+  vec<cmer_t> cmer_ov;
+  vec<inc_t> inc_ov;
   krepp::FileMap mer_map;
   krepp::FileMap inc_map;
   tree_sptr_t tree = nullptr;

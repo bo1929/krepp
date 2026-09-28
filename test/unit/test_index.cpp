@@ -672,7 +672,7 @@ TEST_CASE("partial indexes that share a backbone load together")
   // second one was recognised by its content instead of being parsed again.
   CHECK(index->get_flatht_sptr(0)->get_tree() == index->get_flatht_sptr(3)->get_tree());
   std::ostringstream out;
-  index->report_load_stats(out);
+  index->display_load_stats(out);
   CHECK(out.str().find("1 tree(s) reused") != std::string::npos);
 }
 
@@ -687,7 +687,7 @@ TEST_CASE("the load accounting names every phase")
   }
   auto index = load_index_dir(dir / "index");
   std::ostringstream out;
-  index->report_load_stats(out);
+  index->display_load_stats(out);
   const std::string text = out.str();
   CHECK(text.find("1 partial library") != std::string::npos);
   CHECK(text.find("metadata") != std::string::npos);

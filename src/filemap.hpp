@@ -57,13 +57,13 @@ namespace krepp {
 
     void swap(FileMap& other) noexcept
     {
-      std::swap(base_, other.base_);
-      std::swap(size_, other.size_);
+      std::swap(map_data, other.map_data);
+      std::swap(map_size, other.map_size);
     }
 
-    bool is_open() const { return base_ != nullptr; }
-    const char* data() const { return base_; }
-    size_t size() const { return size_; }
+    bool is_open() const { return map_data != nullptr; }
+    const char* data() const { return map_data; }
+    size_t size() const { return map_size; }
 
   private:
     void open(const std::filesystem::path& path)
@@ -77,16 +77,16 @@ namespace krepp {
         ::close(fd);
         return;
       }
-      size_ = static_cast<size_t>(st.st_size);
-      void* base = ::mmap(nullptr, size_, PROT_READ, MAP_PRIVATE, fd, 0);
+      map_size = static_cast<size_t>(st.st_size);
+      void* base = ::mmap(nullptr, map_size, PROT_READ, MAP_PRIVATE, fd, 0);
       // The mapping outlives the descriptor, so it can be closed right away.
       ::close(fd);
       if (base == MAP_FAILED) {
-        size_ = 0;
+        map_size = 0;
         return;
       }
-      base_ = static_cast<const char*>(base);
-      advise(base_, size_);
+      map_data = static_cast<const char*>(base);
+      advise(map_data, map_size);
     }
 
     void advise(const void* base, size_t size)
@@ -109,15 +109,15 @@ namespace krepp {
 
     void close()
     {
-      if (base_ != nullptr) {
-        ::munmap(const_cast<char*>(base_), size_);
-        base_ = nullptr;
+      if (map_data != nullptr) {
+        ::munmap(const_cast<char*>(map_data), map_size);
+        map_data = nullptr;
       }
-      size_ = 0;
+      map_size = 0;
     }
 
-    const char* base_ = nullptr;
-    size_t size_ = 0;
+    const char* map_data = nullptr;
+    size_t map_size = 0;
   };
 
 } // namespace krepp

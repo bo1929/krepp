@@ -15,36 +15,36 @@ SFlatHT::SFlatHT(sdynht_sptr_t source)
 {
   nkmers = source->nkmers;
   nrows = source->enc_vvec.size();
-  inc_owned.resize(nrows);
-  enc_owned.reserve(nkmers);
+  inc_ov.resize(nrows);
+  enc_ov.reserve(nkmers);
   inc_t limit_inc = std::numeric_limits<inc_t>::max();
   inc_t copy_inc;
   inc_t lix = 0;
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, static_cast<inc_t>(source->enc_vvec[rix].size()));
     for (inc_t i = 0; i < copy_inc; ++i) {
-      enc_owned.push_back(source->enc_vvec[rix][i]);
+      enc_ov.push_back(source->enc_vvec[rix][i]);
     }
     lix += copy_inc;
-    inc_owned[rix] = lix;
+    inc_ov[rix] = lix;
     source->enc_vvec[rix].clear();
   }
-  enc_v = enc_owned.data();
-  inc_bytes = reinterpret_cast<const char*>(inc_owned.data());
+  enc_vv = enc_ov.data();
+  inc_vv = reinterpret_cast<const char*>(inc_ov.data());
 }
 
 size_t SFlatHT::load(std::ifstream& sketch_stream)
 {
   read_exact(sketch_stream, &nkmers, sizeof(uint64_t), "sketch file");
-  enc_owned.resize(nkmers);
-  read_exact(sketch_stream, enc_owned.data(), nkmers * sizeof(enc_t), "sketch file");
-  assert(nkmers == enc_owned.size());
+  enc_ov.resize(nkmers);
+  read_exact(sketch_stream, enc_ov.data(), nkmers * sizeof(enc_t), "sketch file");
+  assert(nkmers == enc_ov.size());
   read_exact(sketch_stream, &nrows, sizeof(uint32_t), "sketch file");
-  inc_owned.resize(nrows);
-  read_exact(sketch_stream, inc_owned.data(), nrows * sizeof(inc_t), "sketch file");
-  assert(nrows == inc_owned.size());
-  enc_v = enc_owned.data();
-  inc_bytes = reinterpret_cast<const char*>(inc_owned.data());
+  inc_ov.resize(nrows);
+  read_exact(sketch_stream, inc_ov.data(), nrows * sizeof(inc_t), "sketch file");
+  assert(nrows == inc_ov.size());
+  enc_vv = enc_ov.data();
+  inc_vv = reinterpret_cast<const char*>(inc_ov.data());
   return static_cast<size_t>(sketch_stream.tellg());
 }
 
@@ -61,7 +61,7 @@ size_t SFlatHT::load(std::ifstream& sketch_stream, const std::filesystem::path& 
       if (map.size() < offset + enc_bytes + sizeof(uint32_t)) {
         error_exit("Truncated sketch file: " + path.string());
       }
-      enc_v = reinterpret_cast<const enc_t*>(map.data() + offset);
+      enc_vv = reinterpret_cast<const enc_t*>(map.data() + offset);
       offset += enc_bytes;
       uint32_t nr = 0;
       std::memcpy(&nr, map.data() + offset, sizeof(nr));
@@ -71,7 +71,7 @@ size_t SFlatHT::load(std::ifstream& sketch_stream, const std::filesystem::path& 
       }
       nkmers = nk;
       nrows = nr;
-      inc_bytes = map.data() + offset;
+      inc_vv = map.data() + offset;
       offset += static_cast<size_t>(nr) * sizeof(inc_t);
       return offset;
     }
@@ -82,17 +82,17 @@ size_t SFlatHT::load(std::ifstream& sketch_stream, const std::filesystem::path& 
 void SFlatHT::save(std::ofstream& sketch_stream)
 {
   sketch_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
-  sketch_stream.write(reinterpret_cast<const char*>(enc_v), sizeof(enc_t) * nkmers);
+  sketch_stream.write(reinterpret_cast<const char*>(enc_vv), sizeof(enc_t) * nkmers);
   sketch_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
-  sketch_stream.write(inc_bytes, sizeof(inc_t) * nrows);
+  sketch_stream.write(inc_vv, sizeof(inc_t) * nrows);
 }
 
 FlatHT::FlatHT(dynht_sptr_t source)
 {
   nkmers = source->nkmers;
   nrows = source->nrows;
-  inc_owned.resize(nrows);
-  cmer_owned.reserve(nkmers);
+  inc_ov.resize(nrows);
+  cmer_ov.reserve(nkmers);
   tree = source->tree;
   crecord = std::make_shared<CRecord>(source->get_record());
   inc_t limit_inc = std::numeric_limits<inc_t>::max();
@@ -101,10 +101,10 @@ FlatHT::FlatHT(dynht_sptr_t source)
   for (uint32_t rix = 0; rix < nrows; ++rix) {
     copy_inc = std::min(limit_inc, static_cast<inc_t>(source->mer_vvec[rix].size()));
     for (inc_t i = 0; i < copy_inc; ++i) {
-      cmer_owned.emplace_back(source->conv_mer_cmer(source->mer_vvec[rix][i]));
+      cmer_ov.emplace_back(source->conv_mer_cmer(source->mer_vvec[rix][i]));
     }
     lix += copy_inc;
-    inc_owned[rix] = lix;
+    inc_ov[rix] = lix;
     source->mer_vvec[rix].clear();
   }
   bind();
@@ -112,20 +112,20 @@ FlatHT::FlatHT(dynht_sptr_t source)
 
 void FlatHT::bind()
 {
-  cmer_v = cmer_owned.data();
-  inc_bytes = reinterpret_cast<const char*>(inc_owned.data());
+  cmer_vv = cmer_ov.data();
+  inc_vv = reinterpret_cast<const char*>(inc_ov.data());
 }
 
 void FlatHT::load(std::ifstream& mer_stream, std::ifstream& inc_stream)
 {
   read_exact(mer_stream, &nkmers, sizeof(uint64_t), "k-mer array");
-  cmer_owned.resize(nkmers);
-  read_exact(mer_stream, cmer_owned.data(), nkmers * sizeof(cmer_t), "k-mer array");
-  assert(nkmers == cmer_owned.size());
+  cmer_ov.resize(nkmers);
+  read_exact(mer_stream, cmer_ov.data(), nkmers * sizeof(cmer_t), "k-mer array");
+  assert(nkmers == cmer_ov.size());
   read_exact(inc_stream, &nrows, sizeof(uint32_t), "offset array");
-  inc_owned.resize(nrows);
-  read_exact(inc_stream, inc_owned.data(), nrows * sizeof(inc_t), "offset array");
-  assert(nrows == inc_owned.size());
+  inc_ov.resize(nrows);
+  read_exact(inc_stream, inc_ov.data(), nrows * sizeof(inc_t), "offset array");
+  assert(nrows == inc_ov.size());
   bind();
 }
 
@@ -165,16 +165,16 @@ void FlatHT::load(const std::filesystem::path& mer_path, const std::filesystem::
   }
   nkmers = nk;
   nrows = nr;
-  cmer_v = reinterpret_cast<const cmer_t*>(mer_map.data() + sizeof(nk));
-  inc_bytes = inc_map.data() + sizeof(nr);
+  cmer_vv = reinterpret_cast<const cmer_t*>(mer_map.data() + sizeof(nk));
+  inc_vv = inc_map.data() + sizeof(nr);
 }
 
 void FlatHT::save(std::ofstream& mer_stream, std::ofstream& inc_stream)
 {
   mer_stream.write(reinterpret_cast<const char*>(&nkmers), sizeof(uint64_t));
-  mer_stream.write(reinterpret_cast<const char*>(cmer_v), sizeof(cmer_t) * nkmers);
+  mer_stream.write(reinterpret_cast<const char*>(cmer_vv), sizeof(cmer_t) * nkmers);
   inc_stream.write(reinterpret_cast<const char*>(&nrows), sizeof(uint32_t));
-  inc_stream.write(inc_bytes, sizeof(inc_t) * nrows);
+  inc_stream.write(inc_vv, sizeof(inc_t) * nrows);
 }
 
 void DynHT::print_info()
@@ -349,7 +349,7 @@ void FlatHT::display_info(std::ostream* output_stream, uint32_t r)
   vec<uint64_t> se_to_count;
   se_to_count.resize(crecord->get_nsubsets());
   for (uint64_t ix = 0; ix < nkmers; ++ix) {
-    se_to_count[cmer_v[ix].second]++;
+    se_to_count[cmer_vv[ix].second]++;
   }
   crecord->display_info(output_stream, r, se_to_count);
 }
