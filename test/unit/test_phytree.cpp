@@ -405,4 +405,31 @@ TEST_CASE("node helpers agree with the tree shape")
   CHECK(root->sum_children_sh() != 0);
 }
 
+TEST_CASE("an excessively deep Newick tree is rejected instead of exhausting the stack")
+{
+  // Pure nesting: the recursion descends to the bottom before any node can
+  // return, so the depth guard fires before the unifurcation check.
+  const uint32_t depth = kMaxTreeDepth + 2;
+  std::string nwk(depth, '(');
+  nwk += "B";
+  nwk.append(depth, ')');
+  nwk += ";";
+  ThrowingErrorHandler handler;
+  const std::string msg = ThrowingErrorHandler::catches([&] { load_tree(nwk); });
+  CHECK(msg.find("deeper than") != std::string::npos);
+}
+
+TEST_CASE("an excessively deep lineage is rejected")
+{
+  std::string lineage;
+  for (uint32_t i = 0; i <= kMaxTreeDepth; ++i) {
+    lineage += "r__T" + std::to_string(i) + ";";
+  }
+  std::istringstream ss("REF1\t" + lineage + "\n");
+  auto tree = std::make_shared<Tree>(); // parse_lineages uses shared_from_this()
+  ThrowingErrorHandler handler;
+  const std::string msg = ThrowingErrorHandler::catches([&] { tree->parse_lineages(ss); });
+  CHECK(msg.find("deeper than") != std::string::npos);
+}
+
 TEST_SUITE_END();

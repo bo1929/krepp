@@ -125,8 +125,8 @@ LSHF::LSHF(uint32_t m, vec<uint8_t> ppos_v, vec<uint8_t> npos_v, uint32_t r, boo
   : m(m)
   , r(r)
   , frac(frac)
-  , ppos_v(ppos_v)
   , npos_v(npos_v)
+  , ppos_v(ppos_v)
 {
   k = npos_v.size() + ppos_v.size();
   h = ppos_v.size();

@@ -357,6 +357,14 @@ else
   note_ok
 fi
 
+# An absurd Hamming threshold used to allocate gigabytes (and crash) instead
+# of being rejected at argument parsing; the accepted range is 0..31.
+if "${KREPP[@]}" dist -i idx -q query_reads.fq --hdist-th 4000000000 > bad4.log 2>&1; then
+  note_bad "an absurd --hdist-th is rejected"
+else
+  note_ok
+fi
+
 # An index directory holding no index files used to reach the query loop with a
 # null LSH and crash.
 mkdir -p empty_index

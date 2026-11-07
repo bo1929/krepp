@@ -3,13 +3,25 @@
 COMPILER ?= g++
 mode ?= dynamic  # Default to dynamic linking
 
+# Opt-in optimization knobs:
+#   make NATIVE=1             add -march=native -funroll-loops (fastest on
+#                             THIS machine; the binary is not portable)
+#   make OPTFLAGS="-flto"     any extra compiler/linker flags
+#   make BMI2=0|1|auto        x86 only; see the BMI2 section below
+NATIVE ?= 0
+OPTFLAGS ?=
+
 # TODO: -g -ggdb3 -fsanitize=address -fno-omit-frame-pointer
 CXXFLAGS = -std=c++17 -O3
-WFLAGS += -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas -Wno-undefined-inline # -Wall
+ifneq ($(NATIVE),0)
+CXXFLAGS += -march=native -funroll-loops
+endif
+CXXFLAGS += $(OPTFLAGS)
+LDFLAGS += $(OPTFLAGS)
+WFLAGS += -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-unused-command-line-argument -Wno-unknown-pragmas -Wno-undefined-inline
 
 INC = -Iexternal/CLI11/include/CLI \
-			-Iexternal/parallel-hashmap \
-			-Iexternal/boost/libs/math/include
+			-Iexternal/parallel-hashmap
 
 # project files
 #--------------------------------------------
@@ -32,7 +44,7 @@ DEPS = $(OBJECTS:.o=.d) build/omp_index_test.d $(UNIT_OBJECTS:.o=.d)
 
 # rules
 #--------------------------------------------
-.PHONY: all dynamic static clean test test-unit test-regression test-threads coverage
+.PHONY: all dynamic static clean install test test-unit test-regression test-threads coverage
 
 all:
 	$(MAKE) mode=dynamic $(PROGRAM)
@@ -77,7 +89,7 @@ $(info ===== Build mode: $(mode) =====)
 ifeq ($(mode),dynamic)
 	LDLIBS = -lm -lz -lstdc++
 else ifeq ($(mode),static)
-	LDLIBS = --static -static-libgcc -static-libstdc++ -lm -lz
+	LDLIBS = -static -static-libgcc -static-libstdc++ -lm -lz
 	CURL_SUPPORTED = no
 else
 	LDLIBS = -lm -lz -lstdc++
@@ -128,30 +140,46 @@ ifeq ($(COVERAGE),yes)
 endif
 
 ARCH := $(shell uname -m)
-# Check for -mbmi2
-BMI2_SUPPORTED := $(shell echo 'int main() { return 0; }' | $(COMPILER) -mbmi2 -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
+# BMI2 (x86 only). PEXT speeds up the LSH hash extraction, but a binary built
+# with -mbmi2 SIGILLs on pre-Haswell/pre-Zen CPUs. The old probe only checked
+# that the COMPILER accepts the flag; `auto` also runs a probe on the build
+# host's CPU. Override when building for another machine:
+#   make BMI2=1   force -mbmi2 (krepp refuses to run, with a message, on a
+#                 CPU without it)
+#   make BMI2=0   portable build (the compress_mv software path)
+BMI2 ?= auto
 ifeq ($(filter $(ARCH),x86_64 i386),$(ARCH))
-	ifneq ($(BMI2_SUPPORTED),no)
-		CXXFLAGS += -mbmi2
-	endif
+  BMI2_COMPILER := $(shell echo 'int main() { return 0; }' | $(COMPILER) -mbmi2 -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
+  ifeq ($(BMI2),auto)
+    BMI2_CPU := $(shell P=$$(mktemp); printf 'int main(){ __builtin_cpu_init(); return __builtin_cpu_supports("bmi2") ? 0 : 1; }' > $$P.c; ($(COMPILER) $$P.c -o $$P 2>/dev/null && $$P && echo yes) || echo no; rm -f $$P $$P.c)
+    BMI2_ENABLED := $(if $(filter yes,$(BMI2_COMPILER))$(filter yes,$(BMI2_CPU)),yes,no)
+  else ifeq ($(BMI2),1)
+    BMI2_ENABLED := $(BMI2_COMPILER)
+  else
+    BMI2_ENABLED := no
+  endif
+  ifeq ($(BMI2_ENABLED),yes)
+    CXXFLAGS += -mbmi2
+  endif
+  $(info ===== BMI2: $(BMI2_ENABLED) ($(BMI2)) =====)
 endif
 
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp
 	@mkdir -p build
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o $(LDLIBS) 
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o
 
 $(PROGRAM): $(OBJECTS)
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(VARDEF) $(LDFLAGS) $(INC) -o $@ $(LDLIBS) 
 
 build/omp_index_test.o: test/omp_index_test.cpp
 	@mkdir -p build
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c $< -o $@ $(LDLIBS) 
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c $< -o $@
 
 # doctest suite: links the whole library (everything but the CLI's main()).
 build/test/unit/%.o: test/unit/%.cpp
 	@mkdir -p build/test/unit
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -Iexternal/doctest -Isrc -c $< -o $@ $(LDLIBS) 
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -Iexternal/doctest -Isrc -c $< -o $@
 
 -include $(DEPS)
 
@@ -165,3 +193,9 @@ clean:
 	rm -f $(PROGRAM) $(OBJECTS) $(TEST_PROGRAM) build/omp_index_test.o $(UNIT_PROGRAM) $(UNIT_OBJECTS) $(DEPS)
 	@find build -type d -empty -delete 2>/dev/null || true
 	@echo "Succesfully cleaned."
+
+# make install [PREFIX=/usr/local] [DESTDIR=/staging/root]
+PREFIX ?= /usr/local
+install: $(PROGRAM)
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 0755 $(PROGRAM) $(DESTDIR)$(PREFIX)/bin/$(PROGRAM)

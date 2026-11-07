@@ -1,7 +1,7 @@
 /* Unit tests for src/hyperloglog.hpp, src/hdhistllh.hpp and Minfo. */
 
 #include "test_helpers.hpp"
-#include <boost/math/tools/minima.hpp>
+#include "minima.hpp"
 
 using namespace ktest;
 

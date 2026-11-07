@@ -10,7 +10,6 @@ namespace optimize {
   private:
     uint32_t hdist_th;
     uint32_t k;
-    uint32_t h;
     double rho = 1;
     double uc;
     double* mc_ptr = nullptr;
@@ -21,9 +20,8 @@ namespace optimize {
     HDistHistLLH() {}
 
     HDistHistLLH(uint32_t h, uint32_t k, uint32_t hdist_th)
-      : h(h)
+      : hdist_th(hdist_th)
       , k(k)
-      , hdist_th(hdist_th)
     {
       uint64_t vc = 1;
       uint32_t nh = k - h;
@@ -31,7 +29,7 @@ namespace optimize {
       binom_coef_hnk.resize(hdist_th + 1);
       binom_coef_k[0] = 1;
       binom_coef_hnk[0] = 0;
-      for (int32_t i = 0; i < k; ++i) {
+      for (uint32_t i = 0; i < k; ++i) {
         binom_coef_k[i + 1] = (binom_coef_k[i] * (k - i)) / (i + 1);
       }
       for (uint32_t i = 1; i <= hdist_th; ++i) {

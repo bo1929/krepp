@@ -551,6 +551,78 @@ TEST_CASE("place reports valid edges and normalised weights")
   CHECK(single_rows["q2"] == 1);
 }
 
+TEST_CASE("reverse-complemented queries produce identical placements")
+{
+  TempDir dir("query-place-rc");
+  const Corpus corpus = make_corpus();
+  BuildOptions opt = query_opts();
+  const std::filesystem::path nwk = dir / "guide.nwk";
+  spit(nwk, "((refA:0.05,refB:0.05)AB:0.1,(refC:0.2,refD:0.2)CD:0.1)root;");
+  opt.nwk_path = nwk;
+  build_index_from_refs(dir / "index", corpus.refs, opt);
+  auto index = load_index_dir(dir / "index");
+
+  const auto placements_for = [&](const std::string& read, bool no_filter, bool multi) {
+    const std::filesystem::path fq = dir / "reads.fq";
+    write_fastq(fq, {{"q", read}});
+    auto qs = std::make_shared<QSeq>(fq.string());
+    qs->read_next_batch();
+    IBatch ib(index, qs, 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, no_filter, multi, false, false);
+    auto imers_or = std::make_shared<IMers>(index, read.size(), 4);
+    auto imers_rc = std::make_shared<IMers>(index, read.size(), 4);
+    ib.search_mers(read.data(), read.size(), imers_or, imers_rc);
+    ib.summarize_matches(imers_or, imers_rc);
+    vec<placement_t> placements;
+    ib.collect_placements(placements);
+    std::sort(placements.begin(), placements.end(), [](const placement_t& a, const placement_t& b) {
+      return a.edge_num < b.edge_num;
+    });
+    return placements;
+  };
+
+  for (const size_t length : {150u, 600u, 2000u}) {
+    for (const double rate : {0.0, 0.02, 0.05}) {
+      for (const bool with_ns : {false, true}) {
+        std::string read = mutate(substr_of(corpus.base, 5000, length), rate, 123);
+        if (with_ns) read.replace(length / 2, 3, "NNN");
+        for (const bool no_filter : {false, true}) {
+          for (const bool multi : {false, true}) {
+            INFO("length=" << length << " mutation rate=" << rate << " Ns=" << with_ns
+                           << " no_filter=" << no_filter << " multi=" << multi);
+            const auto forward = placements_for(read, no_filter, multi);
+            const auto reverse = placements_for(dna_revcomp(read), no_filter, multi);
+            // Require real placements, so two empty results cannot pass.
+            REQUIRE_FALSE(forward.empty());
+            REQUIRE(forward.size() == reverse.size());
+            strstream forward_output, reverse_output;
+            forward_output << std::fixed;
+            reverse_output << std::fixed;
+            forward_output.precision(STRSTREAM_PRECISION);
+            reverse_output.precision(STRSTREAM_PRECISION);
+            for (size_t i = 0; i < forward.size(); ++i) {
+              const auto& a = forward[i];
+              const auto& b = reverse[i];
+              INFO("edge=" << a.edge_num);
+              CHECK(a.edge_num == b.edge_num);
+              CHECK(a.distal_node == b.distal_node);
+              // Hash-map accumulation can change the last floating-point bits.
+              // Compare all six jplace fields, allowing only roundoff.
+              CHECK(a.pendant_length == doctest::Approx(b.pendant_length).epsilon(1e-12));
+              CHECK(a.distal_length == doctest::Approx(b.distal_length).epsilon(1e-12));
+              CHECK(a.likelihood == doctest::Approx(b.likelihood).epsilon(1e-12));
+              CHECK(a.like_weight_ratio == doctest::Approx(b.like_weight_ratio).epsilon(1e-12));
+              CHECK(a.distance == doctest::Approx(b.distance).epsilon(1e-12));
+              forward_output << PP_JPLACE_FIELDS(a) << '\n';
+              reverse_output << PP_JPLACE_FIELDS(b) << '\n';
+            }
+            CHECK(forward_output.str() == reverse_output.str());
+          }
+        }
+      }
+    }
+  }
+}
+
 TEST_CASE("reported placements keep a non-negative pendant and a distal on the edge")
 {
   TempDir dir("query-branch-lengths");

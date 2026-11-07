@@ -1,9 +1,9 @@
 #include "seek.hpp"
-#include <boost/math/tools/minima.hpp>
+#include "minima.hpp"
 
 SBatch::SBatch(sketch_sptr_t sketch, qseq_sptr_t qs, uint32_t hdist_th)
-  : sketch(sketch)
-  , hdist_th(hdist_th)
+  : hdist_th(hdist_th)
+  , sketch(sketch)
 {
   lshf = sketch->get_lshf();
   k = lshf->get_k();
@@ -11,7 +11,7 @@ SBatch::SBatch(sketch_sptr_t sketch, qseq_sptr_t qs, uint32_t hdist_th)
   m = lshf->get_m();
   batch_size = qs->cbatch_size;
   std::swap(qs->seq_batch, seq_batch);
-  std::swap(qs->identifer_batch, identifer_batch);
+  std::swap(qs->identifier_batch, identifier_batch);
   llhfunc = optimize::HDistHistLLH(h, k, hdist_th);
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
@@ -27,7 +27,7 @@ void SBatch::seek_sequences(std::ostream& output_stream)
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
-    enmers = len - k + 1;
+    enmers = (len >= k) ? len - k + 1 : 0;
     onmers = 0;
 
     SSummary or_summary(enmers, hdist_th);
@@ -40,12 +40,12 @@ void SBatch::seek_sequences(std::ostream& output_stream)
       or_summary.optimize_likelihood(llhfunc, rho);
       rc_summary.optimize_likelihood(llhfunc, rho);
       if (or_summary.d_llh < rc_summary.d_llh) {
-        batch_stream << identifer_batch[bix] << "\t" << or_summary.d_llh << "\n";
+        batch_stream << identifier_batch[bix] << "\t" << or_summary.d_llh << "\n";
       } else {
-        batch_stream << identifer_batch[bix] << "\t" << rc_summary.d_llh << "\n";
+        batch_stream << identifier_batch[bix] << "\t" << rc_summary.d_llh << "\n";
       }
     } else {
-      batch_stream << identifer_batch[bix] << "\tNaN\n";
+      batch_stream << identifier_batch[bix] << "\tNaN\n";
     }
   }
 #pragma omp critical
@@ -58,7 +58,7 @@ void SBatch::search_mers(const char* seq, uint64_t len, SSummary& or_summary, SS
   uint32_t orrix, rcrix;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
   for (i = l = 0; i < len;) {
-    if (seq_nt4_table[seq[i]] >= 4) {
+    if (nt4_of(seq[i]) >= 4) {
       l = 0, i++;
       continue;
     }
@@ -75,19 +75,6 @@ void SBatch::search_mers(const char* seq, uint64_t len, SSummary& or_summary, SS
     orenc64_lr = orenc64_lr & mask_lr;
     rcenc64_bp = revcomp_bp64(orenc64_bp, k);
     onmers++; // TODO: Incorporate missing partial/fraction?
-#ifdef CANONICAL
-    if (rcenc64_bp < orenc64_bp) {
-      orrix = lshf->compute_hash(orenc64_bp);
-      if (sketch->check_partial(orrix)) {
-        or_summary.add_matching_mer(sketch, orrix, lshf->drop_ppos_lr(orenc64_lr));
-      }
-    } else {
-      rcrix = lshf->compute_hash(rcenc64_bp);
-      if (sketch->check_partial(rcrix)) {
-        rc_summary.add_matching_mer(sketch, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
-      }
-    }
-#else
     orrix = lshf->compute_hash(orenc64_bp);
     if (sketch->check_partial(orrix)) {
       or_summary.add_matching_mer(sketch, orrix, lshf->drop_ppos_lr(orenc64_lr));
@@ -96,7 +83,6 @@ void SBatch::search_mers(const char* seq, uint64_t len, SSummary& or_summary, SS
     if (sketch->check_partial(rcrix)) {
       rc_summary.add_matching_mer(sketch, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
     }
-#endif /* CANONICAL */
   }
 }
 

@@ -87,6 +87,7 @@ public:
   void set_lshf();
   void set_nrows();
   static uint32_t compute_nrows(uint8_t h, uint32_t m, uint32_t r, bool frac);
+  static void check_row_memory(uint32_t rows);
   void save_configuration(std::ofstream& cfg_stream);
   void set_sketch_defaults()
   {
@@ -96,7 +97,6 @@ public:
     m = 4;
     r = 1;
     frac = true;
-    nrows = pow(2, 2 * h - 1);
     sdust_t = 0;
     sdust_w = 0;
   }

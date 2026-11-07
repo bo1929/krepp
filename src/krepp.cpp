@@ -350,9 +350,9 @@ SketchSingle::SketchSingle(CLI::App& sc)
     ->required()
     ->check(url_validator | CLI::ExistingFile);
   sc.add_option("-o,--output-path", sketch_path, "Path to store the resulting binary sketch file.")->required();
-  sc.add_option("-k,--kmer-len", k, "Length of k-mers. [26]")->check(CLI::Range(19, 31));
+  sc.add_option("-k,--kmer-len", k, "Length of k-mers. [25]")->check(CLI::Range(19, 31));
   sc.add_option("-w,--win-len", w, "Length of minimizer window (w>=k). [k+6]");
-  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [k-16]");
+  sc.add_option("-h,--num-positions", h, "Number of positions for the LSH. [max(k-16, 9)]");
   sc.add_option("-m,--modulo-lsh", m, "Modulo value to partition LSH space. [4]")->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
@@ -379,7 +379,8 @@ QuerySketch::QuerySketch(CLI::App& sc)
     ->check(url_validator | CLI::ExistingFile);
   sc.add_option("-i,--sketch-path", sketch_path, "Sketch file at <path> to query.")->required()->check(CLI::ExistingFile);
   sc.add_option("-o,--output-path", output_path, "Write output to a file at <path>. [stdout]");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")
+    ->check(CLI::Range(0, 31));
   sc.callback([&]() {
     if (!output_path.empty()) {
       output_file.open(output_path);
@@ -401,9 +402,9 @@ void init_sc_index(CLI::App& sc, IndexConfig& config)
   sc.add_option("-t,--nwk-file", config.nwk_path, "Path to the Newick file for the guide tree (must be rooted).")
     ->check(CLI::ExistingFile);
   sc.add_option("-k,--kmer-len", config.k, "Length of k-mers. [29]")->check(CLI::Range(19, 31));
-  sc.add_option("-w,--win-len", config.w, "Length of minimizer window (w>k). [k+6]");
-  sc.add_option("-h,--num-positions", config.h, "Number of positions for the LSH. [k-16]");
-  sc.add_option("-m,--modulo-lsh", config.m, "Mudulo value to partition LSH space. [4]")->check(CLI::PositiveNumber);
+  sc.add_option("-w,--win-len", config.w, "Length of minimizer window (w>=k). [k+6]");
+  sc.add_option("-h,--num-positions", config.h, "Number of positions for the LSH. [max(k-16, 9)]");
+  sc.add_option("-m,--modulo-lsh", config.m, "Modulo value to partition LSH space. [4]")->check(CLI::PositiveNumber);
   sc.add_option("-r,--residue-lsh", config.r, "A k-mer x will be included only if r = LSH(x) mod m. [1]")
     ->check(CLI::NonNegativeNumber);
   sc.add_flag("--frac,!--no-frac", config.frac, "Include k-mers with r <= LSH(x) mod m. [true]");
@@ -465,7 +466,7 @@ void QueryIndex::init_sc_dist(CLI::App& sc)
     "Filter a hit if its distance is too high compared to the best hit (based on the statistical significance). [false]");
   sc.add_flag("--p-value,!--no-p-value",
               p_value,
-              "Append a p-value column to compare a reference hit is against the best hit [false]");
+              "Append a column comparing each hit against the best hit of the same query; smaller is better. [false]");
   sc.callback([&]() {
     no_filter = !filter;
     if (!output_path.empty()) {
@@ -488,7 +489,8 @@ QueryIndex::QueryIndex(CLI::App& sc)
     ->required()
     ->check(CLI::ExistingDirectory);
   sc.add_option("-o,--output-path", output_path, "Write output to a file at <path>. [stdout]");
-  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")->check(CLI::NonNegativeNumber);
+  sc.add_option("--hdist-th", hdist_th, "Maximum Hamming distance for a k-mer to match. [4]")
+    ->check(CLI::Range(0, 31));
   sc.add_option("--chisq",
                 chisq_value,
                 "Chi-square value for the distinguishability test; --filter keeps the hits with a smaller statistic [2.706]")
@@ -503,6 +505,17 @@ QueryIndex::QueryIndex(CLI::App& sc)
 int main(int argc, char** argv)
 {
   PRINT_VERSION
+#if defined(__BMI2__) && (defined(__x86_64__) || defined(__i386__))
+  // The binary was compiled with -mbmi2 (see the makefile's BMI2 probe); a
+  // CPU without BMI2 would hit SIGILL deep in the query loop. Fail early and
+  // explain instead.
+  __builtin_cpu_init();
+  if (!__builtin_cpu_supports("bmi2")) {
+    std::cerr << "[ERROR] This krepp binary was compiled with BMI2 support, but this CPU does not have BMI2. "
+              << "Rebuild with `make BMI2=0` for a portable binary." << std::endl;
+    return EXIT_FAILURE;
+  }
+#endif
   std::ios::sync_with_stdio(false);
   IndexConfig index_config;
   CLI::App app{"krepp: a tool for k-mer-based search, distance estimation & phylogenetic placement."};
@@ -516,6 +529,10 @@ int main(int argc, char** argv)
   app.add_option("--seed", seed, "Random seed for the LSH and other parts that require randomness. [0]");
   app.callback([&]() {
     if (app.count("--seed")) {
+      // `gen` is thread_local; every random path that must be reproducible
+      // (the LSH position choice) runs on the main thread, so seeding here
+      // is sufficient. Anything random added to worker threads later needs
+      // its own per-thread seeding derived from `seed`.
       gen.seed(seed);
     }
     set_num_threads(num_threads);
@@ -614,7 +631,7 @@ int main(int argc, char** argv)
   if (sc_seek.parsed()) {
     std::cerr << "Loading the sketch..." << std::endl;
     krepp_seek.load_sketch();
-    std::cerr << "Seeking query sequences in the sktech..." << std::endl;
+    std::cerr << "Seeking query sequences in the sketch..." << std::endl;
     std::chrono::duration<float> es_b = std::chrono::system_clock::now() - tstart;
     krepp_seek.seek_sequences();
     std::chrono::duration<float> es_s = std::chrono::system_clock::now() - tstart - es_b;

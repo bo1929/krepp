@@ -2,6 +2,7 @@
 #include <atomic>
 #include <chrono>
 #include <sstream>
+#include <unistd.h>
 
 namespace {
   double countsec(const std::chrono::steady_clock::time_point& start)
@@ -137,7 +138,7 @@ void Index::load_partial_index(std::string suffix)
   vec<uint8_t> ppos_v(h_curr), npos_v(k_curr - h_curr);
   metadata_stream.read(reinterpret_cast<char*>(ppos_v.data()), ppos_v.size() * sizeof(uint8_t));
   metadata_stream.read(reinterpret_cast<char*>(npos_v.data()), npos_v.size() * sizeof(uint8_t));
-  CHECK_STREAM_OR_EXIT(metadata_stream, "Failed to read the metadata of a partial skecth!");
+  CHECK_STREAM_OR_EXIT(metadata_stream, "Failed to read the metadata of a partial sketch!");
   metadata_stream.close();
 
   lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_curr, ppos_v, npos_v, r, frac);
@@ -186,7 +187,7 @@ void Index::load_partial_index(std::string suffix)
   if (std::filesystem::exists(info_path)) {
     std::ifstream info_stream(info_path);
     info_str.assign((std::istreambuf_iterator<char>(info_stream)), std::istreambuf_iterator<char>());
-    CHECK_STREAM_OR_EXIT(info_stream, "Failed to metadata info_str text of a partial index!");
+    CHECK_STREAM_OR_EXIT(info_stream, "Failed to read the text metadata of a partial index!");
   } else {
     info_str += "krepp version: ?\n";
     info_str += "date: ?\n";
@@ -344,7 +345,33 @@ uint32_t BaseLSH::compute_nrows(uint8_t h, uint32_t m, uint32_t r, bool frac)
   return static_cast<uint32_t>(rows);
 }
 
-void BaseLSH::set_nrows() { nrows = compute_nrows(h, m, r, frac); }
+void BaseLSH::set_nrows()
+{
+  nrows = compute_nrows(h, m, r, frac);
+  check_row_memory(nrows);
+}
+
+void BaseLSH::check_row_memory(uint32_t rows)
+{
+  // The build keeps a std::vector per row (24 B) in DynHT/SDynHT and, during
+  // the conversion, an 8 B offset per row in FlatHT/SFlatHT; refuse up front
+  // configurations this machine cannot hold instead of being OOM-killed
+  // midway through the build (e.g. -k 31 -h 15 -m 1 needs ~32 GiB of rows).
+  const uint64_t estimate = static_cast<uint64_t>(rows) * 32;
+  uint64_t phys = 0;
+#if defined(_SC_PHYS_PAGES) && defined(_SC_PAGESIZE)
+  const long pages = sysconf(_SC_PHYS_PAGES);
+  const long page_size = sysconf(_SC_PAGESIZE);
+  if (pages > 0 && page_size > 0) {
+    phys = static_cast<uint64_t>(pages) * static_cast<uint64_t>(page_size);
+  }
+#endif
+  if (phys && estimate > phys / 4 * 3) {
+    error_exit("The requested configuration needs ~" + std::to_string(estimate >> 30) +
+               " GiB for the k-mer row structures alone, over 75% of this machine's " + std::to_string(phys >> 30) +
+               " GiB of memory; reduce -h or increase -m (or build partial indexes).");
+  }
+}
 
 void BaseLSH::save_configuration(std::ofstream& cfg_stream)
 {
@@ -375,7 +402,6 @@ IndexMultiple::IndexMultiple(const IndexConfig& config)
   if (!validate_configuration()) {
     error_exit("Invalid configuration!");
   }
-  nrows = pow(2, 2 * h - 1);
   std::filesystem::create_directory(index_dir);
   suffix = "-";
   suffix += "m" + std::to_string(m) + "r" + std::to_string(r);

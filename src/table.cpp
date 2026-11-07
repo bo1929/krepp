@@ -9,6 +9,32 @@ namespace {
       error_exit("Truncated " + what);
     }
   }
+
+  /* Bytes left from the current position; -1 when the stream is not seekable.
+   * Used to reject corrupt size headers before allocating what they claim. */
+  int64_t stream_remaining(std::ifstream& stream)
+  {
+    const std::streamoff here = stream.tellg();
+    if (here == std::streamoff(-1)) {
+      return -1;
+    }
+    stream.seekg(0, std::ios::end);
+    const std::streamoff end = stream.tellg();
+    stream.clear();
+    stream.seekg(here);
+    if (end == std::streamoff(-1)) {
+      return -1;
+    }
+    return static_cast<int64_t>(end - here);
+  }
+
+  void check_header_size(std::ifstream& stream, uint64_t need, const std::string& what)
+  {
+    const int64_t remaining = stream_remaining(stream);
+    if (remaining >= 0 && static_cast<uint64_t>(remaining) < need) {
+      error_exit("Truncated " + what);
+    }
+  }
 } // namespace
 
 SFlatHT::SFlatHT(sdynht_sptr_t source)
@@ -36,10 +62,15 @@ SFlatHT::SFlatHT(sdynht_sptr_t source)
 size_t SFlatHT::load(std::ifstream& sketch_stream)
 {
   read_exact(sketch_stream, &nkmers, sizeof(uint64_t), "sketch file");
+  if (nkmers > std::numeric_limits<uint64_t>::max() / sizeof(enc_t)) {
+    error_exit("Corrupt k-mer count in the sketch file");
+  }
+  check_header_size(sketch_stream, nkmers * sizeof(enc_t) + sizeof(uint32_t), "sketch file");
   enc_ov.resize(nkmers);
   read_exact(sketch_stream, enc_ov.data(), nkmers * sizeof(enc_t), "sketch file");
   assert(nkmers == enc_ov.size());
   read_exact(sketch_stream, &nrows, sizeof(uint32_t), "sketch file");
+  check_header_size(sketch_stream, static_cast<uint64_t>(nrows) * sizeof(inc_t), "sketch file");
   inc_ov.resize(nrows);
   read_exact(sketch_stream, inc_ov.data(), nrows * sizeof(inc_t), "sketch file");
   assert(nrows == inc_ov.size());
@@ -57,6 +88,9 @@ size_t SFlatHT::load(std::ifstream& sketch_stream, const std::filesystem::path& 
       uint64_t nk = 0;
       std::memcpy(&nk, map.data() + offset, sizeof(nk));
       offset += sizeof(nk);
+      if (nk > std::numeric_limits<uint64_t>::max() / sizeof(enc_t)) {
+        error_exit("Corrupt k-mer count in the sketch file: " + path.string());
+      }
       const size_t enc_bytes = static_cast<size_t>(nk) * sizeof(enc_t);
       if (map.size() < offset + enc_bytes + sizeof(uint32_t)) {
         error_exit("Truncated sketch file: " + path.string());
@@ -119,10 +153,15 @@ void FlatHT::bind()
 void FlatHT::load(std::ifstream& mer_stream, std::ifstream& inc_stream)
 {
   read_exact(mer_stream, &nkmers, sizeof(uint64_t), "k-mer array");
+  if (nkmers > std::numeric_limits<uint64_t>::max() / sizeof(cmer_t)) {
+    error_exit("Corrupt k-mer count in the index file");
+  }
+  check_header_size(mer_stream, nkmers * sizeof(cmer_t), "k-mer array in the index file");
   cmer_ov.resize(nkmers);
   read_exact(mer_stream, cmer_ov.data(), nkmers * sizeof(cmer_t), "k-mer array");
   assert(nkmers == cmer_ov.size());
   read_exact(inc_stream, &nrows, sizeof(uint32_t), "offset array");
+  check_header_size(inc_stream, static_cast<uint64_t>(nrows) * sizeof(inc_t), "offset array in the index file");
   inc_ov.resize(nrows);
   read_exact(inc_stream, inc_ov.data(), nrows * sizeof(inc_t), "offset array");
   assert(nrows == inc_ov.size());
@@ -143,7 +182,10 @@ void FlatHT::load(const std::filesystem::path& mer_path, const std::filesystem::
   mer_map = krepp::FileMap(mer_path);
   inc_map = krepp::FileMap(inc_path);
   if (!mer_map.is_open() || !inc_map.is_open()) {
-    // Some filesystems cannot map: fall back to reading.
+    // Some filesystems cannot map: release any partial mapping and fall back
+    // to reading, so is_mapped() reflects where the views actually come from.
+    mer_map = krepp::FileMap();
+    inc_map = krepp::FileMap();
     std::ifstream mer_stream(mer_path, std::ifstream::binary);
     std::ifstream inc_stream(inc_path, std::ifstream::binary);
     if (!mer_stream.is_open() || !inc_stream.is_open()) {
@@ -156,6 +198,9 @@ void FlatHT::load(const std::filesystem::path& mer_path, const std::filesystem::
   std::memcpy(&nk, mer_map.data(), sizeof(nk));
   uint32_t nr = 0;
   std::memcpy(&nr, inc_map.data(), sizeof(nr));
+  if (nk > std::numeric_limits<uint64_t>::max() / sizeof(cmer_t)) {
+    error_exit("Corrupt k-mer count in " + mer_path.string());
+  }
   // Validate before touching the arrays.
   if (mer_map.size() < sizeof(nk) + static_cast<size_t>(nk) * sizeof(cmer_t)) {
     error_exit("Truncated k-mer array in " + mer_path.string());

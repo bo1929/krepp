@@ -91,10 +91,10 @@ void Tree::split_nwk(vec<std::string>& el_v)
   if (nwk_str.back() == '\n') {
     nwk_str.pop_back();
   }
-  buf.reserve(el_v.size());
   if (nwk_str.back() != ';') {
     error_exit("Given Newick tree ends with a character other than ';'.");
   }
+  buf.reserve(nwk_str.size());
   for (uint32_t i = 0; i < nwk_str.length(); i++) {
     if (is_comment) {
       is_comment = is_comment != (nwk_str[i] == ']');
@@ -149,15 +149,19 @@ void Tree::split_nwk(vec<std::string>& el_v)
   }
 }
 
-void Node::parse(vec<std::string>& el_v)
+void Node::parse(vec<std::string>& el_v, uint32_t depth)
 {
+  if (depth > kMaxTreeDepth) {
+    error_exit("Given Newick tree is deeper than " + std::to_string(kMaxTreeDepth) +
+               " levels; krepp's parser is recursive, so such (pathological) trees are rejected.");
+  }
   ldepth = parent ? parent->ldepth + 1 : 0;
   if (tree->atter >= el_v.size()) return;
   if (el_v[tree->atter] == "(") {
     while (true) {
       tree->atter++;
       node_sptr_t child = std::make_shared<Node>(tree);
-      child->parse(el_v);
+      child->parse(el_v, depth + 1);
       child->set_parent(getptr());
       if (el_v[tree->atter] == ",")
         continue;
@@ -350,9 +354,15 @@ void Tree::parse_lineages(std::istream& lineage_stream)
   parallel_flat_phmap<std::string, node_sptr_t> taxon_to_node = {};
   parallel_flat_phmap<std::string, bool> rid_to_presence = {};
 
+  // Constructed once; std::regex compilation is expensive and this runs per
+  // line (and per taxon) on files with hundreds of thousands of lineages.
+  static const std::regex re_semi_colon_space("; ");
+  static const std::regex re_rank_prefix("__.*");
+  static const std::regex re_rank_separator(".__");
+
   std::string line;
   while (std::getline(lineage_stream, line)) {
-    line = std::regex_replace(line, std::regex("; "), ";");
+    line = std::regex_replace(line, re_semi_colon_space, ";");
     std::istringstream iss(line);
     std::string lineage, name;
     if (!(std::getline(iss, name, '\t') && std::getline(iss, lineage, '\t'))) {
@@ -366,10 +376,14 @@ void Tree::parse_lineages(std::istream& lineage_stream)
     std::stringstream lss(lineage);
     std::string taxon, rank;
     node_sptr_t parent = nullptr;
+    uint32_t depth = 0;
     while (std::getline(lss, taxon, ';')) {
-      rank = std::regex_replace(taxon, std::regex("__.*"), "");
-      taxon = std::regex_replace(taxon, std::regex(".__"), "");
+      rank = std::regex_replace(taxon, re_rank_prefix, "");
+      taxon = std::regex_replace(taxon, re_rank_separator, "");
       if (taxon.empty()) continue;
+      if (++depth > kMaxTreeDepth) {
+        error_exit("A lineage in the given file is deeper than " + std::to_string(kMaxTreeDepth) + " taxa.");
+      }
       if (!taxon_to_node.contains(taxon)) {
         taxon_to_node[taxon] = std::make_shared<Node>(getptr(), taxon, parent);
         if (parent) taxon_to_node[taxon]->set_parent(parent);
@@ -446,7 +460,7 @@ void Tree::load(std::istream& tree_stream)
   }
   if (ndecorated && (ndecorated != ntotal)) {
     error_exit("The given Newick tree is only partially decorated with edge numbers ({N}); decorate all " +
-               std::to_string(ntotal) + " nodes or none, so that the output does not edge numbering schemes.");
+               std::to_string(ntotal) + " nodes or none, so that the output does not mix edge numbering schemes.");
   }
   compute_bdepth();
 }
