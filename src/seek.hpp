@@ -58,7 +58,7 @@ private:
   uint64_t batch_size;
   uint64_t bix;
   vec<std::string> seq_batch;
-  vec<std::string> identifer_batch;
+  vec<std::string> identifier_batch;
   optimize::HDistHistLLH llhfunc;
   double rho;
 };

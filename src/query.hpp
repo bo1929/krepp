@@ -171,8 +171,6 @@ private:
 
   void process_mer(const PendingMer& mer);
   uint32_t k;
-  uint32_t h;
-  uint32_t len;
   uint32_t hdist_th;
   uint32_t onmers;
   uint32_t enmers;
@@ -227,14 +225,13 @@ private:
   index_sptr_t index;
   uint64_t mask_bp;
   uint64_t mask_lr;
-  uint32_t enmers;
   uint32_t onmers;
   uint32_t wnmers_or;
   uint32_t wnmers_rc;
   uint64_t batch_size;
   uint64_t bix;
   vec<std::string> seq_batch;
-  vec<std::string> identifer_batch;
+  vec<std::string> identifier_batch;
   node_sptr_t nd_closest = nullptr;
   minfo_sptr_t mi_closest = nullptr;
   optimize::HDistHistLLH llhfunc;
@@ -248,18 +245,6 @@ protected:
 class Minfo
 {
   friend class IBatch;
-
-  // struct match_t
-  // {
-  //   enc_t enc_lr;
-  //   uint32_t pos;
-  //   uint32_t hdist;
-  //   match_t(enc_t enc_lr, uint32_t pos, uint32_t hdist)
-  //     : enc_lr(enc_lr)
-  //     , pos(pos)
-  //     , hdist(hdist)
-  //   {}
-  // };
 
 public:
   Minfo(uint32_t hdist_th, uint32_t nmers, double rho)
@@ -287,22 +272,18 @@ public:
   }
   void update_match(enc_t enc_lr, uint32_t pos, uint32_t hdist_curr)
   {
-    /* if (match_v.empty() || ((match_v.back()).pos != pos)) { */
+    (void)enc_lr; // kept for API symmetry; the histogram below is position-keyed
     if (last_hdist == 0xFFFFFFFF || last_pos != pos) {
       match_count++;
       mismatch_count--;
       hdisthist_v[hdist_curr]++;
       last_pos = pos;
       last_hdist = hdist_curr;
-      /* match_v.emplace_back(enc_lr, pos, hdist_curr); */
     } else {
       if (last_hdist > hdist_curr) {
         hdisthist_v[hdist_curr]++;
         hdisthist_v[last_hdist]--;
         last_hdist = hdist_curr;
-        /* hdisthist_v[(match_v.back()).hdist]--; */
-        /* (match_v.back()).enc_lr = enc_lr; */
-        /* (match_v.back()).hdist = hdist_curr; */
       }
     }
     if (hdist_curr < hdist_min) {
@@ -319,7 +300,6 @@ public:
     return total_leq_tau;
   }
   double jukes_cantor_dist() { return -0.75 * log(1 - CJC * d_llh); }
-  /* void compute_gamma(); */
   void optimize_likelihood(optimize::HDistHistLLH& llhfunc);
   double likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc);
 
@@ -337,7 +317,6 @@ private:
   double mismatch_count = 0;
   double match_count = 0;
   double rho = 0.0;
-  /* double gamma = 0.0; */
   uint32_t rmatch_count = 0;
   uint32_t last_pos = 0;
   uint32_t last_hdist = 0xFFFFFFFF;
@@ -347,7 +326,6 @@ private:
   double lwr = 1; // std::numeric_limits<double>::quiet_NaN();
   double v_llh = std::numeric_limits<double>::quiet_NaN();
   double d_llh = std::numeric_limits<double>::max();
-  /* std::vector<match_t> match_v; */
 };
 
 #endif

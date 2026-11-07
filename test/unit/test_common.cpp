@@ -80,6 +80,14 @@ TEST_CASE("seq_nt4_table maps the IUPAC alphabet onto 0..4")
     CHECK(seq_nt4_table[static_cast<unsigned char>(c)] == 4);
   }
   CHECK(seq_nt4_table[0] == 4);
+  // Bytes >= 0x80 (a negative value where char is signed) map to 4 as well;
+  // the 256-entry table and nt4_of() keep them from indexing out of bounds.
+  CHECK(seq_nt4_table[0x80] == 4);
+  CHECK(seq_nt4_table[0xC1] == 4);
+  CHECK(seq_nt4_table[255] == 4);
+  CHECK(nt4_of(static_cast<char>(0xC1)) == 4);
+  CHECK(nt4_of('A') == 0);
+  CHECK(nt4_of('t') == 3);
 }
 
 TEST_CASE("nt4 tables agree with the string reference encodings")

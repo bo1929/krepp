@@ -69,7 +69,7 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
   hll::HyperLogLog c1(HLL_BUCKET_FACTOR);
   hll::HyperLogLog c2(HLL_BUCKET_FACTOR);
   uint64_t kix = 0, klix = 0;
-  uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
+  uint64_t orenc64_bp, orenc64_lr;
   std::vector<hashmer_t> lsh_enc_win(ldiff);
   hashmer_t cminimizer, pminimizer;
   uint32_t mrs = 0, mre = len;
@@ -81,7 +81,7 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     mrs = (uint32_t)(rgs[mi] >> 32);
   }
   for (i = l = 0; i < len;) {
-    if (seq_nt4_table[seq[i]] >= 4) {
+    if (nt4_of(seq[i]) >= 4) {
       l = 0, i++;
       continue;
     }
@@ -121,13 +121,6 @@ void RSeq::extract_mers(vvec<T>& table, sh_t sh)
     cminimizer = *std::min_element(
       lsh_enc_win.begin(), lsh_enc_win.end(), [](const hashmer_t& lhs, const hashmer_t& rhs) { return lhs.z < rhs.z; });
     c2.add(xur64m_hash(cminimizer.y & mask_lr));
-#ifdef CANONICAL
-    rcenc64_bp = revcomp_bp64(cminimizer.x, k);
-    if (cminimizer.x < rcenc64_bp) {
-      cminimizer.x = rcenc64_bp;
-      cminimizer.y = conv_bp64_lr64(rcenc64_bp);
-    }
-#endif /* CANONICAL */
     rix = lshf->compute_hash(cminimizer.x);
     rix_res = rix % m;
     if (frac ? rix_res <= r : rix_res == r) {
@@ -180,16 +173,16 @@ QSeq::QSeq(std::string input)
 bool QSeq::read_next_batch()
 {
   seq_batch.clear();
-  identifer_batch.clear();
+  identifier_batch.clear();
   seq_batch.reserve(rbatch_size);
-  identifer_batch.reserve(rbatch_size);
+  identifier_batch.reserve(rbatch_size);
   bool cont_reading = false;
   uint64_t ix = 0, bpc = 0;
   // Alternatively, use (ix < rbatch_size).
   while ((bpc < bpc_limit) && (cont_reading = kseq_read(kseq) >= 0)) {
     bpc += kseq->seq.l;
     seq_batch.emplace_back(kseq->seq.s);
-    identifer_batch.emplace_back(kseq->name.s);
+    identifier_batch.emplace_back(kseq->name.s);
     ix++;
   }
   cbatch_size = ix;
@@ -198,8 +191,8 @@ bool QSeq::read_next_batch()
 
 bool QSeq::is_batch_finished()
 {
-  assert(seq_batch.size() == identifer_batch.size());
-  return seq_batch.empty() && identifer_batch.empty();
+  assert(seq_batch.size() == identifier_batch.size());
+  return seq_batch.empty() && identifier_batch.empty();
 }
 
 template void RSeq::extract_mers(vvec<mer_t>& table, sh_t sh);

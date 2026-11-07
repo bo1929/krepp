@@ -346,4 +346,28 @@ TEST_CASE("seek with hdist-th zero only reports exact k-mer matches")
   if (!rows[1].is_na) CHECK(rows[1].distance >= rows[0].distance);
 }
 
+TEST_CASE("a corrupt sketch header is rejected before allocating")
+{
+  TempDir dir("sketch-corrupt");
+  const std::string seq = rand_dna(5000, 305);
+  const std::filesystem::path fa = dir / "ref.fna";
+  write_fasta(fa, "ref", seq);
+  const std::filesystem::path path = write_sketch(dir / "ref.sketch", fa.string(), sketch_opts());
+  std::string full = slurp(path);
+  REQUIRE(full.size() > 8);
+  const uint64_t huge = std::numeric_limits<uint64_t>::max() / 2;
+  std::memcpy(full.data(), &huge, sizeof(huge));
+  const std::filesystem::path corrupt = dir / "corrupt.sketch";
+  spit(corrupt, full);
+
+  for (const bool mapped : {true, false}) {
+    CAPTURE(mapped);
+    UseMmap use(mapped);
+    auto sketch = std::make_shared<Sketch>(corrupt);
+    ThrowingErrorHandler handler;
+    const std::string msg = ThrowingErrorHandler::catches([&] { sketch->load_full_sketch(); });
+    CHECK(msg.find("Corrupt k-mer count") != std::string::npos);
+  }
+}
+
 TEST_SUITE_END();

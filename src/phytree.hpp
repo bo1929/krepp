@@ -6,6 +6,11 @@
 
 typedef std::vector<std::string>::const_iterator vec_str_iter;
 
+/* Parsing and streaming Newick trees recurse per level; a pathological
+ * (e.g. caterpillar) tree would otherwise exhaust the stack. Real backbones
+ * and lineage trees are orders of magnitude shallower. */
+constexpr uint32_t kMaxTreeDepth = 10000;
+
 class Tree : public std::enable_shared_from_this<Tree>
 {
   friend class Node;
@@ -65,9 +70,9 @@ public:
   {
   }
   Node(tree_sptr_t tree, std::string name, node_sptr_t parent, bool is_leaf = false)
-    : tree(tree)
-    , name(name)
+    : name(name)
     , parent(parent)
+    , tree(tree)
     , is_leaf(is_leaf)
   {
     if (is_leaf) {
@@ -84,7 +89,7 @@ public:
     tblen = std::numeric_limits<double>::quiet_NaN();
   }
   void print_info();
-  void parse(vec<std::string>& n_vec);
+  void parse(vec<std::string>& el_v, uint32_t depth = 0);
   void generate_tree(vec_str_iter name_first, vec_str_iter name_last);
   void set_sh(sh_t source) { sh = source; }
   void set_se(se_t source) { se = source; }

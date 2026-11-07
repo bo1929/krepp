@@ -102,7 +102,6 @@ private:
 
   se_t nnodes = 0;
   se_t nsubsets = 0;
-  uint32_t num_partials = 1;
   // Remove tree from this completely or make it a star tree.
   tree_sptr_t tree = nullptr;
   const pse_t* se_to_pse_vv = nullptr;

@@ -624,6 +624,82 @@ TEST_CASE("a truncated colour array is rejected on load")
   }
 }
 
+TEST_CASE("a corrupt size header is rejected before allocating")
+{
+  TempDir dir("index-corrupt");
+  const std::vector<Reference> refs = make_refs();
+  const BuildOptions opt = small_opts();
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  const std::string suffix = index_suffix(opt.m, opt.r, opt.frac);
+
+  // A k-mer count whose byte product would overflow: refused up front on both
+  // load paths, instead of resizing by a wrapped (or astronomical) value.
+  for (const bool mapped : {true, false}) {
+    TempDir forged("index-corrupt-overflow");
+    std::filesystem::copy(dir / "index", forged / "index", std::filesystem::copy_options::recursive);
+    const std::filesystem::path file = forged / "index" / ("cmer" + suffix);
+    std::string full = slurp(file);
+    REQUIRE(full.size() > 8);
+    const uint64_t huge = std::numeric_limits<uint64_t>::max() / 2;
+    std::memcpy(full.data(), &huge, sizeof(huge));
+    spit(file, full);
+    CAPTURE(mapped);
+    UseMmap use(mapped);
+    ThrowingErrorHandler handler;
+    const std::string msg = ThrowingErrorHandler::catches([&] { load_index_dir(forged / "index"); });
+    CHECK(msg.find("Corrupt k-mer count") != std::string::npos);
+  }
+
+  // A count that is merely larger than the file could hold: refused as
+  // truncated, before the allocation, on both paths.
+  for (const bool mapped : {true, false}) {
+    TempDir forged("index-corrupt-big");
+    std::filesystem::copy(dir / "index", forged / "index", std::filesystem::copy_options::recursive);
+    const std::filesystem::path file = forged / "index" / ("cmer" + suffix);
+    std::string full = slurp(file);
+    REQUIRE(full.size() > 8);
+    const uint64_t big = 1000000000ULL; // claims 8 GB of k-mers
+    std::memcpy(full.data(), &big, sizeof(big));
+    spit(file, full);
+    CAPTURE(mapped);
+    UseMmap use(mapped);
+    ThrowingErrorHandler handler;
+    const std::string msg = ThrowingErrorHandler::catches([&] { load_index_dir(forged / "index"); });
+    CHECK(msg.find("Truncated k-mer array") != std::string::npos);
+  }
+}
+
+TEST_CASE("a corrupt colour-array header is rejected before allocating")
+{
+  TempDir dir("crecord-corrupt");
+  const std::vector<Reference> refs = make_refs();
+  const BuildOptions opt = small_opts();
+  {
+    SilenceStderr quiet;
+    build_index_from_refs(dir / "index", refs, opt);
+  }
+  const std::filesystem::path source = dir / "index" / ("crecord" + index_suffix(opt.m, opt.r, opt.frac));
+  const std::string original = slurp(source);
+  REQUIRE(original.size() > 8);
+  for (const bool mapped : {true, false}) {
+    TempDir forged("crecord-corrupt-copy");
+    std::filesystem::copy(dir / "index", forged / "index", std::filesystem::copy_options::recursive);
+    const std::filesystem::path file = forged / "index" / source.filename();
+    std::string full = original;
+    const uint32_t huge_nsubsets = std::numeric_limits<uint32_t>::max(); // claims ~34 GB
+    std::memcpy(full.data() + sizeof(uint32_t), &huge_nsubsets, sizeof(huge_nsubsets));
+    spit(file, full);
+    CAPTURE(mapped);
+    UseMmap use(mapped);
+    ThrowingErrorHandler handler;
+    const std::string msg = ThrowingErrorHandler::catches([&] { load_index_dir(forged / "index"); });
+    CHECK(msg.find("Truncated colour array") != std::string::npos);
+  }
+}
+
 TEST_CASE("two partial indexes may not claim the same residue")
 {
   TempDir dir("index-overlap");

@@ -1,5 +1,5 @@
 #include "query.hpp"
-#include <boost/math/tools/minima.hpp>
+#include "minima.hpp"
 
 /* #define CHISQ_THRESHOLD 3.841 */
 /* #define CHISQ_THRESHOLD 2.706 */
@@ -38,15 +38,15 @@ IBatch::IBatch(index_sptr_t index,
                bool multi,
                bool summarize,
                bool p_value)
-  : index(index)
-  , hdist_th(hdist_th)
+  : hdist_th(hdist_th)
   , chisq_value(chisq_value)
   , dist_max(dist_max)
-  , tau(tau)
   , no_filter(no_filter)
-  , multi(multi)
   , summarize(summarize)
   , p_value(p_value)
+  , tau(tau)
+  , index(index)
+  , multi(multi)
 {
   lshf = index->get_lshf();
   tree = index->get_tree();
@@ -55,7 +55,7 @@ IBatch::IBatch(index_sptr_t index,
   m = lshf->get_m();
   batch_size = qs->cbatch_size;
   std::swap(qs->seq_batch, seq_batch);
-  std::swap(qs->identifer_batch, identifer_batch);
+  std::swap(qs->identifier_batch, identifier_batch);
   llhfunc = optimize::HDistHistLLH(h, k, hdist_th);
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
@@ -64,7 +64,6 @@ IBatch::IBatch(index_sptr_t index,
 
 void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc)
 {
-  enmers = len - k + 1;
   onmers = 0;
   wnmers_or = 0;
   wnmers_rc = 0;
@@ -72,7 +71,7 @@ void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, i
   uint32_t orrix, rcrix;
   uint64_t orenc64_bp, orenc64_lr, rcenc64_bp;
   for (i = l = 0; i < len;) {
-    if (seq_nt4_table[seq[i]] >= 4) {
+    if (nt4_of(seq[i]) >= 4) {
       l = 0, i++;
       continue;
     }
@@ -89,21 +88,6 @@ void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, i
     orenc64_lr = orenc64_lr & mask_lr;
     rcenc64_bp = revcomp_bp64(orenc64_bp, k);
     onmers++; // TODO: Incorporate missing fraction/partial?
-#ifdef CANONICAL
-    if (rcenc64_bp < orenc64_bp) {
-      orrix = lshf->compute_hash(orenc64_bp);
-      if (index->check_partial(orrix)) {
-        imers_or->add_matching_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr));
-        wnmers_or++;
-      }
-    } else {
-      rcrix = lshf->compute_hash(rcenc64_bp);
-      if (index->check_partial(rcrix)) {
-        imers_rc->add_matching_mer(i - k, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)));
-        wnmers_rc++;
-      }
-    }
-#else
     orrix = lshf->compute_hash(orenc64_bp);
     if (imers_or->stage_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr))) {
       wnmers_or++;
@@ -112,7 +96,6 @@ void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, i
     if (imers_rc->stage_mer(len - i, rcrix, lshf->drop_ppos_lr(conv_bp64_lr64(rcenc64_bp)))) {
       wnmers_rc++;
     }
-#endif /* CANONICAL */
   }
   imers_or->flush_mers();
   imers_rc->flush_mers();
@@ -135,7 +118,6 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
   widen_hdist_filter(imers_rc->hdist_filt);
   for (auto [nd, mi] : imers_or->leaf_to_minfo) {
     mi->mismatch_count = onmers - mi->match_count;
-    // mi->compute_gamma();
     if (mi->hdist_min > imers_or->hdist_filt) {
       continue;
     }
@@ -148,7 +130,6 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
   }
   for (auto [nd, mi] : imers_rc->leaf_to_minfo) {
     mi->mismatch_count = onmers - mi->match_count;
-    // mi->compute_gamma();
     if (mi->hdist_min > imers_rc->hdist_filt) {
       continue;
     }
@@ -204,7 +185,7 @@ void IBatch::report_distances(strstream& batch_stream)
     }
   } else {
     if (node_to_minfo.empty() || (!std::isnan(dist_max) && (mi_closest->d_llh > dist_max))) {
-      batch_stream << identifer_batch[bix] << "\tNA\tNaN";
+      batch_stream << identifier_batch[bix] << "\tNA\tNaN";
       if (p_value) {
         batch_stream << "\tNaN";
       }
@@ -229,7 +210,7 @@ void IBatch::report_distances(strstream& batch_stream)
         return lhs->first->get_se() < rhs->first->get_se();
       });
       for (const auto* entry : rows) {
-        batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(entry->first, entry->second);
+        batch_stream << identifier_batch[bix] << "\t" << DISTANCE_FIELDS(entry->first, entry->second);
         if (p_value) {
           append_p_value(batch_stream, entry->second->chisq);
         }
@@ -239,7 +220,7 @@ void IBatch::report_distances(strstream& batch_stream)
       if (p_value) {
         mi_closest->chisq = mi_closest->likelihood_ratio(mi_closest->d_llh, llhfunc);
       }
-      batch_stream << identifer_batch[bix] << "\t" << DISTANCE_FIELDS(nd_closest, mi_closest);
+      batch_stream << identifier_batch[bix] << "\t" << DISTANCE_FIELDS(nd_closest, mi_closest);
       if (p_value) {
         append_p_value(batch_stream, mi_closest->chisq);
       }
@@ -415,13 +396,13 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
 
   if (tabular) {
     for (const placement_t& pp : placements) {
-      batch_stream << identifer_batch[bix] << "\t" << PP_TABULAR_FIELDS(pp) << "\n";
+      batch_stream << identifier_batch[bix] << "\t" << PP_TABULAR_FIELDS(pp) << "\n";
     }
     return true;
   }
 
   if (has_previous) batch_stream << ",\n";
-  batch_stream << "\t\t\t{\"n\" : [\"" << identifer_batch[bix] << "\"], \"p\" : [";
+  batch_stream << "\t\t\t{\"n\" : [\"" << identifier_batch[bix] << "\"], \"p\" : [";
   // Layout follows the shape of the search, not the number of placements: a
   // single matched node, or single-best mode, prints inline. Multi mode with
   // more than one match breaks across lines even if only one placement
@@ -441,21 +422,15 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
 }
 
 IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
-  : index(index)
-  , len(len)
-  , hdist_th(hdist_th)
+  : hdist_th(hdist_th)
   , onmers(0)
+  , index(index)
 {
   lshf = index->get_lshf();
   tree = index->get_tree();
   k = lshf->get_k();
-  h = lshf->get_h();
   pending_v.reserve(kPendingBlock);
-  if (len) {
-    enmers = len - k + 1;
-  } else {
-    enmers = 0;
-  }
+  enmers = (len >= k) ? static_cast<uint32_t>(len - k + 1) : 0;
 }
 
 void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
@@ -517,6 +492,9 @@ void IMers::process_mer(const PendingMer& mer)
   pse_t pse;
   node_sptr_t nd;
   uint32_t hdist_curr;
+  // Normally drained by the traversal; cleared so a handler-installed throw
+  // from error_exit() cannot leak entries into the next k-mer.
+  se_v.clear();
   const enc_t enc_lr = mer.enc_lr;
   const uint32_t pos = mer.pos;
   CRecord* crecord = mer.crecord;
@@ -568,34 +546,6 @@ void IMers::process_mer(const PendingMer& mer)
   }
   onmers++;
 }
-
-/* void Minfo::compute_gamma() */
-/* { */
-/*   // Alternative 1: number of k-mers covered. */
-/*   gamma = static_cast<double> match_count / static_cast<double>(nmers); */
-/*   // Alternative 2: number of positions covered. */
-/*   // Requires matches to be collected. */
-/*   uint32_t s; */
-/*   uint32_t i, j, k; */
-/*   uint32_t ugamma = 0; */
-/*   for (i = 0; i < match_v.size(); ++i) { */
-/*     if (i == 0) { */
-/*       ugamma = imers->k; */
-/*       continue; */
-/*     } */
-/*     if (match_v[i].pos > match_v[i - 1].pos) { */
-/*       s = (match_v[i].pos - match_v[i - 1].pos); */
-/*     } else { */
-/*       s = (match_v[i - 1].pos - match_v[i].pos); */
-/*     } */
-/*     if (s > imers->k) { */
-/*       ugamma += imers->k; */
-/*     } else { */
-/*       ugamma += s; */
-/*     } */
-/*   } */
-/*   gamma = ugamma / (nmers + imers->k - 1); */
-/* } */
 
 double Minfo::likelihood_ratio(double d, optimize::HDistHistLLH& llhfunc)
 {

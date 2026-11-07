@@ -58,9 +58,8 @@ extern bool use_mmap;
 extern bool verbose;
 extern std::string invocation;
 extern std::string leave_out_ref;
-extern thread_local std::random_device rd;
 extern thread_local std::mt19937 gen;
-extern const unsigned char seq_nt4_table[128];
+extern const unsigned char seq_nt4_table[256];
 extern const uint64_t nt4_lr_table[4];
 extern const uint64_t nt4_bp_table[4];
 extern uint32_t seed;
@@ -127,7 +126,7 @@ struct mer_t
   }
 };
 
-static inline uint32_t gp_hash(const std::string& str)
+inline uint32_t gp_hash(const std::string& str)
 {
   uint32_t b = 378551;
   uint32_t a = 63689;
@@ -139,7 +138,7 @@ static inline uint32_t gp_hash(const std::string& str)
   return (h & 0x7FFFFFFF);
 }
 
-static inline uint32_t xur32_hash(uint32_t h)
+inline uint32_t xur32_hash(uint32_t h)
 {
   h ^= h >> 16;
   h *= 0x85ebca6b;
@@ -149,7 +148,7 @@ static inline uint32_t xur32_hash(uint32_t h)
   return h;
 }
 
-static inline uint64_t xur64_hash(uint64_t h)
+inline uint64_t xur64_hash(uint64_t h)
 {
   h ^= (h >> 33);
   h *= 0xff51afd7ed558ccdL;
@@ -159,7 +158,7 @@ static inline uint64_t xur64_hash(uint64_t h)
   return h;
 }
 
-static inline uint64_t xur64m_hash(uint64_t h)
+inline uint64_t xur64m_hash(uint64_t h)
 {
   h += 0x9E3779B97F4A7C15L;
   h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9L;
@@ -167,27 +166,27 @@ static inline uint64_t xur64m_hash(uint64_t h)
   return h ^ (h >> 31);
 }
 
-static inline uint32_t hdist_lr64(const uint64_t x, const uint64_t y)
+inline uint32_t hdist_lr64(const uint64_t x, const uint64_t y)
 {
   uint64_t z1 = x ^ y;
   return __builtin_popcount(z1 | (z1 >> 32));
 }
 
-static inline uint32_t zc_lr32(const uint32_t x, const uint32_t y)
+inline uint32_t zc_lr32(const uint32_t x, const uint32_t y)
 {
   uint32_t z1 = x ^ y;
   return (z1 | (z1 >> 16)) & 0x0000ffff;
 }
 
-static inline uint32_t hdist_lr32(const uint32_t x, const uint32_t y)
+inline uint32_t hdist_lr32(const uint32_t x, const uint32_t y)
 {
   uint32_t z1 = x ^ y;
   return __builtin_popcount((z1 | (z1 >> 16)) & 0x0000ffff);
 }
 
-static inline uint32_t popcount_lr32(const uint32_t z) { return __builtin_popcount((z | (z >> 16)) & 0x0000ffff); }
+inline uint32_t popcount_lr32(const uint32_t z) { return __builtin_popcount((z | (z >> 16)) & 0x0000ffff); }
 
-static inline uint64_t revcomp_bp64(const uint64_t x, uint8_t k)
+inline uint64_t revcomp_bp64(const uint64_t x, uint8_t k)
 {
   uint64_t res = ~x;
   res = ((res >> 2 & 0x3333333333333333) | (res & 0x3333333333333333) << 2);
@@ -198,7 +197,7 @@ static inline uint64_t revcomp_bp64(const uint64_t x, uint8_t k)
   return (res >> (2 * (32 - k)));
 }
 
-static inline uint64_t rmoddp_bp64(uint64_t x)
+inline uint64_t rmoddp_bp64(uint64_t x)
 {
   x = x & 0x5555555555555555;
   x = (x | (x >> 1)) & 0x3333333333333333;
@@ -209,7 +208,7 @@ static inline uint64_t rmoddp_bp64(uint64_t x)
   return x;
 }
 
-static inline sh_t hash_name(std::string& name)
+inline sh_t hash_name(std::string& name)
 {
   sh_t sh = 0;
   uint32_t a1, a2;
@@ -221,7 +220,7 @@ static inline sh_t hash_name(std::string& name)
   return sh;
 }
 
-static inline sh_t rehash(sh_t sh)
+inline sh_t rehash(sh_t sh)
 {
   uint32_t a1, a2;
   MurmurHash3_x86_32(&sh, sizeof(sh), MMHSEED0, &a1);
@@ -233,29 +232,34 @@ static inline sh_t rehash(sh_t sh)
   return sh;
 }
 
-static inline uint64_t conv_bp64_lr64(uint64_t x) { return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x); }
+inline uint64_t conv_bp64_lr64(uint64_t x) { return (rmoddp_bp64(x >> 1) << 32) | rmoddp_bp64(x); }
 
-static inline void compute_encoding(const char* s1, const char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
+/* The 256-entry table maps every byte; the cast keeps a negative char
+ * (a byte >= 0x80 on platforms where char is signed) from indexing
+ * out of bounds. Such bytes are not IUPAC and map to 4 (N). */
+inline unsigned char nt4_of(char c) { return seq_nt4_table[static_cast<unsigned char>(c)]; }
+
+inline void compute_encoding(const char* s1, const char* s2, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
   for (; s1 < s2; ++s1) {
     enc_lr <<= 1;
     enc_bp <<= 2;
-    enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
-    enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
+    enc_bp += nt4_bp_table[nt4_of(*s1)];
+    enc_lr += nt4_lr_table[nt4_of(*s1)];
   }
 }
-static inline void update_encoding(const char* s1, uint64_t& enc_lr, uint64_t& enc_bp)
+inline void update_encoding(const char* s1, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr <<= 1;
   enc_bp <<= 2;
   enc_lr &= 0xFFFFFFFEFFFFFFFE;
-  enc_bp += nt4_bp_table[seq_nt4_table[*s1]];
-  enc_lr += nt4_lr_table[seq_nt4_table[*s1]];
+  enc_bp += nt4_bp_table[nt4_of(*s1)];
+  enc_lr += nt4_lr_table[nt4_of(*s1)];
 }
 
-static std::string vec_to_str(const std::vector<uint8_t>& v)
+inline std::string vec_to_str(const std::vector<uint8_t>& v)
 {
   std::ostringstream oss;
   oss << "[";

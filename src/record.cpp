@@ -91,7 +91,10 @@ sh_t Record::add_subset(sh_t sh1, sh_t sh2)
     nonce = Subset::rehash(nonce++ * sh1 * sh2);
   }
   sh += nonce;
-  if ((!subset) | (nonce != 0)) {
+  // A missing entry (subset null on the final probe) or any collision walk
+  // (nonce != 0) records a fresh subset; a stale `subset` from an earlier
+  // probe iteration is irrelevant in both cases.
+  if ((!subset) || (nonce != 0)) {
     sh_to_subset[sh] = std::make_shared<Subset>(
       sh, subset1->card > subset2->card ? subset1->sh : subset2->sh, subset1->card + subset2->card, nonce);
   }
@@ -225,6 +228,21 @@ void CRecord::load(std::ifstream& crecord_stream)
 {
   crecord_stream.read(reinterpret_cast<char*>(&nnodes), sizeof(se_t));
   crecord_stream.read(reinterpret_cast<char*>(&nsubsets), sizeof(se_t));
+  // Reject a header that claims more data than the file holds before the
+  // (potentially huge) allocations, mirroring the mapped-load validation.
+  {
+    const std::streamoff here = crecord_stream.tellg();
+    crecord_stream.seekg(0, std::ios::end);
+    const std::streamoff end = crecord_stream.tellg();
+    if (here != std::streamoff(-1) && end != std::streamoff(-1)) {
+      const uint64_t need =
+        static_cast<uint64_t>(nsubsets) * sizeof(pse_t) + static_cast<uint64_t>(nnodes) * sizeof(double);
+      if (static_cast<uint64_t>(end - here) < need) {
+        error_exit("Truncated colour array in the index file");
+      }
+    }
+    crecord_stream.seekg(here);
+  }
   se_to_pse_ov.resize(nsubsets);
   crecord_stream.read(reinterpret_cast<char*>(se_to_pse_ov.data()), sizeof(pse_t) * nsubsets);
   se_to_rho.resize(nnodes);
@@ -338,31 +356,6 @@ void CRecord::display_info(std::ostream* output_stream, uint32_t r, vec<uint64_t
   for (auto const& [key, val] : outdegree_hist) {
     (*output_stream) << r << "\tOUTDEGREE_COUNT\t" << key << "\t" << val << "\n";
   }
-  // std::queue<se_t> se_q;
-  // uint64_t se;
-  // uint32_t depth;
-  // std::pair<se_t, se_t> pse;
-  // for (uint64_t ix = 1; ix < se_to_pse_ov.size(); ++ix) {
-  //   depth = 0;
-  //   if (!tree->check_node(ix)) {
-  //     se_q.push(ix);
-  //     while (!se_q.empty()) {
-  //       depth++;
-  //       uint32_t n = se_q.size();
-  //       for (uint32_t i = 0; i < n; i++) {
-  //         se = se_q.front();
-  //         se_q.pop();
-  //         if (!tree->check_node(se)) {
-  //          pse = se_to_pse_ov[se];
-  //           se_q.push(pse.first);
-  //           se_q.push(pse.second);
-  //         }
-  //       }
-  //     }
-  //     depth--;
-  //   }
-  //   (*output_stream) << r << "\tCOLOR_INFO\t" << ix << "\t" << depth << "\t" << se_to_count[ix] << "\n";
-  // }
 }
 
 void CRecord::apply_rho_coef(double coef)
