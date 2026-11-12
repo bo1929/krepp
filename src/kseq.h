@@ -75,7 +75,7 @@
       if (ks->end < __bufsize) ks->is_eof = 1;                                                                              \
       if (ks->end == 0) return -1;                                                                                          \
     }                                                                                                                       \
-    return (int)ks->buf[ks->begin++];                                                                                       \
+    return (int)(unsigned char)ks->buf[ks->begin++];                                                  \
   }
 
 #ifndef KSTRING_T
@@ -113,10 +113,10 @@ typedef struct __kstring_t
           if (ks->buf[i] == delimiter) break;                                                                               \
       } else if (delimiter == KS_SEP_SPACE) {                                                                               \
         for (i = ks->begin; i < ks->end; ++i)                                                                               \
-          if (isspace(ks->buf[i])) break;                                                                                   \
+          if (isspace((unsigned char)ks->buf[i])) break;                                                                    \
       } else if (delimiter == KS_SEP_TAB) {                                                                                 \
         for (i = ks->begin; i < ks->end; ++i)                                                                               \
-          if (isspace(ks->buf[i]) && ks->buf[i] != ' ') break;                                                              \
+          if (isspace((unsigned char)ks->buf[i]) && ks->buf[i] != ' ') break;                                               \
       } else                                                                                                                \
         i = 0; /* never come to here! */                                                                                    \
       if (str->m - str->l < (size_t)(i - ks->begin + 1)) {                                                        \

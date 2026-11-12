@@ -333,6 +333,28 @@ TEST_CASE("QSeq keeps a single long record in one batch")
   CHECK(qs.is_batch_finished());
 }
 
+TEST_CASE("QSeq does not split records on high bytes in the sequence")
+{
+  TempDir dir("qseq-highbyte");
+  const std::filesystem::path fa = dir / "reads.fa";
+  {
+    std::ofstream out(fa, std::ios::binary);
+    out << ">one\nACGTACGTACGT";
+    out.put(static_cast<char>(0xff)); // signed-char bug: (int)0xff == -1 == the EOF sentinel
+    out.put(static_cast<char>(0xfe));
+    out << "ACGTACGTACGT\n>two\nACGTACGTACGTACGT\n";
+  }
+  QSeq qs(fa.string());
+  uint64_t total = 0;
+  while (qs.read_next_batch() || !qs.is_batch_finished()) {
+    total += qs.get_cbatch_size();
+    if (qs.is_batch_finished() && qs.get_cbatch_size() == 0) break;
+  }
+  // High bytes are sequence characters (they encode as N downstream); they
+  // must not truncate a record or fabricate extra ones.
+  CHECK(total == 2);
+}
+
 TEST_CASE("QSeq refuses a missing file")
 {
   ThrowingErrorHandler handler;
