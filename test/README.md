@@ -1,12 +1,14 @@
 # Tests
 
-Three suites, all wired into `make test`:
+Three suites, all wired into `make test`, plus an optional bindings parity
+suite (`make test-python`, needs `make python` first):
 
 | target | what it runs |
 |---|---|
 | `make test-unit` | `test/unit/*.cpp` — the doctest suite, linked against the whole library |
 | `make test-regression` | `test/regression/run_regression.sh` — CLI golden-file tests |
 | `make test-threads` | `test/omp_index_test.cpp` — the index builder under threads |
+| `make test-python` | `test/python/test_bindings.py` — Python bindings vs CLI parity |
 
 ```bash
 make test              # everything

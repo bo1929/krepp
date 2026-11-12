@@ -145,6 +145,57 @@ struct placement_t
   node_sptr_t node = nullptr;
 };
 
+// Structured (stream-free) results for embedding; the fields mirror exactly
+// what the report_* stream writers emit, so bindings and CLI cannot drift.
+// One row of `krepp dist` output: REFERENCE_NAME, DIST [, P_VALUE].
+struct dist_row_t
+{
+  std::string ref_name;
+  double d_llh = std::numeric_limits<double>::quiet_NaN();
+  double p_value = std::numeric_limits<double>::quiet_NaN(); // NaN unless requested
+};
+
+// One query's `krepp dist` result. na=true reproduces the "NA\tNaN" row.
+struct query_dist_t
+{
+  std::string query;
+  bool na = false;
+  vec<dist_row_t> rows; // sorted like the CLI output (d_llh, then se)
+};
+
+// One query's `krepp place` result (the jplace "p" arrays, as structs).
+struct query_place_t
+{
+  std::string query;
+  bool placed = false; // false when collect_placements filtered everything
+  vec<placement_t> placements;
+};
+
+// Per-reference k-mer match summary for one query (post-summarize state).
+struct match_row_t
+{
+  std::string ref_name;
+  double match_count = 0;
+  double mismatch_count = 0;
+  double nmers = 0;
+  double rho = 0;
+  uint32_t hdist_min = 0xFFFFFFFF;
+  vec<double> hdisthist; // histogram index = hamming distance
+  double d_llh = std::numeric_limits<double>::quiet_NaN();
+};
+
+struct query_match_t
+{
+  std::string query;
+  uint32_t onmers = 0; // valid k-mers scanned
+  uint32_t enmers = 0; // expected k-mers (len >= k ? len-k+1 : 0)
+  // Histogram of match counts by hamming distance, summed over all matched
+  // references (a k-mer matching several references counts once per
+  // reference); index = hamming distance, size = hdist_th + 1.
+  vec<double> hdist_hist;
+  vec<match_row_t> rows; // sorted by (d_llh, ref_name) for determinism
+};
+
 class IMers : public std::enable_shared_from_this<IMers>
 {
   friend class IBatch;
@@ -206,6 +257,11 @@ public:
   bool collect_placements(vec<placement_t>& placements);
   bool report_placement(strstream& batch_stream, bool tabular, bool has_previous);
   const parallel_flat_phmap<node_sptr_t, double>& get_summary() { return node_to_wcount; }
+  // Structured (stream-free) batch collectors for the embedding API; each
+  // mirrors its stream-writing counterpart row-for-row (see api.hpp).
+  vec<query_dist_t> dist_batch();
+  vec<query_place_t> place_batch();
+  vec<query_match_t> match_batch();
 
 private:
   placement_t make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi, const minfo_sptr_t& mi_parent);

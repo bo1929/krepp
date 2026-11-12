@@ -6,85 +6,8 @@ void TargetSketch::load_sketch()
   sketch->make_rho_partial();
 }
 
-void TargetIndex::read_lineages()
-{
-  qtree = std::make_shared<Tree>();
-  std::ifstream lineage_stream(lineage_path);
-  CHECK_STREAM_OR_EXIT(lineage_stream, (std::string("Error opening ") + lineage_path.string()));
-  qtree->parse_lineages(lineage_stream);
-  qtree->reset_traversal();
-  index->get_tree()->map_to_qtree(qtree);
-  lineage_stream.close();
-}
-
-void TargetIndex::ensure_backbone()
-{
-  if (!nwk_path.empty()) {
-    qtree = std::make_shared<Tree>();
-    std::ifstream tree_stream(nwk_path);
-    CHECK_STREAM_OR_EXIT(tree_stream, (std::string("Error opening ") + nwk_path.string()));
-    qtree->load(tree_stream);
-    CHECK_STREAM_OR_EXIT(tree_stream, "Failed to read the given backbone tree!");
-    qtree->reset_traversal();
-    index->get_tree()->map_to_qtree(qtree);
-    tree_stream.close();
-  } else if (index->check_wbackbone()) {
-    qtree = index->get_tree();
-  } else {
-    error_exit("Given index lacks a tree and no backbone tree is provided...");
-  }
-}
-
-void TargetIndex::load_index()
-{
-  const std::set<std::string> lall{"cmer", "crecord", "inc", "metadata", "tree", "reflist"};
-  const std::set<std::string> lall_wbackbone{"cmer", "crecord", "inc", "metadata", "tree"};
-  const std::set<std::string> lall_wobackbone{"cmer", "crecord", "inc", "metadata", "reflist"};
-  node_phmap<std::string, std::set<std::string>> suffix_to_ltype;
-  for (const auto& entry : std::filesystem::directory_iterator(index_dir)) {
-    std::string filename, ltype, mrcfg, fracv;
-    size_t pos1, pos2;
-    filename = entry.path().filename();
-    pos1 = filename.find("-", 0);
-    pos2 = filename.find("-", pos1 + 1);
-    ltype = filename.substr(0, pos1);
-    if (lall.find(ltype) != lall.end()) {
-      if (entry.path().extension().empty()) {
-        mrcfg = filename.substr(pos1, pos2 - pos1);
-        fracv = filename.substr(pos2, filename.size() - pos2);
-        suffix_to_ltype[mrcfg + fracv].insert(ltype);
-      }
-    } else {
-    }
-  }
-  std::vector<std::string> suffixes;
-  for (auto const& [suffix, ltypes] : suffix_to_ltype) {
-    suffixes.push_back(suffix);
-  }
-  if (suffixes.empty()) {
-    error_exit("No index found in " + index_dir.string() +
-               " (expected cmer/inc/crecord/metadata files, optionally with tree/reflist).");
-  }
-#pragma omp parallel for num_threads(num_threads), schedule(static)
-  for (uint32_t lix = 0; lix < suffixes.size(); ++lix) {
-    const std::set<std::string>& ltype = suffix_to_ltype[suffixes[lix]];
-    bool wobackbone = std::includes(ltype.begin(), ltype.end(), lall_wobackbone.begin(), lall_wobackbone.end());
-    bool wbackbone = std::includes(ltype.begin(), ltype.end(), lall_wbackbone.begin(), lall_wbackbone.end());
-    if (wbackbone) {
-      index->load_partial_tree(suffixes[lix]);
-      index->load_partial_index(suffixes[lix]);
-    } else if (wobackbone) {
-      index->generate_partial_tree(suffixes[lix]);
-      index->load_partial_index(suffixes[lix]);
-    } else {
-      error_exit("There is a partial index with a missing file!");
-    }
-  }
-  index->make_rho_partial();
-  if (verbose) {
-    index->display_load_stats(std::cerr);
-  }
-}
+// TargetIndex::{read_lineages, ensure_backbone, load_index} live in api.cpp,
+// so the embedding facade can link them without pulling in this CLI layer.
 
 void SketchSingle::create_sketch()
 {

@@ -33,6 +33,7 @@ OBJECTS = build/common.o \
 					build/index.o build/sketch.o \
 					build/query.o build/seek.o \
 					build/record.o build/table.o \
+					build/api.o \
 					build/krepp.o
 # Everything but the CLI layer, which is what an embedding library links against.
 UNIT_PROGRAM = build/krepp_tests
@@ -44,7 +45,7 @@ DEPS = $(OBJECTS:.o=.d) build/omp_index_test.d $(UNIT_OBJECTS:.o=.d)
 
 # rules
 #--------------------------------------------
-.PHONY: all dynamic static clean install test test-unit test-regression test-threads coverage
+.PHONY: all dynamic static clean install test test-unit test-regression test-threads coverage python test-python
 
 all:
 	$(MAKE) mode=dynamic $(PROGRAM)
@@ -169,6 +170,41 @@ build/%.o: src/%.cpp
 	@mkdir -p build
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c src/$*.cpp -o build/$*.o
 
+# Python bindings (pybind11, vendored at external/pybind11).
+#   make python [PYTHON=python3.12]   -> python/krepp/_krepp<ext-suffix>
+# Rebuilt with -fPIC into build/py/ so the binary's objects stay untouched.
+PYTHON ?= python3
+PY_EXT_SUFFIX := $(shell $(PYTHON)-config --extension-suffix 2>/dev/null)
+PY_INCLUDES := $(shell $(PYTHON)-config --includes 2>/dev/null)
+PYBIND_INC = -Iexternal/pybind11/include
+PY_LDFLAGS = -shared
+ifeq ($(OS),Darwin)
+PY_LDFLAGS += -undefined dynamic_lookup
+endif
+PY_SOURCES = $(filter-out src/krepp.cpp,$(wildcard src/*.cpp))
+PY_OBJECTS = $(patsubst src/%.cpp,build/py/%.o,$(PY_SOURCES)) build/py/krepp_py.o
+PY_DEPS = $(PY_OBJECTS:.o=.d)
+PY_MODULE = python/krepp/_krepp$(PY_EXT_SUFFIX)
+
+python: $(PY_MODULE)
+
+build/py/%.o: src/%.cpp
+	@mkdir -p build/py
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -fPIC -MMD -MP $(VARDEF) $(INC) -Isrc -c $< -o $@
+
+build/py/krepp_py.o: bindings/krepp_py.cpp
+	@mkdir -p build/py
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -fPIC -MMD -MP $(VARDEF) $(INC) $(PYBIND_INC) $(PY_INCLUDES) -Isrc -c $< -o $@
+
+-include $(PY_DEPS)
+
+$(PY_MODULE): $(PY_OBJECTS)
+	@mkdir -p python/krepp
+	$(COMPILER) $(PY_LDFLAGS) $(LDFLAGS) $+ $(VARDEF) -o $@ $(LDLIBS)
+
+test-python: $(PY_MODULE)
+	PYTHONPATH=python $(PYTHON) test/python/test_bindings.py
+
 $(PROGRAM): $(OBJECTS)
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(VARDEF) $(LDFLAGS) $(INC) -o $@ $(LDLIBS) 
 
@@ -191,6 +227,7 @@ $(TEST_PROGRAM): $(TEST_OBJECTS)
 
 clean:
 	rm -f $(PROGRAM) $(OBJECTS) $(TEST_PROGRAM) build/omp_index_test.o $(UNIT_PROGRAM) $(UNIT_OBJECTS) $(DEPS)
+	rm -rf build/py python/krepp/_krepp*.so
 	@find build -type d -empty -delete 2>/dev/null || true
 	@echo "Succesfully cleaned."
 

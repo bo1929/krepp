@@ -135,6 +135,33 @@ Placement values are deterministic up to the last printed digit of `like_weight_
 (a ratio of sums accumulated in hash-map order); with `--num-threads` above 1, the order
 of queries in the file can also vary between runs.
 
+## Python bindings
+
+`make python` builds an extension module (using `pybind11`) into `python/krepp/`.
+Distances, placements and per-query *k*-mer match summaries come back as Python objects
+
+```python
+import krepp                          # with PYTHONPATH=python (repo root)
+
+s = krepp.Session("index_toy", krepp.Options(num_threads=4, p_value=True))
+
+for qd in s.dist("query_toy.fq"):     # like `krepp dist`
+    for row in qd.rows:
+        print(qd.query, row.ref_name, row.dist, row.p_value)
+
+for qp in s.place("query_toy.fq"):    # like `krepp place`
+    for p in qp.placements:
+        print(qp.query, p.edge_num, p.distal_node, p.like_weight_ratio)
+
+for qm in s.matches("query_toy.fq"):  # k-mer match summaries per reference
+    print(qm.query, qm.onmers, qm.enmers, qm.hdist_hist)   # aggregate histogram by Hamming distance
+    for r in qm.rows:
+        print("   ", r.ref_name, r.match_count, r.hdist_min, r.hdisthist)  # per reference
+```
+
+Use `make python PYTHON=/path/to/python3` to target a specific interpreter
+(default: `python3`).
+
 ## Citation
 ```bibtex
 @article{sapci_krepp_2026,

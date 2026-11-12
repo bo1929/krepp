@@ -331,4 +331,55 @@ TEST_CASE("data pointers expose the raw position arrays")
   for (size_t i = 0; i < npos.size(); ++i) CHECK(static_cast<uint8_t>(lshf.npos_data()[i]) == npos[i]);
 }
 
+TEST_CASE("set_lshf skips the padding loop when k-h exceeds 16")
+{
+  // check_configuration rejects k-h > 16 at the CLI level, but direct
+  // constructions (and this suite's incompatibility fixtures) used to wrap
+  // the padding loop's signed bound to ~2^32 unsigned iterations and shift
+  // past bit 63 (UB). Construction must now be immediate and safe.
+  const auto t0 = std::chrono::steady_clock::now();
+  LSHF lshf(27, 10, 4, 1, true);
+  const auto elapsed = std::chrono::steady_clock::now() - t0;
+  CHECK(lshf.get_k() == 27);
+  CHECK(lshf.get_h() == 10);
+  CHECK(elapsed < std::chrono::seconds(1));
+  // Smoke: the extractions run without hanging or trapping.
+  (void)lshf.compute_hash(0x123456789abcdef0ull);
+  (void)lshf.drop_ppos_lr(0x123456789abcdef0ull);
+  (void)lshf.drop_ppos_bp(0x123456789abcdef0ull);
+}
+
+TEST_CASE("the reconstructing constructor rejects corrupt position vectors")
+{
+  ThrowingErrorHandler handler;
+  const vec<uint8_t> ppos = {26, 25, 22, 16, 14, 12, 11, 5, 4, 3, 1}; // h=11
+  const vec<uint8_t> npos = {0, 2, 6, 7, 8, 9, 10, 13, 15, 17, 18, 19, 20, 21, 23, 24}; // k=27
+
+  // A position beyond k-1 would shift the masks out of range.
+  vec<uint8_t> bad_npos = npos;
+  bad_npos[3] = 40;
+  CHECK(ThrowingErrorHandler::catches([&] { LSHF l(4u, ppos, bad_npos, 1u, true); })
+          .find("Invalid LSH position") != std::string::npos);
+  vec<uint8_t> bad_ppos = ppos;
+  bad_ppos[0] = 99;
+  CHECK(ThrowingErrorHandler::catches([&] { LSHF l(4u, bad_ppos, npos, 1u, true); })
+          .find("Invalid LSH position") != std::string::npos);
+
+  // k out of [19, 31].
+  const vec<uint8_t> few_ppos = {8, 7, 6, 5, 4, 3, 2, 1, 0}; // h=9
+  const vec<uint8_t> few_npos = {9, 10};                      // k=11
+  CHECK(ThrowingErrorHandler::catches([&] { LSHF l(4u, few_ppos, few_npos, 1u, true); })
+          .find("Invalid LSH configuration") != std::string::npos);
+
+  // k-h > 16 cannot fit the 32-bit dropped encoding.
+  const vec<uint8_t> many_npos = {9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26}; // k=27, h=9
+  CHECK(ThrowingErrorHandler::catches([&] { LSHF l(4u, few_ppos, many_npos, 1u, true); })
+          .find("Invalid LSH configuration") != std::string::npos);
+
+  // The sane configuration still constructs.
+  LSHF ok_lshf(4u, ppos, npos, 1u, true);
+  CHECK(ok_lshf.get_k() == 27);
+  CHECK(ok_lshf.get_h() == 11);
+}
+
 TEST_SUITE_END();

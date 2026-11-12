@@ -421,6 +421,141 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Structured (stream-free) collectors for the embedding API (api.hpp).
+// Each mirrors the per-record flow of its stream-writing counterpart:
+// search_mers + summarize_matches, then structs instead of stream writes.
+// ---------------------------------------------------------------------------
+
+vec<query_dist_t> IBatch::dist_batch()
+{
+  vec<query_dist_t> out;
+  out.reserve(batch_size);
+  for (bix = 0; bix < batch_size; ++bix) {
+    const char* seq = seq_batch[bix].data();
+    uint64_t len = seq_batch[bix].size();
+
+    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
+    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
+
+    search_mers(seq, len, imers_or, imers_rc);
+    summarize_matches(imers_or, imers_rc);
+
+    query_dist_t qd;
+    qd.query = identifier_batch[bix];
+    if (node_to_minfo.empty() || (!std::isnan(dist_max) && (mi_closest->d_llh > dist_max))) {
+      qd.na = true; // the "NA\tNaN" row of report_distances
+    } else if (multi) {
+      vec<const std::pair<const node_sptr_t, minfo_sptr_t>*> rows;
+      rows.reserve(node_to_minfo.size());
+      for (const auto& entry : node_to_minfo) {
+        if (p_value || !no_filter) {
+          entry.second->chisq = mi_closest->likelihood_ratio(entry.second->d_llh, llhfunc);
+        }
+        if (no_filter || entry.second->chisq < chisq_value) {
+          if (std::isnan(dist_max) || entry.second->d_llh < dist_max) {
+            rows.push_back(&entry);
+          }
+        }
+      }
+      std::sort(rows.begin(), rows.end(), [](const auto* lhs, const auto* rhs) {
+        if (lhs->second->d_llh != rhs->second->d_llh) return lhs->second->d_llh < rhs->second->d_llh;
+        return lhs->first->get_se() < rhs->first->get_se();
+      });
+      qd.rows.reserve(rows.size());
+      for (const auto* entry : rows) {
+        dist_row_t row;
+        row.ref_name = entry->first->get_name();
+        row.d_llh = entry->second->d_llh;
+        if (p_value) {
+          row.p_value = chisq_cdf(entry->second->chisq);
+        }
+        qd.rows.push_back(std::move(row));
+      }
+    } else {
+      if (p_value) {
+        mi_closest->chisq = mi_closest->likelihood_ratio(mi_closest->d_llh, llhfunc);
+      }
+      dist_row_t row;
+      row.ref_name = nd_closest->get_name();
+      row.d_llh = mi_closest->d_llh;
+      if (p_value) {
+        row.p_value = chisq_cdf(mi_closest->chisq);
+      }
+      qd.rows.push_back(std::move(row));
+    }
+    out.push_back(std::move(qd));
+  }
+  return out;
+}
+
+vec<query_place_t> IBatch::place_batch()
+{
+  vec<query_place_t> out;
+  out.reserve(batch_size);
+  for (bix = 0; bix < batch_size; ++bix) {
+    const char* seq = seq_batch[bix].data();
+    uint64_t len = seq_batch[bix].size();
+
+    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
+    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
+
+    search_mers(seq, len, imers_or, imers_rc);
+    summarize_matches(imers_or, imers_rc);
+
+    query_place_t qp;
+    qp.query = identifier_batch[bix];
+    qp.placed = collect_placements(qp.placements);
+    out.push_back(std::move(qp));
+  }
+  return out;
+}
+
+vec<query_match_t> IBatch::match_batch()
+{
+  vec<query_match_t> out;
+  out.reserve(batch_size);
+  for (bix = 0; bix < batch_size; ++bix) {
+    const char* seq = seq_batch[bix].data();
+    uint64_t len = seq_batch[bix].size();
+
+    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
+    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
+
+    search_mers(seq, len, imers_or, imers_rc);
+    summarize_matches(imers_or, imers_rc);
+
+    query_match_t qm;
+    qm.query = identifier_batch[bix];
+    qm.onmers = onmers;
+    qm.enmers = (len >= k) ? static_cast<uint32_t>(len - k + 1) : 0;
+    qm.hdist_hist.assign(hdist_th + 1, 0.0);
+    qm.rows.reserve(node_to_minfo.size());
+    for (const auto& [nd, mi] : node_to_minfo) {
+      match_row_t row;
+      row.ref_name = nd->get_name();
+      row.match_count = mi->match_count;
+      row.mismatch_count = mi->mismatch_count;
+      row.nmers = mi->nmers;
+      row.rho = mi->rho;
+      row.hdist_min = mi->hdist_min;
+      row.hdisthist = mi->hdisthist_v;
+      row.d_llh = mi->d_llh;
+      for (uint32_t d = 0; d < qm.hdist_hist.size() && d < mi->hdisthist_v.size(); ++d) {
+        qm.hdist_hist[d] += mi->hdisthist_v[d];
+      }
+      qm.rows.push_back(std::move(row));
+    }
+    // phmap iteration order is arbitrary; sort for deterministic output.
+    std::sort(qm.rows.begin(), qm.rows.end(), [](const match_row_t& lhs, const match_row_t& rhs) {
+      if (lhs.d_llh != rhs.d_llh) return lhs.d_llh < rhs.d_llh;
+      return lhs.ref_name < rhs.ref_name;
+    });
+    out.push_back(std::move(qm));
+  }
+  return out;
+}
+
 IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
   : hdist_th(hdist_th)
   , onmers(0)

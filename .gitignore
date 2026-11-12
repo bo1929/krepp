@@ -4,6 +4,7 @@ build
 test/index*
 test/references*
 
-krepp
+/krepp
 __pycache__
+python/krepp/*.so
 *PLAN.md

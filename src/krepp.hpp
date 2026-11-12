@@ -42,7 +42,11 @@ protected:
 class TargetIndex
 {
 public:
-  void load_index();
+  // relay: when non-null, errors inside the parallel load are latched into it
+  // (ErrorRelay) instead of escaping the OpenMP region, and load_index throws
+  // after the region. The CLI passes nothing and keeps the exit-on-error
+  // behaviour; the embedding API (api.hpp) uses it to surface exceptions.
+  void load_index(ErrorRelay* relay = nullptr);
   void ensure_backbone();
   void read_lineages();
 
