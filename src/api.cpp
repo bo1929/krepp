@@ -235,7 +235,11 @@ namespace api {
             total_qseq_count += qs->get_cbatch_size();
             auto ib = std::make_shared<IBatch>(
               index, qs, opts.hdist_th, opts.chisq_value, opts.dist_max, opts.tau, no_filter, opts.multi, false, p_value_flag);
-#pragma omp task firstprivate(ib)
+            // Explicit sharing: `relay` and `results` live in drive()'s scope and
+            // must be SHARED across tasks (relay is non-copyable — std::atomic
+            // members; results is appended under the critical below). GCC would
+            // otherwise default them to firstprivate and try to copy `relay`.
+#pragma omp task firstprivate(ib, batch_fn) shared(relay, results)
             {
               relay.guard([&] {
                 vec<T> local = batch_fn(*ib);
@@ -273,10 +277,10 @@ namespace api {
   vec<query_match_t> Session::matches(const std::string& query_path)
   {
     std::lock_guard<std::mutex> lock(session_mutex());
-    // Unfiltered view of the k-mer matches: every reference that had at least
-    // one k-mer within hdist_th, with its histogram and distance.
+    // Unfiltered view of the k-mer matches; the adaptive best-hit rejection
+    // inside summarize_matches() is optional for this collector only.
     return drive<query_match_t>(
-      query_path, true, false, [](IBatch& ib) { return ib.match_batch(); });
+      query_path, true, false, [this](IBatch& ib) { return ib.match_batch(opts.match_adaptive_filter); });
   }
 
   // Explicit instantiation is not needed: drive is only used from this TU and

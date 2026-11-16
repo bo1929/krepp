@@ -29,6 +29,7 @@ namespace api {
     bool p_value = false;                                       // dist --p-value
     bool dist_filter = false;                                   // dist --filter (off by default)
     bool place_filter = true;                                   // place --filter (on by default)
+    bool match_adaptive_filter = true;                          // matches(): best-hit adaptive HD rejection
     uint32_t num_threads = 1;                                   // --num-threads
     bool verbose = false;                                       // --verbose
     bool use_mmap = true;                                       // --mmap / --no-mmap

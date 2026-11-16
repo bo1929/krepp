@@ -252,7 +252,9 @@ public:
          bool summarize,
          bool p_value);
   void search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, imers_sptr_t imers_rc);
-  void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc);
+  // adaptive_filter=false skips the best-hit-widened Hamming-distance
+  // rejection (all-hits view); only match_batch() forwards it.
+  void summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc, bool adaptive_filter = true);
   void estimate_distances(strstream& batch_stream);
   void report_distances(strstream& batch_stream);
   void place_sequences(strstream& batch_stream, bool tabular);
@@ -263,7 +265,7 @@ public:
   // mirrors its stream-writing counterpart row-for-row (see api.hpp).
   vec<query_dist_t> dist_batch();
   vec<query_place_t> place_batch();
-  vec<query_match_t> match_batch();
+  vec<query_match_t> match_batch(bool adaptive_filter = true);
 
 private:
   placement_t make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi, const minfo_sptr_t& mi_parent);

@@ -37,6 +37,11 @@ PYBIND11_MODULE(_krepp, m)
     .def_readwrite("p_value", &Options::p_value, "dist: compute the p-value column (--p-value). [False]")
     .def_readwrite("dist_filter", &Options::dist_filter, "dist: filter by statistical significance (dist --filter). [False]")
     .def_readwrite("place_filter", &Options::place_filter, "place: filter by k-mer support (place --filter). [True]")
+    .def_readwrite("match_adaptive_filter",
+                   &Options::match_adaptive_filter,
+                   "matches: apply the best-hit adaptive Hamming-distance rejection (threshold 2*best_HD+1). "
+                   "False returns every reference surviving the LSH lookup and hdist_th (all-hits view); "
+                   "affects matches() only, never dist()/place(). [True]")
     .def_readwrite("num_threads", &Options::num_threads, "OpenMP threads (--num-threads); >1 makes result order nondeterministic, as in the CLI. [1]")
     .def_readwrite("verbose", &Options::verbose, "Per-phase load timing on stderr (--verbose). [False]")
     .def_readwrite("use_mmap", &Options::use_mmap, "View index arrays through a file mapping (--mmap/--no-mmap). [True]")

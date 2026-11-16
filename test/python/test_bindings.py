@@ -489,6 +489,75 @@ def main():
             and dist_key(cli_rows) == bind_key(res_x10)
         note(ok, f"dist multi-batch parity ({len(res_x10)} queries, {len(cli_rows)} rows)")
 
+        # ---- matches: match_adaptive_filter (all-hits mode) ---------------------
+        # Default must stay True so existing callers keep current behavior.
+        note(krepp.Options().match_adaptive_filter is True,
+             "match_adaptive_filter defaults to True")
+
+        s_ah = krepp.Session(idx, krepp.Options(num_threads=1, match_adaptive_filter=False))
+        a_res = s_ah.matches(query)
+        ok = len(a_res) == len(mres)
+        detail = f"query count all-hits={len(a_res)} default={len(mres)}"
+        recovered = 0
+        if ok:
+            for qm_a, qm_d in zip(a_res, mres):
+                if qm_a.query != qm_d.query:
+                    ok, detail = False, f"query order mismatch {qm_a.query} vs {qm_d.query}"
+                    break
+                names_d = {r.ref_name for r in qm_d.rows}
+                names_a = {r.ref_name for r in qm_a.rows}
+                if not names_d <= names_a:
+                    # §4.3: all-hits retains the default set; per-row statistics
+                    # may still differ through orientation choice, names may not.
+                    ok, detail = False, f"{qm_a.query}: default names missing: {names_d - names_a}"
+                    break
+                recovered += len(names_a - names_d)
+                for r in qm_a.rows:
+                    hs = sum(r.hdisthist)
+                    if (len(r.hdisthist) != 5 or abs(hs - r.match_count) > 1e-6
+                            or not (0.0 <= r.match_count <= qm_a.onmers)
+                            or qm_a.onmers > qm_a.enmers):
+                        ok, detail = False, f"{qm_a.query}/{r.ref_name}: count identity violated in all-hits mode"
+                        break
+                if not ok:
+                    break
+        note(ok, "all-hits matches(): superset of default + count identities",
+             detail if not ok else f"recovered {recovered} adaptively-suppressed references")
+
+        # The flag is matches-only: dist()/place() results must not change.
+        note(bind_key(s_ah.dist(query)) == bind_key(dres),
+             "match_adaptive_filter=False leaves dist() unchanged")
+
+        # Engineered recovery fixture (§5.6): exact source hits make the
+        # adaptive threshold 2*0+1=1, suppressing relatives matched only at
+        # HD>=2; all-hits must recover at least one such relative.
+        import random as _random
+        _rng = _random.Random(0)
+        _toy_dir = os.path.join(ROOT, "test", "references_toy")
+        _synth = os.path.join(work, "synth_source_reads.fq")
+        with open(_synth, "w") as _fh:
+            for _g in sorted(os.listdir(_toy_dir)):
+                if not _g.endswith(".fna"):
+                    continue
+                with open(os.path.join(_toy_dir, _g)) as _in:
+                    _seq = "".join(ln.strip() for ln in _in if not ln.startswith(">"))
+                for _i in range(4):
+                    _st = _rng.randrange(0, max(1, len(_seq) - 150))
+                    _sub = _seq[_st:_st + 150]
+                    _fh.write(f"@{_g.split('.')[0]}_synth{_i}\n{_sub}\n+\n{'I' * len(_sub)}\n")
+        m_def = s_mt.matches(_synth)
+        m_all = s_ah.matches(_synth)
+        recovered_q = 0
+        for qd_, qa_ in zip(m_def, m_all):
+            nd_ = {r.ref_name for r in qd_.rows}
+            na_ = {r.ref_name for r in qa_.rows}
+            assert nd_ <= na_, f"{qa_.query}: synthetic default not subset of all-hits"
+            if na_ - nd_:
+                recovered_q += 1
+        note(recovered_q > 0,
+             f"engineered exact-source reads: all-hits recovers suppressed relatives ({recovered_q} queries)")
+
+
         # ---- corrupt index battery (RuntimeError, process survives) ---------------
         # (the truncated-cmer case is covered in the error-path section above)
         def corrupt(label, mutate):

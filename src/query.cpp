@@ -109,16 +109,18 @@ void IBatch::widen_hdist_filter(uint32_t& hdist_filt)
   }
 }
 
-void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
+void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc, bool adaptive_filter)
 {
   nd_closest = tree->get_root();
   mi_closest = std::make_shared<Minfo>(hdist_th);
   node_to_minfo.clear();
-  widen_hdist_filter(imers_or->hdist_filt);
-  widen_hdist_filter(imers_rc->hdist_filt);
+  if (adaptive_filter) {
+    widen_hdist_filter(imers_or->hdist_filt);
+    widen_hdist_filter(imers_rc->hdist_filt);
+  }
   for (auto [nd, mi] : imers_or->leaf_to_minfo) {
     mi->mismatch_count = onmers - mi->match_count;
-    if (mi->hdist_min > imers_or->hdist_filt) {
+    if (adaptive_filter && mi->hdist_min > imers_or->hdist_filt) {
       continue;
     }
     mi->optimize_likelihood(llhfunc);
@@ -130,7 +132,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
   }
   for (auto [nd, mi] : imers_rc->leaf_to_minfo) {
     mi->mismatch_count = onmers - mi->match_count;
-    if (mi->hdist_min > imers_rc->hdist_filt) {
+    if (adaptive_filter && mi->hdist_min > imers_rc->hdist_filt) {
       continue;
     }
     mi->optimize_likelihood(llhfunc);
@@ -513,7 +515,7 @@ vec<query_place_t> IBatch::place_batch()
   return out;
 }
 
-vec<query_match_t> IBatch::match_batch()
+vec<query_match_t> IBatch::match_batch(bool adaptive_filter)
 {
   vec<query_match_t> out;
   out.reserve(batch_size);
@@ -525,7 +527,7 @@ vec<query_match_t> IBatch::match_batch()
     imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
 
     search_mers(seq, len, imers_or, imers_rc);
-    summarize_matches(imers_or, imers_rc);
+    summarize_matches(imers_or, imers_rc, adaptive_filter);
 
     query_match_t qm;
     qm.query = identifier_batch[bix];
