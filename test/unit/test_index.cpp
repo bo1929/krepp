@@ -185,8 +185,26 @@ TEST_CASE("a per-sequence build and a per-file build agree")
     build_index(dir / "by_seq", fa, opt);
   }
   const std::string suffix = index_suffix(opt.m, opt.r, opt.frac);
-  for (const std::string& part : {"cmer", "inc", "crecord", "reflist"}) {
+  for (const std::string& part : {"cmer", "inc", "reflist"}) {
+    CAPTURE(part);
     CHECK(slurp(dir / "by_file" / (part + suffix)) == slurp(dir / "by_seq" / (part + suffix)));
+  }
+  // The two children of a color represent an unordered partition.
+  const auto file_index = load_index_dir(dir / "by_file");
+  const auto seq_index = load_index_dir(dir / "by_seq");
+  const auto file_colors = file_index->get_crecord(opt.r);
+  const auto seq_colors = seq_index->get_crecord(opt.r);
+  REQUIRE(file_colors->get_nsubsets() == seq_colors->get_nsubsets());
+  REQUIRE(file_colors->get_nnodes() == seq_colors->get_nnodes());
+  for (se_t color = 0; color < file_colors->get_nsubsets(); ++color) {
+    CAPTURE(color);
+    const auto [file_first, file_second] = file_colors->get_pse(color);
+    const auto [seq_first, seq_second] = seq_colors->get_pse(color);
+    CHECK(std::minmax(file_first, file_second) == std::minmax(seq_first, seq_second));
+  }
+  for (se_t node = 0; node < file_colors->get_nnodes(); ++node) {
+    CAPTURE(node);
+    CHECK(file_colors->get_rho(node) == seq_colors->get_rho(node));
   }
   // The human readable metadata differs only in the date line.
   const std::vector<std::string> meta_file = read_lines(dir / "by_file" / ("metadata" + suffix + ".txt"));

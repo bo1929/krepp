@@ -22,6 +22,7 @@ git clone --recurse-submodules -j8 https://github.com/bo1929/krepp.git
 cd krepp && make
 ```
 and run `./krepp --help`. Then, perhaps, install it to a directory you have in your `$PATH` with `sudo make install` (or `make install PREFIX=~/.local`, or simply `cp ./krepp ~/.local/bin`).
+For a portable x86 binary or Python extension, build from a clean tree with `BMI2=0`.
 
 
 ## Quickstart with a toy example
@@ -131,9 +132,8 @@ SEQ_ID	DISTAL_NODE	EDGE_NUM	LWR	DIST
 ||61435-2985	G001610775	37	0.19048	0.00804
 ||61435-2985	G000741845	36	0.17634	0.00995
 ```
-Placement values are deterministic up to the last printed digit of `like_weight_ratio`
-(a ratio of sums accumulated in hash-map order); with `--num-threads` above 1, the order
-of queries in the file can also vary between runs.
+Likelihood weights can vary between runs when hits tie for the best distance.
+With `--num-threads` above 1, the order of queries in the file can also vary.
 
 ## Python bindings
 
@@ -161,6 +161,8 @@ for qm in s.matches("query_toy.fq"):  # k-mer match summaries per reference
 
 Use `make python PYTHON=/path/to/python3` to target a specific interpreter
 (default: `python3`).
+Each Python query method collects the entire result in memory before returning.
+Use the streaming CLI for query files whose results may exceed available memory.
 
 ## Citation
 ```bibtex

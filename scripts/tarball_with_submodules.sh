@@ -1,73 +1,50 @@
 #!/usr/bin/env bash
 
-# git-archive-submodules - A script to produce an archive tar.gz file of the a git module including all git submodules
-# based on https://ttboj.wordpress.com/2015/07/23/git-archive-with-submodules-and-tar-magic/
+# Package a tagged source tree and its pinned submodules.
+set -euo pipefail
 
-
-usage()
-{
-  echo >&2 "git-archive-submodules - A script to produce an archive tar.gz file of the
-                       a git module including all git submodules"
-  echo >&2 "requires: git, sed, gzip, and tar (or gtar on macos)"
-  echo >&2 "usage: $0 [destination]"
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
 }
 
-# requires gnu-tar on mac
-export TARCOMMAND=tar
-case "$OSTYPE" in
-  darwin*)    export TARCOMMAND=gtar;;
-  linux-gnu*) export TARCOMMAND=tar;;
-  *)        echo "unknown: $OSTYPE" && exit 1;;
+[[ $# -le 1 ]] || fail "usage: $0 [destination]"
+
+case "$(uname -s)" in
+  Darwin) tar_command=gtar ;;
+  Linux)  tar_command=tar ;;
+  *)      fail "unsupported platform" ;;
 esac
-command -v ${TARCOMMAND} >/dev/null 2>&1 || { usage; echo >&2 "ERROR: I require ${TARCOMMAND} but it's not installed.  Aborting."; exit 1; }
+for command_name in git gzip "$tar_command"; do
+  command -v "$command_name" >/dev/null 2>&1 || fail "$command_name is required"
+done
 
-# reqiures git
-command -v git >/dev/null 2>&1 || { usage; echo >&2 "ERROR:I require git but it's not installed.  Aborting."; usage; exit 1; }
+repo_root=$(git rev-parse --show-toplevel)
+tag=$(git -C "$repo_root" describe --tags --exact-match --match 'v[0-9]*' HEAD 2>/dev/null) ||
+  fail "check out a release tag before creating an archive"
+[[ "$tag" != */* ]] || fail "release tag must not contain a slash: $tag"
+git -C "$repo_root" diff --cached --quiet --ignore-submodules=none HEAD -- &&
+  git -C "$repo_root" diff --quiet --ignore-submodules=all -- ||
+  fail "tracked files must match the release tag"
 
-# requires sed
-command -v sed >/dev/null 2>&1 || { usage; echo >&2 "ERROR:I require sed but it's not installed.  Aborting."; usage; exit 1; }
+archive_prefix="krepp-${tag#v}"
+destination=${1:-"$archive_prefix-including-submodules.tar.gz"}
+[[ ! -d "$destination" ]] || fail "destination must be a file path: $destination"
 
-# requires gzip
-command -v gzip >/dev/null 2>&1 || { usage; echo >&2 "ERROR:I require gzip but it's not installed.  Aborting."; usage; exit 1; }
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/krepp-archive.XXXXXX")
+trap 'rm -rf -- "$scratch"' EXIT
+archive_file="$scratch/source.tar"
+submodule_archive="$scratch/submodule.tar"
+export archive_prefix archive_file submodule_archive tar_command
 
-export TARMODULE=`basename \`git rev-parse --show-toplevel\``
-export TARVERSION=`git describe --tags --abbrev=0 | sed 's/v//g'`
-export TARPREFIX="${TARMODULE}-${TARVERSION}"
+git -C "$repo_root" archive --prefix="$archive_prefix/" --output="$archive_file" "$tag"
+git -C "$repo_root" submodule update --init --recursive --checkout
+git -C "$repo_root" submodule foreach --recursive '
+  git diff --cached --quiet --ignore-submodules=none "$sha1" -- &&
+    git archive --prefix="$archive_prefix/$displaypath/" --output="$submodule_archive" "$sha1" &&
+    "$tar_command" --concatenate --file="$archive_file" "$submodule_archive"
+'
 
-# create module archive
-git archive --prefix=${TARPREFIX}/ -o ${TMPDIR}${TARPREFIX}.tar v${TARVERSION}
-if [[ ! -f "${TMPDIR}${TARPREFIX}.tar" ]]; then
-  echo "ERROR: base sourcecode archive was not created. check git output in log above."
-  usage
-  exit 1
-fi
-
-# force init submodules
-git submodule update --init --recursive
-
-# tar each submodule recursively
-git submodule foreach --recursive 'git archive --prefix=${TARPREFIX}/${displaypath}/ HEAD > ${TMPDIR}tmp.tar && ${TARCOMMAND} --concatenate --file=${TMPDIR}${TARPREFIX}.tar ${TMPDIR}tmp.tar'
-
-# compress tar file
-gzip -9 ${TMPDIR}${TARPREFIX}.tar
-if [[ ! -f "${TMPDIR}${TARPREFIX}.tar.gz" ]]; then
-  echo "ERROR: gzipped archive was not created. check git output in log above."
-  usage
-  exit 1
-fi
-
-# copy file to final name and location if specified
-if [[ -z "$1" ]]; then
-  destination=${TARPREFIX}-including-submodules.tar.gz
-else
-  destination=$1
-fi
-cp ${TMPDIR}${TARPREFIX}.tar.gz ${destination}
-if [[ -f "${TMPDIR}${TARPREFIX}.tar.gz" ]]; then
-  rm ${TMPDIR}${TARPREFIX}.tar.gz
-  echo "created ${destination}"
-else
-  echo "ERROR copying ${TMPDIR}${TARPREFIX}.tar.gz to ${destination}"
-  usage
-  exit 1
-fi
+gzip -n -9 "$archive_file"
+cp -- "$archive_file.gz" "$destination"
+printf 'created %s\n' "$destination"
