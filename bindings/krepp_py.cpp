@@ -136,5 +136,5 @@ PYBIND11_MODULE(_krepp, m)
          py::arg("fasta"),
          "Per-query k-mer match summaries per matched reference (list[QueryMatch]).")
     .def_property_readonly("total_qseq", &Session::get_total_qseq, "Number of query sequences processed so far.")
-    .def_property_readonly("options", &Session::get_options, py::return_value_policy::reference_internal);
+    .def_property_readonly("options", &Session::get_options, "A copy of the session's query options.");
 }

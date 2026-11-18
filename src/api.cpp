@@ -232,7 +232,7 @@ namespace api {
         relay.guard([&] {
           bool cont_reading = false;
           while (!relay.check_error() && ((cont_reading = qs->read_next_batch()) || !qs->is_batch_finished())) {
-            total_qseq_count += qs->get_cbatch_size();
+            total_qseq_count.fetch_add(qs->get_cbatch_size(), std::memory_order_relaxed);
             auto ib = std::make_shared<IBatch>(
               index, qs, opts.hdist_th, opts.chisq_value, opts.dist_max, opts.tau, no_filter, opts.multi, false, p_value_flag);
             // Explicit sharing: `relay` and `results` live in drive()'s scope and

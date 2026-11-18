@@ -17,6 +17,8 @@
 
 #include "krepp.hpp"
 
+#include <atomic>
+
 namespace api {
 
   struct Options
@@ -52,8 +54,8 @@ namespace api {
     vec<query_place_t> place(const std::string& query_path);
     vec<query_match_t> matches(const std::string& query_path);
 
-    uint64_t get_total_qseq() const { return total_qseq_count; }
-    const Options& get_options() const { return opts; }
+    uint64_t get_total_qseq() const { return total_qseq_count.load(std::memory_order_relaxed); }
+    Options get_options() const { return opts; }
 
   private:
     // Mirrors the CLI driver loop (omp single reader + per-batch tasks); the
@@ -65,8 +67,8 @@ namespace api {
     void prepare_placement_tree(); // read_lineages() or ensure_backbone(), once
     static void check_query_path(const std::string& query_path);
 
-    Options opts;
-    uint64_t total_qseq_count = 0;
+    const Options opts;
+    std::atomic<uint64_t> total_qseq_count{0};
     bool tree_ready = false;
   };
 

@@ -398,6 +398,10 @@ def main():
         # ---- total_qseq bookkeeping (s1 ran dist 3x: res + dres + res_after) --
         note(s1.total_qseq == 3 * len(dres),
              "total_qseq accumulates across calls", f"total_qseq={s1.total_qseq}")
+        original_threshold = s1.options.hdist_th
+        options_snapshot = s1.options
+        options_snapshot.hdist_th = 32
+        note(s1.options.hdist_th == original_threshold, "session options are returned as a snapshot")
 
         # ================= extended coverage =================
         def run_cli(args, outname):
@@ -429,11 +433,11 @@ def main():
         s_lin = krepp.Session(idx, krepp.Options(num_threads=1, lineage_path=os.path.join(work, "lineages_toy.txt")))
         cli_t = {}
         for c in run_cli(["place", "-i", "idx", "-q", "query_reads.fq", "-l", "lineages_toy.txt", "--tabular"], "lin.tsv"):
-            cli_t.setdefault(c[0], []).append((c[1], int(c[2]), round(float(c[4]), 4)))
+            cli_t.setdefault(c[0], []).append((c[1], int(c[2]), round(float(c[4]), 5)))
         bind_t = {}
         for qp in s_lin.place(query):
             for p in qp.placements:
-                bind_t.setdefault(qp.query, []).append((p.distal_node, p.edge_num, round(p.distance, 4)))
+                bind_t.setdefault(qp.query, []).append((p.distal_node, p.edge_num, round(p.distance, 5)))
         ok = set(cli_t) == set(bind_t) and all(sorted(cli_t[q]) == sorted(bind_t[q]) for q in cli_t)
         note(ok, "place with lineage tree parity",
              "" if ok else f"{set(cli_t) ^ set(bind_t)}")

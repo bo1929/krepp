@@ -154,18 +154,23 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc, boo
   }
 }
 
+void IBatch::scan_query(const std::string& seq,
+                       const imers_sptr_t& imers_or,
+                       const imers_sptr_t& imers_rc,
+                       bool adaptive_filter)
+{
+  imers_or->reset_query(seq.size());
+  imers_rc->reset_query(seq.size());
+  search_mers(seq.data(), seq.size(), imers_or, imers_rc);
+  summarize_matches(imers_or, imers_rc, adaptive_filter);
+}
+
 void IBatch::estimate_distances(strstream& batch_stream)
 {
   const auto imers_or = std::make_shared<IMers>(index, 0, hdist_th);
   const auto imers_rc = std::make_shared<IMers>(index, 0, hdist_th);
   for (bix = 0; bix < batch_size; ++bix) {
-    const char* seq = seq_batch[bix].data();
-    uint64_t len = seq_batch[bix].size();
-
-    imers_or->reset_query(len);
-    imers_rc->reset_query(len);
-    search_mers(seq, len, imers_or, imers_rc);
-    summarize_matches(imers_or, imers_rc);
+    scan_query(seq_batch[bix], imers_or, imers_rc);
     batch_stream.precision(5);
     batch_stream << std::fixed;
     report_distances(batch_stream);
@@ -238,13 +243,7 @@ void IBatch::place_sequences(strstream& batch_stream, bool tabular)
   const auto imers_rc = std::make_shared<IMers>(index, 0, hdist_th);
   bool has_previous = false;
   for (bix = 0; bix < batch_size; ++bix) {
-    const char* seq = seq_batch[bix].data();
-    uint64_t len = seq_batch[bix].size();
-
-    imers_or->reset_query(len);
-    imers_rc->reset_query(len);
-    search_mers(seq, len, imers_or, imers_rc);
-    summarize_matches(imers_or, imers_rc);
+    scan_query(seq_batch[bix], imers_or, imers_rc);
     batch_stream.precision(5);
     batch_stream << std::fixed;
     if (report_placement(batch_stream, tabular, has_previous) && !summarize && !tabular) {
@@ -435,15 +434,10 @@ vec<query_dist_t> IBatch::dist_batch()
 {
   vec<query_dist_t> out;
   out.reserve(batch_size);
+  const auto imers_or = std::make_shared<IMers>(index, 0, hdist_th);
+  const auto imers_rc = std::make_shared<IMers>(index, 0, hdist_th);
   for (bix = 0; bix < batch_size; ++bix) {
-    const char* seq = seq_batch[bix].data();
-    uint64_t len = seq_batch[bix].size();
-
-    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
-    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
-
-    search_mers(seq, len, imers_or, imers_rc);
-    summarize_matches(imers_or, imers_rc);
+    scan_query(seq_batch[bix], imers_or, imers_rc);
 
     query_dist_t qd;
     qd.query = identifier_batch[bix];
@@ -497,15 +491,10 @@ vec<query_place_t> IBatch::place_batch()
 {
   vec<query_place_t> out;
   out.reserve(batch_size);
+  const auto imers_or = std::make_shared<IMers>(index, 0, hdist_th);
+  const auto imers_rc = std::make_shared<IMers>(index, 0, hdist_th);
   for (bix = 0; bix < batch_size; ++bix) {
-    const char* seq = seq_batch[bix].data();
-    uint64_t len = seq_batch[bix].size();
-
-    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
-    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
-
-    search_mers(seq, len, imers_or, imers_rc);
-    summarize_matches(imers_or, imers_rc);
+    scan_query(seq_batch[bix], imers_or, imers_rc);
 
     query_place_t qp;
     qp.query = identifier_batch[bix];
@@ -519,20 +508,15 @@ vec<query_match_t> IBatch::match_batch(bool adaptive_filter)
 {
   vec<query_match_t> out;
   out.reserve(batch_size);
+  const auto imers_or = std::make_shared<IMers>(index, 0, hdist_th);
+  const auto imers_rc = std::make_shared<IMers>(index, 0, hdist_th);
   for (bix = 0; bix < batch_size; ++bix) {
-    const char* seq = seq_batch[bix].data();
-    uint64_t len = seq_batch[bix].size();
-
-    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
-    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
-
-    search_mers(seq, len, imers_or, imers_rc);
-    summarize_matches(imers_or, imers_rc, adaptive_filter);
+    scan_query(seq_batch[bix], imers_or, imers_rc, adaptive_filter);
 
     query_match_t qm;
     qm.query = identifier_batch[bix];
     qm.onmers = onmers;
-    qm.enmers = (len >= k) ? static_cast<uint32_t>(len - k + 1) : 0;
+    qm.enmers = imers_or->enmers;
     qm.hdist_hist.assign(hdist_th + 1, 0.0);
     qm.rows.reserve(node_to_minfo.size());
     for (const auto& [nd, mi] : node_to_minfo) {

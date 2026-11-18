@@ -268,6 +268,10 @@ public:
   vec<query_match_t> match_batch(bool adaptive_filter = true);
 
 private:
+  void scan_query(const std::string& seq,
+                  const imers_sptr_t& imers_or,
+                  const imers_sptr_t& imers_rc,
+                  bool adaptive_filter = true);
   placement_t make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi, const minfo_sptr_t& mi_parent);
   static void widen_hdist_filter(uint32_t& hdist_filt);
   uint32_t k;

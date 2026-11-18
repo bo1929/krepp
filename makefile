@@ -153,7 +153,7 @@ ifeq ($(filter $(ARCH),x86_64 i386),$(ARCH))
   BMI2_COMPILER := $(shell echo 'int main() { return 0; }' | $(COMPILER) -mbmi2 -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
   ifeq ($(BMI2),auto)
     BMI2_CPU := $(shell P=$$(mktemp); printf 'int main(){ __builtin_cpu_init(); return __builtin_cpu_supports("bmi2") ? 0 : 1; }' > $$P.c; ($(COMPILER) $$P.c -o $$P 2>/dev/null && $$P && echo yes) || echo no; rm -f $$P $$P.c)
-    BMI2_ENABLED := $(if $(filter yes,$(BMI2_COMPILER))$(filter yes,$(BMI2_CPU)),yes,no)
+    BMI2_ENABLED := $(if $(filter yesyes,$(BMI2_COMPILER)$(BMI2_CPU)),yes,no)
   else ifeq ($(BMI2),1)
     BMI2_ENABLED := $(BMI2_COMPILER)
   else
@@ -202,7 +202,7 @@ $(PY_MODULE): $(PY_OBJECTS)
 	@mkdir -p python/krepp
 	$(COMPILER) $(PY_LDFLAGS) $(LDFLAGS) $+ $(VARDEF) -o $@ $(LDLIBS)
 
-test-python: $(PY_MODULE)
+test-python: $(PROGRAM) $(PY_MODULE)
 	PYTHONPATH=python $(PYTHON) test/python/test_bindings.py
 
 $(PROGRAM): $(OBJECTS)
