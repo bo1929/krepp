@@ -1,6 +1,6 @@
 # Tests
 
-Three suites, all wired into `make test`, plus an optional bindings parity
+Four suites, all wired into `make test`, plus an optional bindings parity
 suite (`make test-python`, needs `make python` first):
 
 | target | what it runs |
@@ -8,6 +8,7 @@ suite (`make test-python`, needs `make python` first):
 | `make test-unit` | `test/unit/*.cpp` — the doctest suite, linked against the whole library |
 | `make test-regression` | `test/regression/run_regression.sh` — CLI golden-file tests |
 | `make test-threads` | `test/omp_index_test.cpp` — the index builder under threads |
+| `make test-omp-runtime` | `test/omp_runtime_test.cpp` — both index builds, loading, `place` and `dist` after the OpenMP runtime shut down and restarted (fails only against a static libomp; see the file) |
 | `make test-python` | `test/python/test_bindings.py` — Python bindings vs CLI parity |
 
 ```bash

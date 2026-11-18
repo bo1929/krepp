@@ -41,8 +41,8 @@ void Index::generate_partial_tree(std::string suffix)
   const std::filesystem::path reflist_path = index_dir / ("reflist" + suffix);
   const uint64_t digest = digest_file(reflist_path);
   bool cached = false;
-#pragma omp critical
   {
+    std::lock_guard<std::mutex> critical_lock(critical_mutex());
     cached = tree && digest != 0 && digest == reflist_digest;
     if (cached) {
       tree_reused_count++;
@@ -67,8 +67,8 @@ void Index::generate_partial_tree(std::string suffix)
   curr_tree->generate_tree(names_v);
   const double d_tree = countsec(started);
   bool compatible = false;
-#pragma omp critical
   {
+    std::lock_guard<std::mutex> critical_lock(critical_mutex());
     const auto t_compare = std::chrono::steady_clock::now();
     compatible = curr_tree->check_compatible(tree);
     if (compatible) tree = !tree ? curr_tree : tree;
@@ -84,8 +84,8 @@ void Index::load_partial_tree(std::string suffix)
   const std::filesystem::path nwk_path = index_dir / ("tree" + suffix);
   const uint64_t digest = digest_file(nwk_path);
   bool cached = false;
-#pragma omp critical
   {
+    std::lock_guard<std::mutex> critical_lock(critical_mutex());
     cached = tree && digest != 0 && digest == tree_digest;
     if (cached) {
       tree_reused_count++;
@@ -105,8 +105,8 @@ void Index::load_partial_tree(std::string suffix)
   tree_stream.close();
   const double d_tree = countsec(started);
   bool compatible = false;
-#pragma omp critical
   {
+    std::lock_guard<std::mutex> critical_lock(critical_mutex());
     const auto t_compare = std::chrono::steady_clock::now();
     compatible = curr_tree->check_compatible(tree);
     if (compatible) tree = !tree ? curr_tree : tree;
@@ -143,8 +143,8 @@ void Index::load_partial_index(std::string suffix)
 
   lshf_sptr_t curr_lshf = std::make_shared<LSHF>(m_curr, ppos_v, npos_v, r, frac);
   bool compatible = false;
-#pragma omp critical
   {
+    std::lock_guard<std::mutex> critical_lock(critical_mutex());
     compatible = curr_lshf->check_compatible(lshf);
     if (compatible) {
       lshf = !lshf ? curr_lshf : lshf;
@@ -158,8 +158,8 @@ void Index::load_partial_index(std::string suffix)
 
   crecord_sptr_t curr_crecord;
   flatht_sptr_t curr_flatht;
-#pragma omp critical
   {
+    std::lock_guard<std::mutex> critical_lock(critical_mutex());
     curr_crecord = std::make_shared<CRecord>(tree);
     curr_flatht = std::make_shared<FlatHT>(tree, curr_crecord);
   }
@@ -206,8 +206,8 @@ void Index::load_partial_index(std::string suffix)
   }
 
   std::string overlap;
-#pragma omp critical
   {
+    std::lock_guard<std::mutex> critical_lock(critical_mutex());
     if (frac) {
       for (uint32_t ix = 0; ix <= r; ++ix) {
         if (r_to_flatht.contains(ix)) {
@@ -585,8 +585,8 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht, ErrorR
       rseq_sptr_t rs = std::make_shared<RSeq>(name_to_path[nd->get_name()], lshf, w, r, frac, sdust_t, sdust_w);
       dynht->fill_table(sh, rs);
       dynht->get_record()->insert_rho(nd->get_sh(), rs->get_rho());
-#pragma omp critical
       {
+        std::lock_guard<std::mutex> critical_lock(critical_mutex());
         relay.guard([&] {
           std::cerr << "\33[2K\r" << std::flush;
           std::cerr << "Leaf node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
@@ -594,8 +594,8 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht, ErrorR
         });
       }
     } else {
-#pragma omp critical
       {
+        std::lock_guard<std::mutex> critical_lock(critical_mutex());
         relay.guard([&] {
           std::cerr << "\33[2K\r" << std::flush;
           std::cerr << "Genome skipped: " << nd->get_name() << "\r" << std::flush;
@@ -639,8 +639,8 @@ void IndexMultiple::build_for_subtree(node_sptr_t nd, dynht_sptr_t dynht, ErrorR
 #if defined(_OPENMP) && _WOPENMP == 1
     omp_destroy_lock(&parent_lock);
 #endif
-#pragma omp critical
     {
+      std::lock_guard<std::mutex> critical_lock(critical_mutex());
       relay.guard([&] {
         std::cerr << "\33[2K\r" << std::flush;
         std::cerr << "Internal node: " << nd->get_name() << "\tsize: " << dynht->get_nkmers()
@@ -703,8 +703,8 @@ void IndexMultiple::index_sequences()
       ltab->fill_table(lf->get_sh(), rs, true);
       record->insert_rho(lf->get_sh(), rs->get_rho());
       se_to_table[lf->get_se()] = ltab;
-#pragma omp critical
       {
+        std::lock_guard<std::mutex> critical_lock(critical_mutex());
         relay.guard([&] {
           std::cerr << "\33[2K\r" << std::flush;
           std::cerr << "Leaf node: " << lf->get_name() << "\tsize: " << ltab->get_nkmers()
@@ -730,8 +730,8 @@ void IndexMultiple::index_sequences()
           acc->union_table(ctab);
         }
         se_to_table[parent->get_se()] = acc;
-#pragma omp critical
         {
+          std::lock_guard<std::mutex> critical_lock(critical_mutex());
           relay.guard([&] {
             std::cerr << "\33[2K\r" << std::flush;
             std::cerr << "Internal node: " << parent->get_name() << "\tsize: " << (acc ? acc->get_nkmers() : 0)
