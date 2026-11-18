@@ -159,6 +159,8 @@ public:
   void flush_mers();
 
 private:
+  void reset_query(uint64_t query_len);
+
   /* A queued lookup with its bucket already resolved. */
   struct PendingMer
   {

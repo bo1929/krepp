@@ -173,13 +173,14 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc)
 
 void IBatch::estimate_distances(strstream& batch_stream)
 {
+  const auto imers_or = std::make_shared<IMers>(index, 0, hdist_th);
+  const auto imers_rc = std::make_shared<IMers>(index, 0, hdist_th);
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
 
-    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
-    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
-
+    imers_or->reset_query(len);
+    imers_rc->reset_query(len);
     search_mers(seq, len, imers_or, imers_rc);
     summarize_matches(imers_or, imers_rc);
     batch_stream.precision(5);
@@ -250,14 +251,15 @@ void IBatch::report_distances(strstream& batch_stream)
 
 void IBatch::place_sequences(strstream& batch_stream, bool tabular)
 {
+  const auto imers_or = std::make_shared<IMers>(index, 0, hdist_th);
+  const auto imers_rc = std::make_shared<IMers>(index, 0, hdist_th);
   bool has_previous = false;
   for (bix = 0; bix < batch_size; ++bix) {
     const char* seq = seq_batch[bix].data();
     uint64_t len = seq_batch[bix].size();
 
-    imers_sptr_t imers_or = std::make_shared<IMers>(index, len, hdist_th);
-    imers_sptr_t imers_rc = std::make_shared<IMers>(index, len, hdist_th);
-
+    imers_or->reset_query(len);
+    imers_rc->reset_query(len);
     search_mers(seq, len, imers_or, imers_rc);
     summarize_matches(imers_or, imers_rc);
     batch_stream.precision(5);
@@ -442,20 +444,27 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
 
 IMers::IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th)
   : index(index)
-  , len(len)
   , hdist_th(hdist_th)
-  , onmers(0)
 {
   lshf = index->get_lshf();
   tree = index->get_tree();
   k = lshf->get_k();
   h = lshf->get_h();
   pending_v.reserve(kPendingBlock);
-  if (len) {
-    enmers = len - k + 1;
-  } else {
-    enmers = 0;
-  }
+  reset_query(len);
+}
+
+void IMers::reset_query(uint64_t query_len)
+{
+  len = query_len;
+  enmers = query_len >= k ? query_len - k + 1 : 0;
+  onmers = 0;
+  hdist_filt = std::numeric_limits<uint32_t>::max();
+  // Discard the old hash layout because its iteration order can affect ties.
+  leaf_to_minfo = decltype(leaf_to_minfo){};
+  pending_v.clear();
+  se_v.clear();
+  // Keep the visit stamps and counter together so the next query can reuse the array.
 }
 
 void IMers::add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr)
