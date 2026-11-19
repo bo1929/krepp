@@ -137,6 +137,15 @@ namespace api {
       static std::mutex mtx;
       return mtx;
     }
+
+    // Guards the result vector the batch tasks of drive() append to. A
+    // std::mutex rather than a named `omp critical`, for the reason given at
+    // critical_mutex() in common.hpp.
+    std::mutex& results_mutex()
+    {
+      static std::mutex mtx;
+      return mtx;
+    }
   } // namespace
 
   Session::Session(const std::filesystem::path& index_dir_path, const Options& options)
@@ -243,8 +252,8 @@ namespace api {
             {
               relay.guard([&] {
                 vec<T> local = batch_fn(*ib);
-#pragma omp critical(krepp_api_results)
                 {
+                  std::lock_guard<std::mutex> results_lock(results_mutex());
                   results.insert(
                     results.end(), std::make_move_iterator(local.begin()), std::make_move_iterator(local.end()));
                 }

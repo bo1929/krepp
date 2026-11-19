@@ -103,8 +103,8 @@ void QueryIndex::estimate_distances()
         {
           strstream batch_stream;
           ib->estimate_distances(batch_stream);
-#pragma omp critical
           {
+            std::lock_guard<std::mutex> critical_lock(critical_mutex());
             if (summarize) {
               for (auto& [nd, wcount] : ib->get_summary()) {
                 twcount += wcount;
@@ -206,8 +206,8 @@ void QueryIndex::place_sequences()
         {
           strstream batch_stream;
           ib->place_sequences(batch_stream, tabular);
-#pragma omp critical
           {
+            std::lock_guard<std::mutex> critical_lock(critical_mutex());
             if (summarize) {
               for (auto& [nd, wcount] : ib->get_summary()) {
                 twcount += wcount;

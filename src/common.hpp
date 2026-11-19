@@ -23,6 +23,7 @@
 #include <locale>
 #include <math.h>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <ostream>
 #include <queue>
@@ -303,6 +304,19 @@ void set_error_handler(error_handler_t handler);
 void set_num_threads(uint32_t nthreads);
 
 [[noreturn]] void error_exit(const std::string& msg, int code = EXIT_FAILURE);
+
+// Stands in for an unnamed `#pragma omp critical`: those all shared one lock, and
+// so do the sections that take this mutex. An OpenMP critical keeps its lock in
+// a variable the compiler places in krepp's own binary; a statically linked
+// libomp frees that lock when its last thread exits and starts afresh on the
+// next call, but the variable keeps the stale pointer, so the next critical
+// section crashes. A std::mutex does not depend on the runtime's lifetime
+// (test/omp_runtime_test.cpp).
+inline std::mutex& critical_mutex()
+{
+  static std::mutex mtx;
+  return mtx;
+}
 
 class ErrorRelay
 {

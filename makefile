@@ -27,6 +27,7 @@ INC = -Iexternal/CLI11/include/CLI \
 #--------------------------------------------
 PROGRAM = krepp
 TEST_PROGRAM = build/omp_index_test
+RUNTIME_TEST_PROGRAM = build/omp_runtime_test
 OBJECTS = build/common.o \
 					build/MurmurHash3.o build/lshf.o \
 					build/phytree.o	build/rqseq.o \
@@ -39,13 +40,14 @@ OBJECTS = build/common.o \
 UNIT_PROGRAM = build/krepp_tests
 LIB_OBJECTS = $(filter-out build/krepp.o,$(OBJECTS))
 TEST_OBJECTS = $(LIB_OBJECTS) build/omp_index_test.o
+RUNTIME_TEST_OBJECTS = $(LIB_OBJECTS) build/omp_runtime_test.o
 UNIT_SOURCES = $(wildcard test/unit/*.cpp)
 UNIT_OBJECTS = $(patsubst test/unit/%.cpp,build/test/unit/%.o,$(UNIT_SOURCES))
-DEPS = $(OBJECTS:.o=.d) build/omp_index_test.d $(UNIT_OBJECTS:.o=.d)
+DEPS = $(OBJECTS:.o=.d) build/omp_index_test.d build/omp_runtime_test.d $(UNIT_OBJECTS:.o=.d)
 
 # rules
 #--------------------------------------------
-.PHONY: all dynamic static clean install test test-unit test-regression test-threads coverage python test-python
+.PHONY: all dynamic static clean install test test-unit test-regression test-threads test-omp-runtime coverage python test-python
 
 all:
 	$(MAKE) mode=dynamic $(PROGRAM)
@@ -56,7 +58,7 @@ dynamic:
 static:
 	$(MAKE) mode=static $(PROGRAM)
 
-test: test-unit test-regression test-threads
+test: test-unit test-regression test-threads test-omp-runtime
 
 test-unit: $(UNIT_PROGRAM)
 	./$(UNIT_PROGRAM)
@@ -66,6 +68,9 @@ test-regression: $(PROGRAM)
 
 test-threads: $(TEST_PROGRAM)
 	./$(TEST_PROGRAM)
+
+test-omp-runtime: $(RUNTIME_TEST_PROGRAM)
+	./$(RUNTIME_TEST_PROGRAM)
 
 # Source-based coverage of the unit/integration suite (clang only).
 # The report covers src/ only; the tests themselves are excluded.
@@ -212,6 +217,10 @@ build/omp_index_test.o: test/omp_index_test.cpp
 	@mkdir -p build
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c $< -o $@
 
+build/omp_runtime_test.o: test/omp_runtime_test.cpp
+	@mkdir -p build
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -MMD -MP $(VARDEF) $(INC) -c $< -o $@
+
 # doctest suite: links the whole library (everything but the CLI's main()).
 build/test/unit/%.o: test/unit/%.cpp
 	@mkdir -p build/test/unit
@@ -225,8 +234,11 @@ $(UNIT_PROGRAM): $(UNIT_OBJECTS) $(LIB_OBJECTS)
 $(TEST_PROGRAM): $(TEST_OBJECTS)
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(VARDEF) $(LDFLAGS) $(INC) -o $@ $(LDLIBS) 
 
+$(RUNTIME_TEST_PROGRAM): $(RUNTIME_TEST_OBJECTS)
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(VARDEF) $(LDFLAGS) $(INC) -o $@ $(LDLIBS) 
+
 clean:
-	rm -f $(PROGRAM) $(OBJECTS) $(TEST_PROGRAM) build/omp_index_test.o $(UNIT_PROGRAM) $(UNIT_OBJECTS) $(DEPS)
+	rm -f $(PROGRAM) $(OBJECTS) $(TEST_PROGRAM) build/omp_index_test.o $(RUNTIME_TEST_PROGRAM) build/omp_runtime_test.o $(UNIT_PROGRAM) $(UNIT_OBJECTS) $(DEPS)
 	rm -rf build/py python/krepp/_krepp*.so
 	@find build -type d -empty -delete 2>/dev/null || true
 	@echo "Succesfully cleaned."

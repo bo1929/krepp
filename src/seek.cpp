@@ -48,8 +48,10 @@ void SBatch::seek_sequences(std::ostream& output_stream)
       batch_stream << identifier_batch[bix] << "\tNaN\n";
     }
   }
-#pragma omp critical
-  output_stream << batch_stream.rdbuf();
+  {
+    std::lock_guard<std::mutex> critical_lock(critical_mutex());
+    output_stream << batch_stream.rdbuf();
+  }
 }
 
 void SBatch::search_mers(const char* seq, uint64_t len, SSummary& or_summary, SSummary& rc_summary)
