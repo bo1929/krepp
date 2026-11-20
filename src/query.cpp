@@ -7,6 +7,7 @@
 
 namespace {
   constexpr size_t kPendingBlock = 64;
+  using node_match_t = std::pair<const node_sptr_t, minfo_sptr_t>;
 
   inline void prefetch(const void* ptr)
   {
@@ -111,46 +112,39 @@ void IBatch::widen_hdist_filter(uint32_t& hdist_filt)
 
 void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc, bool adaptive_filter)
 {
-  nd_closest = tree->get_root();
+  const node_sptr_t root = tree->get_root();
+  nd_closest = root;
   mi_closest = std::make_shared<Minfo>(hdist_th);
   node_to_minfo.clear();
   if (adaptive_filter) {
     widen_hdist_filter(imers_or->hdist_filt);
     widen_hdist_filter(imers_rc->hdist_filt);
   }
-  for (auto [nd, mi] : imers_or->leaf_to_minfo) {
-    mi->mismatch_count = onmers - mi->match_count;
-    if (adaptive_filter && mi->hdist_min > imers_or->hdist_filt) {
-      continue;
-    }
-    mi->optimize_likelihood(llhfunc);
-    if (mi->d_llh <= mi_closest->d_llh) {
-      nd_closest = nd;
-      mi_closest = mi;
-    }
-    node_to_minfo.emplace(nd, mi);
-  }
-  for (auto [nd, mi] : imers_rc->leaf_to_minfo) {
-    mi->mismatch_count = onmers - mi->match_count;
-    if (adaptive_filter && mi->hdist_min > imers_rc->hdist_filt) {
-      continue;
-    }
-    mi->optimize_likelihood(llhfunc);
-    if (mi->d_llh <= mi_closest->d_llh) {
-      nd_closest = nd;
-      mi_closest = mi;
-    }
-    node_to_minfo[nd] = mi;
-    // If both in reverse-complement and the original sequence, decide:
-    if ((imers_or->leaf_to_minfo).contains(nd)) {
-      minfo_sptr_t mi_or = (imers_or->leaf_to_minfo)[nd];
-      if ((mi->d_llh > mi_or->d_llh) || ((mi->d_llh == mi_or->d_llh) && (mi->match_count < mi_or->match_count))) {
-        node_to_minfo[nd] = mi_or;
+  for (const auto& imers : {imers_or, imers_rc}) {
+    for (const auto& [nd, mi] : imers->leaf_to_minfo) {
+      mi->mismatch_count = onmers - mi->match_count;
+      if (adaptive_filter && mi->hdist_min > imers->hdist_filt) {
+        continue;
+      }
+      mi->optimize_likelihood(llhfunc);
+      auto [it, inserted] = node_to_minfo.try_emplace(nd, mi);
+      if (!inserted) {
+        // Prefer lower distance, then more matches, then the reverse complement.
+        auto& previous = it->second;
+        if (mi->d_llh < previous->d_llh ||
+            (mi->d_llh == previous->d_llh && mi->match_count >= previous->match_count)) {
+          previous = mi;
+        }
       }
     }
   }
-  if (nd_closest != tree->get_root()) {
-    node_to_minfo[nd_closest] = mi_closest;
+  // Choose the likelihood reference from the same strand summaries used for placement.
+  for (const auto& [nd, mi] : node_to_minfo) {
+    if (mi->d_llh < mi_closest->d_llh ||
+        (mi->d_llh == mi_closest->d_llh && (nd_closest == root || nd->get_se() < nd_closest->get_se()))) {
+      nd_closest = nd;
+      mi_closest = mi;
+    }
   }
 }
 
@@ -201,7 +195,7 @@ void IBatch::report_distances(strstream& batch_stream)
       return;
     }
     if (multi) {
-      vec<const std::pair<const node_sptr_t, minfo_sptr_t>*> rows;
+      vec<const node_match_t*> rows;
       rows.reserve(node_to_minfo.size());
       for (const auto& entry : node_to_minfo) {
         if (p_value || !no_filter) {
@@ -291,23 +285,29 @@ placement_t IBatch::make_placement(const node_sptr_t& nd, const minfo_sptr_t& mi
 bool IBatch::collect_placements(vec<placement_t>& placements)
 {
   placements.clear();
-  if (node_to_minfo.size() == 0 || !(no_filter || (mi_closest->get_leq_tau(tau) > 1.0))) {
+  if (node_to_minfo.empty() || !(no_filter || (mi_closest->get_leq_tau(tau) > 1.0))) {
     return false;
   }
-  node_sptr_t nd_pp = nd_closest;
-  minfo_sptr_t mi_pp = mi_closest;
-  mi_pp->chisq = 0;
+  mi_closest->chisq = 0;
 
   if (node_to_minfo.size() == 1) {
-    placements.push_back(make_placement(nd_pp, mi_pp, nullptr));
+    placements.push_back(make_placement(nd_closest, mi_closest, nullptr));
     return true;
   }
 
-  vec<node_sptr_t> nd_v;
-  nd_v.reserve(node_to_minfo.size());
-  parallel_flat_phmap<node_sptr_t, minfo_sptr_t> pp_map;
+  // Sum each parent's floating-point contributions in a fixed leaf order.
+  vec<const node_match_t*> leaves;
+  leaves.reserve(node_to_minfo.size());
+  for (const auto& entry : node_to_minfo) {
+    leaves.push_back(&entry);
+  }
+  std::sort(leaves.begin(), leaves.end(), [](const auto* lhs, const auto* rhs) {
+    return lhs->first->get_se() < rhs->first->get_se();
+  });
 
-  for (auto& [nd_curr, mi_curr] : node_to_minfo) {
+  parallel_flat_phmap<node_sptr_t, minfo_sptr_t> pp_map;
+  for (const auto* leaf : leaves) {
+    const auto& [nd_curr, mi_curr] = *leaf;
     pp_map[nd_curr] = mi_curr;
     double denom = 1.0;
     node_sptr_t nd_parent = nd_curr;
@@ -327,15 +327,14 @@ bool IBatch::collect_placements(vec<placement_t>& placements)
   }
 
   auto parent_minfo = [&pp_map](const node_sptr_t& nd) -> minfo_sptr_t {
-    node_sptr_t nd_parent = nd->get_parent();
-    if (!nd_parent || !pp_map.contains(nd_parent)) {
-      return nullptr;
-    }
-    return pp_map[nd_parent];
+    const auto it = pp_map.find(nd->get_parent());
+    return it == pp_map.end() ? nullptr : it->second;
   };
 
-  // Collect candidate placements.
-  for (auto& [nd_curr, mi_curr] : pp_map) {
+  vec<const node_match_t*> candidates;
+  candidates.reserve(leaves.size());
+  for (const auto& entry : pp_map) {
+    const auto& [nd_curr, mi_curr] = entry;
     if (nd_curr->get_nchildren() != nd_curr->get_eff_nchildren() || nd_curr->get_nchildren() == 1) {
       continue;
     }
@@ -345,40 +344,44 @@ bool IBatch::collect_placements(vec<placement_t>& placements)
       }
       mi_curr->chisq = mi_closest->likelihood_ratio(mi_curr->d_llh, llhfunc);
       if ((mi_curr->chisq < chisq_value) && nd_curr->get_parent()) {
-        nd_v.push_back(nd_curr);
+        candidates.push_back(&entry);
       }
     }
   }
-  // assert(nd_v.size() > 0);
+  if (candidates.empty()) {
+    return false;
+  }
+  // Normalize weights and report candidates in the same order on every run.
+  std::sort(candidates.begin(), candidates.end(), [](const auto* lhs, const auto* rhs) {
+    return lhs->first->get_en() < rhs->first->get_en();
+  });
 
   double total_lwr = 0;
-  for (uint32_t i = 0; i < nd_v.size(); ++i) {
-    nd_pp = nd_v[i];
-    mi_pp = pp_map[nd_pp];
-    mi_pp->lwr = exp(-mi_pp->chisq / 2);
-    total_lwr = total_lwr + mi_pp->lwr;
+  for (const auto* entry : candidates) {
+    auto& mi = *entry->second;
+    mi.lwr = exp(-mi.chisq / 2);
+    total_lwr += mi.lwr;
   }
 
+  auto append_placement = [&](const node_match_t& entry) {
+    const auto& [nd, mi] = entry;
+    mi->lwr /= total_lwr;
+    placements.push_back(make_placement(nd, mi, parent_minfo(nd)));
+  };
   if (multi) {
-    placements.reserve(nd_v.size());
-    for (uint32_t i = 0; i < nd_v.size(); ++i) {
-      nd_pp = nd_v[i];
-      mi_pp = pp_map[nd_pp];
-      mi_pp->lwr = mi_pp->lwr / total_lwr;
-      placements.push_back(make_placement(nd_pp, mi_pp, parent_minfo(nd_pp)));
+    placements.reserve(candidates.size());
+    for (const auto* entry : candidates) {
+      append_placement(*entry);
     }
   } else {
-    if (nd_v.size() > 1) {
-      // Sort: prefer higher card, then lower d_llh
-      std::sort(nd_v.begin(), nd_v.end(), [&](node_sptr_t lhs, node_sptr_t rhs) {
-        return (lhs->get_card() == rhs->get_card()) ? pp_map[lhs]->d_llh > pp_map[rhs]->d_llh
-                                                    : lhs->get_card() < rhs->get_card();
-      });
-    }
-    nd_pp = nd_v.back();
-    mi_pp = pp_map[nd_pp];
-    mi_pp->lwr = mi_pp->lwr / total_lwr;
-    placements.push_back(make_placement(nd_pp, mi_pp, parent_minfo(nd_pp)));
+    // min_element keeps the first of equivalent candidates, in edge-number order.
+    const auto best = std::min_element(candidates.begin(), candidates.end(), [](const auto* lhs, const auto* rhs) {
+      if (lhs->first->get_card() != rhs->first->get_card()) {
+        return lhs->first->get_card() > rhs->first->get_card();
+      }
+      return lhs->second->d_llh < rhs->second->d_llh;
+    });
+    append_placement(**best);
   }
   return true;
 }
@@ -444,7 +447,7 @@ vec<query_dist_t> IBatch::dist_batch()
     if (node_to_minfo.empty() || (!std::isnan(dist_max) && (mi_closest->d_llh > dist_max))) {
       qd.na = true; // the "NA\tNaN" row of report_distances
     } else if (multi) {
-      vec<const std::pair<const node_sptr_t, minfo_sptr_t>*> rows;
+      vec<const node_match_t*> rows;
       rows.reserve(node_to_minfo.size());
       for (const auto& entry : node_to_minfo) {
         if (p_value || !no_filter) {
@@ -560,7 +563,6 @@ void IMers::reset_query(uint64_t query_len)
   enmers = query_len >= k ? query_len - k + 1 : 0;
   onmers = 0;
   hdist_filt = std::numeric_limits<uint32_t>::max();
-  // Discard the old hash layout because its iteration order can affect ties.
   leaf_to_minfo = decltype(leaf_to_minfo){};
   pending_v.clear();
   se_v.clear();

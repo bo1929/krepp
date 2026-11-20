@@ -202,6 +202,9 @@ class IMers : public std::enable_shared_from_this<IMers>
 
 public:
   IMers(index_sptr_t index, uint64_t len, uint32_t hdist_th);
+  // Start a new query on the same index while retaining the visit-stamp buffer.
+  // Use a separate IMers instance for each concurrent scan.
+  void reset_query(uint64_t query_len);
   imers_sptr_t getptr() { return shared_from_this(); }
   void add_matching_mer(uint32_t pos, uint32_t rix, enc_t enc_lr);
   inline void
@@ -210,8 +213,6 @@ public:
   void flush_mers();
 
 private:
-  void reset_query(uint64_t query_len);
-
   /* A queued lookup with its bucket already resolved. */
   struct PendingMer
   {

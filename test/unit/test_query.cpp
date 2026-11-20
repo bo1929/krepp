@@ -551,6 +551,41 @@ TEST_CASE("place reports valid edges and normalised weights")
   CHECK(single_rows["q2"] == 1);
 }
 
+TEST_CASE("place breaks exact ties between equally large clades by edge number")
+{
+  TempDir dir("query-place-tie");
+  const std::string ref = rand_dna(1500, 7);
+  BuildOptions opt = query_opts();
+  opt.nwk_path = dir / "guide.nwk";
+  spit(opt.nwk_path, "((A:0.1{0},B:0.1{1})AB:0.1{20},(C:0.1{2},D:0.1{3})CD:0.1{10})root:0{30};");
+  build_index_from_refs(dir / "index", {{"A", ref}, {"B", ref}, {"C", ref}, {"D", ref}}, opt);
+
+  const std::filesystem::path fq = dir / "reads.fq";
+  write_fastq(fq, {{"q", ref.substr(500, 150)}});
+
+  // Reload the index to exercise the selection with different node addresses.
+  const auto index = load_index_dir(dir / "index");
+  const auto reloaded = load_index_dir(dir / "index");
+  const std::string multi = place_queries(index, fq.string());
+  CHECK(multi == place_queries(reloaded, fq.string()));
+  const auto candidates = parse_place(multi);
+  std::vector<uint32_t> edges;
+  for (const auto& row : candidates) {
+    edges.push_back(row.edge);
+  }
+  CHECK(edges == std::vector<uint32_t>{0, 1, 2, 3, 10, 20});
+
+  const double no_dist_max = std::numeric_limits<double>::quiet_NaN();
+  for (const auto& loaded : {index, reloaded}) {
+    const auto single = parse_place(place_queries(loaded, fq.string(), true, 4, 2.706, 2, false, false));
+    REQUIRE(single.size() == 1);
+    CHECK(single.front().edge == 10);
+    const auto closest = parse_dist(dist_queries(loaded, fq.string(), 4, 2.706, no_dist_max, 2, true, false));
+    REQUIRE(closest.size() == 1);
+    CHECK(closest.front().reference == "A");
+  }
+}
+
 TEST_CASE("reverse-complemented queries produce identical placements")
 {
   TempDir dir("query-place-rc");
@@ -743,13 +778,9 @@ TEST_CASE("repeated runs report the same results")
   CHECK(first == second);
   CHECK(sorted_lines(first) == sorted_lines(second));
 
-  // Placement rows are compared as a set: the like-weight-ratio is a ratio of
-  // sums over candidates, and which of several equally distant candidates is
-  // taken as the reference model still follows the colour map (as it always
-  // has), so the last digits of the weights are not fixed.
   const std::string place_first = place_queries(index, fq.string());
   const std::string place_second = place_queries(index, fq.string());
-  CHECK(sorted_lines(place_first) == sorted_lines(place_second));
+  CHECK(place_first == place_second);
 }
 
 TEST_CASE("IBatch::search_mers counts every valid k-mer")
