@@ -7,120 +7,120 @@ using namespace ktest;
 
 namespace {
 
-BuildOptions query_opts()
-{
-  BuildOptions opt;
-  opt.k = 19;
-  opt.w = 23;
-  opt.h = 9;
-  opt.m = 4;
-  opt.r = 1;
-  opt.frac = true;
-  opt.seed = 4242;
-  return opt;
-}
+  BuildOptions query_opts()
+  {
+    BuildOptions opt;
+    opt.k = 19;
+    opt.w = 23;
+    opt.h = 9;
+    opt.m = 4;
+    opt.r = 1;
+    opt.frac = true;
+    opt.seed = 4242;
+    return opt;
+  }
 
-/* Two closely related references, one distant relative and one unrelated
+  /* Two closely related references, one distant relative and one unrelated
  * sequence, all long enough to produce a few thousand k-mers. */
-struct Corpus
-{
-  std::string base;
-  std::vector<Reference> refs;
-  Reference query_source; // a piece of refA, the "true" source of the queries
-};
-
-Corpus make_corpus()
-{
-  Corpus c;
-  c.base = rand_dna(20000, 101);
-  c.refs = {
-    {"refA", c.base},
-    {"refB", mutate(c.base, 0.01, 102)},
-    {"refC", mutate(c.base, 0.25, 103)},
-    {"refD", rand_dna(20000, 104)},
+  struct Corpus
+  {
+    std::string base;
+    std::vector<Reference> refs;
+    Reference query_source; // a piece of refA, the "true" source of the queries
   };
-  return c;
-}
 
-std::string substr_of(const std::string& s, size_t start, size_t len) { return s.substr(start, len); }
-
-/* Fields of one distance row: id, reference, distance, p-value. */
-struct DistRow
-{
-  std::string id;
-  std::string reference;
-  double distance;
-  double p_value;
-  bool is_na;
-  int nfields = 0;
-};
-
-std::vector<DistRow> parse_dist(const std::string& text)
-{
-  std::vector<DistRow> rows;
-  std::istringstream in(text);
-  std::string line;
-  while (std::getline(in, line)) {
-    if (line.empty() || line[0] == '#') continue;
-    std::istringstream ls(line);
-    DistRow row;
-    std::string dist, pval;
-    if (!std::getline(ls, row.id, '\t')) continue;
-    if (!std::getline(ls, row.reference, '\t')) continue;
-    if (!std::getline(ls, dist, '\t')) continue;
-    // The P_VALUE column is optional.
-    const bool has_p_value = static_cast<bool>(std::getline(ls, pval));
-    row.nfields = static_cast<int>(std::count(line.begin(), line.end(), '\t')) + 1;
-    row.is_na = (dist == "NaN");
-    row.distance = row.is_na ? std::numeric_limits<double>::quiet_NaN() : std::stod(dist);
-    row.p_value = (!has_p_value || pval == "NaN") ? std::numeric_limits<double>::quiet_NaN() : std::stod(pval);
-    rows.push_back(row);
+  Corpus make_corpus()
+  {
+    Corpus c;
+    c.base = rand_dna(20000, 101);
+    c.refs = {
+      {"refA", c.base},
+      {"refB", mutate(c.base, 0.01, 102)},
+      {"refC", mutate(c.base, 0.25, 103)},
+      {"refD", rand_dna(20000, 104)},
+    };
+    return c;
   }
-  return rows;
-}
 
-/* Fields of one tabular placement row. */
-struct PlaceRow
-{
-  std::string id;
-  std::string node;
-  uint32_t edge;
-  double lwr;
-  double distance;
-};
+  std::string substr_of(const std::string& s, size_t start, size_t len) { return s.substr(start, len); }
 
-std::vector<PlaceRow> parse_place(const std::string& text)
-{
-  std::vector<PlaceRow> rows;
-  std::istringstream in(text);
-  std::string line;
-  while (std::getline(in, line)) {
-    if (line.empty() || line[0] == '#') continue;
-    std::istringstream ls(line);
-    PlaceRow row;
-    std::string edge, lwr, dist;
-    if (!std::getline(ls, row.id, '\t')) continue;
-    if (!std::getline(ls, row.node, '\t')) continue;
-    if (!std::getline(ls, edge, '\t')) continue;
-    if (!std::getline(ls, lwr, '\t')) continue;
-    if (!std::getline(ls, dist)) continue;
-    row.edge = static_cast<uint32_t>(std::stoul(edge));
-    row.lwr = std::stod(lwr);
-    row.distance = std::stod(dist);
-    rows.push_back(row);
+  /* Fields of one distance row: id, reference, distance, p-value. */
+  struct DistRow
+  {
+    std::string id;
+    std::string reference;
+    double distance;
+    double p_value;
+    bool is_na;
+    int nfields = 0;
+  };
+
+  std::vector<DistRow> parse_dist(const std::string& text)
+  {
+    std::vector<DistRow> rows;
+    std::istringstream in(text);
+    std::string line;
+    while (std::getline(in, line)) {
+      if (line.empty() || line[0] == '#') continue;
+      std::istringstream ls(line);
+      DistRow row;
+      std::string dist, pval;
+      if (!std::getline(ls, row.id, '\t')) continue;
+      if (!std::getline(ls, row.reference, '\t')) continue;
+      if (!std::getline(ls, dist, '\t')) continue;
+      // The P_VALUE column is optional.
+      const bool has_p_value = static_cast<bool>(std::getline(ls, pval));
+      row.nfields = static_cast<int>(std::count(line.begin(), line.end(), '\t')) + 1;
+      row.is_na = (dist == "NaN");
+      row.distance = row.is_na ? std::numeric_limits<double>::quiet_NaN() : std::stod(dist);
+      row.p_value = (!has_p_value || pval == "NaN") ? std::numeric_limits<double>::quiet_NaN() : std::stod(pval);
+      rows.push_back(row);
+    }
+    return rows;
   }
-  return rows;
-}
 
-const DistRow* best_row(const std::vector<DistRow>& rows)
-{
-  const DistRow* best = nullptr;
-  for (const DistRow& row : rows) {
-    if (row.is_na) continue;
-    if (!best || row.distance < best->distance) best = &row;
+  /* Fields of one tabular placement row. */
+  struct PlaceRow
+  {
+    std::string id;
+    std::string node;
+    uint32_t edge;
+    double lwr;
+    double distance;
+  };
+
+  std::vector<PlaceRow> parse_place(const std::string& text)
+  {
+    std::vector<PlaceRow> rows;
+    std::istringstream in(text);
+    std::string line;
+    while (std::getline(in, line)) {
+      if (line.empty() || line[0] == '#') continue;
+      std::istringstream ls(line);
+      PlaceRow row;
+      std::string edge, lwr, dist;
+      if (!std::getline(ls, row.id, '\t')) continue;
+      if (!std::getline(ls, row.node, '\t')) continue;
+      if (!std::getline(ls, edge, '\t')) continue;
+      if (!std::getline(ls, lwr, '\t')) continue;
+      if (!std::getline(ls, dist)) continue;
+      row.edge = static_cast<uint32_t>(std::stoul(edge));
+      row.lwr = std::stod(lwr);
+      row.distance = std::stod(dist);
+      rows.push_back(row);
+    }
+    return rows;
   }
-  return best;
-}
+
+  const DistRow* best_row(const std::vector<DistRow>& rows)
+  {
+    const DistRow* best = nullptr;
+    for (const DistRow& row : rows) {
+      if (row.is_na) continue;
+      if (!best || row.distance < best->distance) best = &row;
+    }
+    return best;
+  }
 
 } // namespace
 
@@ -156,11 +156,8 @@ TEST_CASE("the estimated distance grows with the mutation rate")
 
   const std::string read = substr_of(corpus.base, 3000, 2000);
   const std::filesystem::path fq = dir / "reads.fq";
-  write_fastq(fq,
-              {{"m0", read},
-               {"m02", mutate(read, 0.02, 1)},
-               {"m05", mutate(read, 0.05, 2)},
-               {"m10", mutate(read, 0.10, 3)}});
+  write_fastq(
+    fq, {{"m0", read}, {"m02", mutate(read, 0.02, 1)}, {"m05", mutate(read, 0.05, 2)}, {"m10", mutate(read, 0.10, 3)}});
 
   const std::vector<DistRow> rows = parse_dist(dist_queries(index, fq.string()));
   flat_phmap<std::string, double> best_of;
@@ -219,9 +216,11 @@ TEST_CASE("dist --no-multi reports exactly one row per query")
   const std::filesystem::path fq = dir / "reads.fq";
   write_fastq(fq, {{"q1", substr_of(corpus.base, 100, 500)}, {"q2", substr_of(corpus.base, 9000, 500)}});
 
-  const std::vector<DistRow> rows = parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, false));
+  const std::vector<DistRow> rows =
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, false));
   CHECK(rows.size() == 2);
-  for (const DistRow& row : rows) CHECK_FALSE(row.is_na);
+  for (const DistRow& row : rows)
+    CHECK_FALSE(row.is_na);
   CHECK(rows[0].id == "q1");
   CHECK(rows[1].id == "q2");
 }
@@ -254,8 +253,10 @@ TEST_CASE("the chi-square filter drops rows that are not distinguishable")
 
   const std::filesystem::path fq = dir / "reads.fq";
   write_fastq(fq, {{"q", substr_of(corpus.base, 2000, 1500)}});
-  const std::vector<DistRow> unfiltered = parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true));
-  const std::vector<DistRow> filtered = parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, false, true));
+  const std::vector<DistRow> unfiltered =
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true));
+  const std::vector<DistRow> filtered =
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, false, true));
   CHECK_FALSE(unfiltered.empty());
   CHECK(filtered.size() <= unfiltered.size());
   CHECK_FALSE(filtered.empty());
@@ -286,13 +287,13 @@ TEST_CASE("the reported P_VALUE matches the lower tail of the one-sided chi-squa
   CHECK(worst_abs < 2e-4);
   CHECK(worst_rel < 5e-4);
 
-  CHECK(chisq_cdf(0.0) == 0.0);       // tied with the best hit
-  CHECK(chisq_cdf(-1.0) == 0.0);      // a statistic cannot be negative
+  CHECK(chisq_cdf(0.0) == 0.0);  // tied with the best hit
+  CHECK(chisq_cdf(-1.0) == 0.0); // a statistic cannot be negative
   CHECK(std::isnan(chisq_cdf(std::numeric_limits<double>::quiet_NaN())));
   CHECK(chisq_cdf(2.706) == doctest::Approx(0.9).epsilon(0.01));  // the default --chisq
   CHECK(chisq_cdf(3.841) == doctest::Approx(0.95).epsilon(0.01)); // chi2_1 at 0.05
-  CHECK(chisq_cdf(100.0) == 1.0);  // beyond this the two are indistinguishable
-  CHECK(chisq_cdf(101.0) == 1.0);  // beyond the table
+  CHECK(chisq_cdf(100.0) == 1.0);                                 // beyond this the two are indistinguishable
+  CHECK(chisq_cdf(101.0) == 1.0);                                 // beyond the table
   double previous = 0.0;
   for (double chisq = 0.0; chisq <= 100.0; chisq += 0.1) {
     const double got = chisq_cdf(chisq);
@@ -311,8 +312,8 @@ TEST_CASE("dist reports a p-value column for every row")
 
   const std::filesystem::path fq = dir / "reads.fq";
   write_fastq(fq, {{"q", substr_of(corpus.base, 2000, 1500)}});
-  const std::vector<DistRow> rows =
-    parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false, true));
+  const std::vector<DistRow> rows = parse_dist(
+    dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false, true));
   REQUIRE_FALSE(rows.empty());
   for (const DistRow& row : rows) {
     CHECK(row.nfields == 4);
@@ -375,11 +376,11 @@ TEST_CASE("the P_VALUE column is opt-in")
   const std::vector<DistRow> plain = parse_dist(dist_queries(index, fq.string()));
   REQUIRE_FALSE(plain.empty());
   for (const DistRow& row : plain) {
-    CHECK(row.nfields == 3);                          // the old format, by default
-    CHECK(std::isnan(row.p_value));                   // and no value read for it
+    CHECK(row.nfields == 3);        // the old format, by default
+    CHECK(std::isnan(row.p_value)); // and no value read for it
   }
-  const std::vector<DistRow> with_column =
-    parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false, true));
+  const std::vector<DistRow> with_column = parse_dist(
+    dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, true, false, true));
   REQUIRE(with_column.size() == plain.size());
   for (size_t i = 0; i < plain.size(); ++i) {
     CHECK(with_column[i].reference == plain[i].reference);
@@ -458,9 +459,8 @@ TEST_CASE("compute_branch_lengths falls back to the closest leaf below x")
   CHECK(split.pendant == doctest::Approx(0.07));
 
   // No scored leaf below x: the pendant collapses to zero rather than negative.
-  const branch_lengths_t empty = compute_branch_lengths(1.0, 0.1, 0.1, []() {
-    return std::numeric_limits<double>::quiet_NaN();
-  });
+  const branch_lengths_t empty =
+    compute_branch_lengths(1.0, 0.1, 0.1, []() { return std::numeric_limits<double>::quiet_NaN(); });
   CHECK(empty.distal == doctest::Approx(0.5));
   CHECK(empty.pendant == doctest::Approx(0.0));
 }
@@ -546,7 +546,8 @@ TEST_CASE("place reports valid edges and normalised weights")
   // Single-placement mode reports exactly one edge per query.
   const std::vector<PlaceRow> single = parse_place(place_queries(index, fq.string(), true, 4, 2.706, 2, false, false));
   flat_phmap<std::string, uint32_t> single_rows;
-  for (const PlaceRow& row : single) single_rows[row.id] += 1;
+  for (const PlaceRow& row : single)
+    single_rows[row.id] += 1;
   CHECK(single_rows["q1"] == 1);
   CHECK(single_rows["q2"] == 1);
 }
@@ -622,8 +623,8 @@ TEST_CASE("reverse-complemented queries produce identical placements")
         if (with_ns) read.replace(length / 2, 3, "NNN");
         for (const bool no_filter : {false, true}) {
           for (const bool multi : {false, true}) {
-            INFO("length=" << length << " mutation rate=" << rate << " Ns=" << with_ns
-                           << " no_filter=" << no_filter << " multi=" << multi);
+            INFO("length=" << length << " mutation rate=" << rate << " Ns=" << with_ns << " no_filter=" << no_filter
+                           << " multi=" << multi);
             const auto forward = placements_for(read, no_filter, multi);
             const auto reverse = placements_for(dna_revcomp(read), no_filter, multi);
             // Require real placements, so two empty results cannot pass.
@@ -656,6 +657,45 @@ TEST_CASE("reverse-complemented queries produce identical placements")
       }
     }
   }
+}
+
+TEST_CASE("placement can search only the supplied orientation")
+{
+  TempDir dir("query-place-forward-only");
+  const std::string ref = rand_dna(1500, 7);
+  BuildOptions opt = query_opts();
+  opt.nwk_path = dir / "guide.nwk";
+  spit(opt.nwk_path, "(A:0.1,B:0.1)root;");
+  build_index_from_refs(dir / "index", {{"A", ref}, {"B", rand_dna(1500, 8)}}, opt);
+  const auto index = load_index_dir(dir / "index");
+
+  const std::string forward = ref.substr(500, 600);
+  const std::string reverse = dna_revcomp(forward);
+  const auto fq = dir / "reads.fq";
+  write_fastq(fq, {{"q", forward}});
+  auto qs = std::make_shared<QSeq>(fq.string());
+  qs->read_next_batch();
+  constexpr uint32_t hdist_th = 0;
+  IBatch ib(index, qs, hdist_th, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, false, false, false);
+  auto imers_or = std::make_shared<IMers>(index, reverse.size(), hdist_th);
+  auto imers_rc = std::make_shared<IMers>(index, reverse.size(), hdist_th);
+
+  vec<placement_t> both, forward_only;
+  ib.search_mers(reverse.data(), reverse.size(), imers_or, imers_rc);
+  ib.summarize_matches(imers_or, imers_rc);
+  REQUIRE(ib.collect_placements(both));
+
+  imers_or->reset_query(forward.size());
+  ib.search_mers(forward.data(), forward.size(), imers_or);
+  ib.summarize_matches(imers_or);
+  REQUIRE(ib.collect_placements(forward_only));
+  CHECK(forward_only.front().edge_num == both.front().edge_num);
+  CHECK(forward_only.front().distance == doctest::Approx(both.front().distance));
+
+  imers_or->reset_query(reverse.size());
+  ib.search_mers(reverse.data(), reverse.size(), imers_or);
+  ib.summarize_matches(imers_or);
+  CHECK_FALSE(ib.collect_placements(forward_only));
 }
 
 TEST_CASE("reported placements keep a non-negative pendant and a distal on the edge")
@@ -830,7 +870,8 @@ TEST_CASE("a query longer than one batch is still reported in order")
               {{"a", substr_of(corpus.base, 0, 900)},
                {"b", substr_of(corpus.base, 2000, 900)},
                {"c", substr_of(corpus.base, 4000, 900)}});
-  const std::vector<DistRow> rows = parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, false));
+  const std::vector<DistRow> rows =
+    parse_dist(dist_queries(index, fq.string(), 4, 2.706, std::numeric_limits<double>::quiet_NaN(), 2, true, false));
   REQUIRE(rows.size() == 3);
   CHECK(rows[0].id == "a");
   CHECK(rows[1].id == "b");

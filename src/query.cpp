@@ -102,6 +102,38 @@ void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or, i
   imers_rc->flush_mers();
 }
 
+void IBatch::search_mers(const char* seq, uint64_t len, imers_sptr_t imers_or)
+{
+  onmers = 0;
+  wnmers_or = 0;
+  wnmers_rc = 0;
+  uint32_t i, l;
+  uint64_t orenc64_bp, orenc64_lr;
+  for (i = l = 0; i < len;) {
+    if (nt4_of(seq[i]) >= 4) {
+      l = 0, i++;
+      continue;
+    }
+    l++, i++;
+    if (l < k) {
+      continue;
+    }
+    if (l == k) {
+      compute_encoding(seq + i - k, seq + i, orenc64_lr, orenc64_bp);
+    } else {
+      update_encoding(seq + i - 1, orenc64_lr, orenc64_bp);
+    }
+    orenc64_bp = orenc64_bp & mask_bp;
+    orenc64_lr = orenc64_lr & mask_lr;
+    onmers++;
+    const uint32_t orrix = lshf->compute_hash(orenc64_bp);
+    if (imers_or->stage_mer(i - k, orrix, lshf->drop_ppos_lr(orenc64_lr))) {
+      wnmers_or++;
+    }
+  }
+  imers_or->flush_mers();
+}
+
 void IBatch::widen_hdist_filter(uint32_t& hdist_filt)
 {
   const uint32_t unset = std::numeric_limits<uint32_t>::max();
@@ -131,8 +163,7 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc, boo
       if (!inserted) {
         // Prefer lower distance, then more matches, then the reverse complement.
         auto& previous = it->second;
-        if (mi->d_llh < previous->d_llh ||
-            (mi->d_llh == previous->d_llh && mi->match_count >= previous->match_count)) {
+        if (mi->d_llh < previous->d_llh || (mi->d_llh == previous->d_llh && mi->match_count >= previous->match_count)) {
           previous = mi;
         }
       }
@@ -148,10 +179,34 @@ void IBatch::summarize_matches(imers_sptr_t imers_or, imers_sptr_t imers_rc, boo
   }
 }
 
+void IBatch::summarize_matches(imers_sptr_t imers_or, bool adaptive_filter)
+{
+  const node_sptr_t root = tree->get_root();
+  nd_closest = root;
+  mi_closest = std::make_shared<Minfo>(hdist_th);
+  node_to_minfo.clear();
+  if (adaptive_filter) {
+    widen_hdist_filter(imers_or->hdist_filt);
+  }
+  for (const auto& [nd, mi] : imers_or->leaf_to_minfo) {
+    mi->mismatch_count = onmers - mi->match_count;
+    if (adaptive_filter && mi->hdist_min > imers_or->hdist_filt) {
+      continue;
+    }
+    mi->optimize_likelihood(llhfunc);
+    node_to_minfo.emplace(nd, mi);
+    if (mi->d_llh < mi_closest->d_llh ||
+        (mi->d_llh == mi_closest->d_llh && (nd_closest == root || nd->get_se() < nd_closest->get_se()))) {
+      nd_closest = nd;
+      mi_closest = mi;
+    }
+  }
+}
+
 void IBatch::scan_query(const std::string& seq,
-                       const imers_sptr_t& imers_or,
-                       const imers_sptr_t& imers_rc,
-                       bool adaptive_filter)
+                        const imers_sptr_t& imers_or,
+                        const imers_sptr_t& imers_rc,
+                        bool adaptive_filter)
 {
   imers_or->reset_query(seq.size());
   imers_rc->reset_query(seq.size());
@@ -426,12 +481,6 @@ bool IBatch::report_placement(strstream& batch_stream, bool tabular, bool has_pr
   }
   return true;
 }
-
-// ---------------------------------------------------------------------------
-// Structured (stream-free) collectors for the embedding API (api.hpp).
-// Each mirrors the per-record flow of its stream-writing counterpart:
-// search_mers + summarize_matches, then structs instead of stream writes.
-// ---------------------------------------------------------------------------
 
 vec<query_dist_t> IBatch::dist_batch()
 {
